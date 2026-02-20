@@ -1,0 +1,121 @@
+'use strict'
+
+const PdfPrinter = require('pdfmake')
+const path = require('path')
+const fs = require('fs')
+const WebhookSender = require('../Services/WebhookSender')
+
+// Server-side font paths for pdfmake v0.2
+const fontsDir = path.join(__dirname, '../Fonts')
+const printer = new PdfPrinter({
+  Roboto: {
+    normal: path.join(fontsDir, 'Roboto_Condensed-Regular.ttf'),
+    bold: path.join(fontsDir, 'Roboto_Condensed-Bold.ttf'),
+    italics: path.join(fontsDir, 'Roboto_Condensed-Italic.ttf'),
+    bolditalics: path.join(fontsDir, 'Roboto_Condensed-BoldItalic.ttf'),
+  }
+})
+
+class GeneratePdfJob {
+  // This is required by AdonisJS for the Job
+  static get key() {
+    return 'GeneratePdfJob'
+  }
+
+  async handle(data) {
+    try {
+      console.log('Starting PDF generation job...')
+      console.log('Data:', JSON.stringify(data, null, 2))
+
+      // Extract payload — companyName & email are top-level fields
+      const { data: payloadData, template, callback, companyName, email } = data
+
+      // Validate template name
+      if (!template || typeof template !== 'string') {
+        throw new Error('Invalid template name')
+      }
+
+      // Load template dynamically
+      const templatePath = `../../resources/pdf-templates/${template}`
+      let templateFunction
+
+      try {
+        templateFunction = require(templatePath)
+      } catch (error) {
+        throw new Error(`Template '${template}' not found: ${error.message}`)
+      }
+
+      if (typeof templateFunction !== 'function') {
+        throw new Error(`Template '${template}' must export a function`)
+      }
+
+      // Generate PDF document definition
+      console.log('Generating PDF document definition...')
+      const docDefinition = templateFunction(payloadData)
+
+      // Create PDF
+      console.log('Creating PDF...')
+      const pdfDoc = printer.createPdfKitDocument(docDefinition)
+
+      // Generate PDF as buffer
+      const pdfBuffer = await new Promise((resolve, reject) => {
+        const chunks = []
+        pdfDoc.on('data', chunk => chunks.push(chunk))
+        pdfDoc.on('end', () => resolve(Buffer.concat(chunks)))
+        pdfDoc.on('error', err => reject(new Error(`PDF generation failed: ${err}`)))
+        pdfDoc.end()
+      })
+
+      console.log('PDF generated successfully, saving to disk...')
+
+      // Sanitize folder names — hapus karakter tidak valid untuk nama folder
+      const sanitize = (str) => (str || 'unknown').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim()
+      const companyFolder = sanitize(companyName)
+      const emailFolder   = sanitize(email)
+
+      // Buat folder public/download/{companyName}/{email}/ — recursive, tidak error kalau sudah ada
+      const downloadDir = path.join(process.cwd(), 'public', 'download', companyFolder, emailFolder)
+      fs.mkdirSync(downloadDir, { recursive: true })
+
+      // Simpan PDF dengan nama unik: {template}_{timestamp}_{random}.pdf
+      const uniqueId  = Date.now().toString(36) + Math.random().toString(36).slice(2, 7).toUpperCase()
+      const filename  = `${template}_${uniqueId}.pdf`
+      const filePath  = path.join(downloadDir, filename)
+      fs.writeFileSync(filePath, pdfBuffer)
+      console.log(`PDF saved to: ${filePath}`)
+
+      // Bangun download URL
+      const baseUrl    = process.env.APP_URL || `http://localhost:${process.env.PORT || 3334}`
+      const downloadUrl = `${baseUrl}/download/${encodeURIComponent(companyFolder)}/${encodeURIComponent(emailFolder)}/${encodeURIComponent(filename)}`
+
+      // Kirim webhook dengan download URL (bukan base64)
+      const webhookPayload = {
+        success:      true,
+        download_url: downloadUrl,
+        filename:     filename,
+        saved_at:     `public/download/${companyFolder}/${emailFolder}/${filename}`
+      }
+
+      if (callback && callback.url) {
+        const result = await WebhookSender.send(
+          callback.url,
+          webhookPayload,
+          {
+            headers:    callback.header || {},
+            timeout:    10000,
+            maxRetries: 3,
+            retryDelay: 2000
+          }
+        )
+        console.log('[Job] Webhook delivered successfully')
+        console.log('[Job] Response:', result)
+      }
+
+    } catch (error) {
+      console.error('GeneratePdfJob error:', error.message)
+      throw error
+    }
+  }
+}
+
+module.exports = GeneratePdfJob

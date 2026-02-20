@@ -1,0 +1,25 @@
+# Node modules
+node_modules
+package-lock.json
+
+# Adonis directory for storing tmp files
+tmp
+
+# Environment variables, never commit this file
+.env
+
+# The development mysql file
+database/*.mysql
+
+# Generated PDF files — contains user data (email, company, etc.)
+public/download/*
+!public/download/.gitkeep
+
+# Log files
+*.log
+npm-debug.log*
+
+# VSCode & Webstorm history directories
+.history
+.idea
+.vscode
