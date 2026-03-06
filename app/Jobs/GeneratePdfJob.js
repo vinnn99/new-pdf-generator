@@ -1,6 +1,7 @@
 'use strict'
 
 const PdfPrinter = require('pdfmake')
+const Database = use('Database')
 const path = require('path')
 const fs = require('fs')
 const WebhookSender = require('../Services/WebhookSender')
@@ -28,7 +29,7 @@ class GeneratePdfJob {
       console.log('Data:', JSON.stringify(data, null, 2))
 
       // Extract payload — companyName & email are top-level fields
-      const { data: payloadData, template, callback, companyName, email } = data
+      const { data: payloadData, template, callback, companyName, email, userId, companyId } = data
 
       // Validate template name
       if (!template || typeof template !== 'string') {
@@ -93,22 +94,71 @@ class GeneratePdfJob {
         success:      true,
         download_url: downloadUrl,
         filename:     filename,
-        saved_at:     `public/download/${companyFolder}/${emailFolder}/${filename}`
+        saved_at:     `public/download/${companyFolder}/${emailFolder}/${filename}`,
+        template:     template,
+        email:        email,
+        companyName:  companyName,
+        data:         payloadData
+      }
+
+      // Simpan metadata ke DB
+      let generatedId = null
+      try {
+        const inserted = await Database.table('generated_pdfs').insert({
+          user_id: userId || null,
+          company_id: companyId || null,
+          template,
+          filename,
+          download_url: downloadUrl,
+          saved_path: `public/download/${companyFolder}/${emailFolder}/${filename}`,
+          email,
+          company_name: companyName || 'unknown',
+          data: JSON.stringify(payloadData || {}),
+          created_at: new Date(),
+          updated_at: new Date()
+        })
+        generatedId = Array.isArray(inserted) ? inserted[0] : inserted
+      } catch (err) {
+        console.error('Failed to insert generated_pdfs record:', err.message)
       }
 
       if (callback && callback.url) {
-        const result = await WebhookSender.send(
-          callback.url,
-          webhookPayload,
-          {
-            headers:    callback.header || {},
-            timeout:    10000,
-            maxRetries: 3,
-            retryDelay: 2000
+        try {
+          const result = await WebhookSender.send(
+            callback.url,
+            webhookPayload,
+            {
+              headers:    callback.header || {},
+              timeout:    10000,
+              maxRetries: 3,
+              retryDelay: 2000
+            }
+          )
+          console.log('[Job] Webhook delivered successfully')
+          console.log('[Job] Response:', result)
+
+          if (generatedId) {
+            await Database.table('generated_pdfs')
+              .where('id', generatedId)
+              .update({
+                callback_status: result.statusCode || null,
+                callback_response: typeof result.body === 'string' ? result.body : JSON.stringify(result.body),
+                updated_at: new Date()
+              })
           }
-        )
-        console.log('[Job] Webhook delivered successfully')
-        console.log('[Job] Response:', result)
+        } catch (err) {
+          console.error('[Job] Webhook failed:', err.message)
+          if (generatedId) {
+            await Database.table('generated_pdfs')
+              .where('id', generatedId)
+              .update({
+                callback_status: null,
+                callback_error: err.message,
+                updated_at: new Date()
+              })
+          }
+          throw err
+        }
       }
 
     } catch (error) {

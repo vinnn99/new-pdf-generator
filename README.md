@@ -45,31 +45,113 @@ QUEUE_DRIVER=database
 node ace migration:run
 ```
 
-Ini membuat tabel `users`, `tokens`, dan `jobs` yang dibutuhkan queue.
+Ini membuat tabel `users`, `tokens`, `jobs`, `companies`, dan kolom `company_id` + `api_key`.
 
-### 4. Jalankan server (Terminal 1)
+### 4. Jalankan server (worker ikut otomatis)
 
 ```bash
 node server.js
 ```
 
-### 5. Jalankan queue worker (Terminal 2)
-
-```bash
-node ace queue
-```
-
-Queue worker ini yang memproses job generate PDF di background.
+Worker queue otomatis di-spawn (`node ace queue --listen`) saat server start.
+Set `QUEUE_AUTOSTART=false` atau `NODE_ENV=test` jika ingin mematikannya.
 
 ---
 
 ## Cara Pakai API
+
+Setiap request harus melewati middleware `companyAuth`:
+
+- Header `x-api-key` wajib; harus cocok dengan kolom `api_key` di tabel `companies`.
+- Body `email` wajib; harus terdaftar di tabel `users`.
+- `companyName` tidak perlu dikirim; otomatis diambil dari `companies.name` sesuai API key.
+
+### Register User
+
+```
+POST http://localhost:3334/api/v1/register
+Content-Type: application/json
+Header: x-api-key: YOUR_COMPANY_API_KEY
+```
+
+Body:
+
+```json
+{
+  "username": "demo",
+  "email": "user@example.com",
+  "password": "rahasia123"
+}
+```
+
+Aturan:
+- `username` unik
+- `email` valid & unik
+- `password` min 6 karakter
+- User otomatis dikaitkan ke perusahaan berdasarkan API key
+
+Response (201):
+
+```json
+{
+  "status": "registered",
+  "user": {
+    "id": 1,
+    "username": "demo",
+    "email": "user@example.com",
+    "company": {
+      "id": 1,
+      "name": "Contoh Corp"
+    }
+  }
+}
+```
+
+### Login
+
+```
+POST http://localhost:3334/api/v1/login
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "rahasia123"
+}
+```
+
+Validasi:
+- `email` wajib & format email
+- `password` min 6
+- User harus terdaftar (email unik)
+
+Response (200):
+
+```json
+{
+  "status": "logged_in",
+  "token": { "type": "bearer", "token": "<jwt_token>", "refreshToken": null },
+  "user": {
+    "id": 1,
+    "username": "demo",
+    "email": "user@example.com",
+    "company": {
+      "id": 1,
+      "name": "Contoh Corp"
+    }
+  }
+}
+```
 
 ### Endpoint
 
 ```
 POST http://localhost:3334/api/v1/generate-pdf
 Content-Type: application/json
+Header: x-api-key: YOUR_COMPANY_API_KEY
 ```
 
 ### Struktur request
@@ -77,7 +159,6 @@ Content-Type: application/json
 ```json
 {
   "template": "nama_template",
-  "companyName": "Nama Perusahaan",
   "email": "user@email.com",
   "data": {
     "...field sesuai template..."
@@ -91,7 +172,8 @@ Content-Type: application/json
 }
 ```
 
-> `companyName` dan `email` bersifat opsional. Dipakai untuk mengorganisir file PDF yang tersimpan di `public/download/{companyName}/{email}/`. Jika tidak diisi, akan default ke `unknown`.
+- `email` wajib; harus ada di tabel `users`.
+- `companyName` tidak perlu dikirim; otomatis diisi dari perusahaan (API key) dan dipakai untuk folder `public/download/{companyName}/{email}/`.
 
 ### Response sukses (202)
 
@@ -142,7 +224,6 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 ```json
 {
   "template": "musik",
-  "companyName": "Nama Perusahaan",
   "email": "user@email.com",
   "data": {
     "nama":      "Nama artis",
@@ -169,10 +250,8 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 ```json
 {
   "template": "invoice",
-  "companyName": "Nama Perusahaan",
   "email": "user@email.com",
   "data": {
-    "companyName":    "PT Nama Perusahaan",
     "companyAddress": "Jl. Alamat No. 1, Kota",
     "companyPhone":   "+6221-555-0100",
     "companyEmail":   "info@perusahaan.com",
@@ -197,8 +276,53 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 }
 ```
 
-> **Field wajib invoice:** `companyName`, `clientName`, `items`
-> Sisanya opsional — jika tidak diisi akan pakai nilai default.
+> **Field wajib invoice:** `clientName`, `items`
+> `companyName` diisi otomatis dari API key; lainnya opsional — jika tidak diisi akan pakai nilai default.
+
+---
+
+### List Generated PDF (butuh login JWT)
+
+```
+GET http://localhost:3334/api/v1/generated-pdfs?page=1&perPage=10
+Header: Authorization: Bearer <jwt_token>
+```
+
+- Harus login (`/api/v1/login`) untuk mendapatkan JWT.
+- Data yang ditampilkan hanya milik user yang sedang login.
+- Diurutkan `created_at` terbaru.
+- `perPage` dibatasi maks 100; default 10.
+
+Response contoh:
+
+```json
+{
+  "status": "ok",
+  "total": 2,
+  "perPage": 10,
+  "page": 1,
+  "lastPage": 1,
+  "data": [
+    {
+      "id": 5,
+      "user_id": 1,
+      "company_id": 1,
+      "template": "invoice",
+      "filename": "invoice_abcd1.pdf",
+      "download_url": "http://localhost:3334/download/Contoh_Corp/user%40example.com/invoice_abcd1.pdf",
+      "saved_path": "public/download/Contoh_Corp/user@example.com/invoice_abcd1.pdf",
+      "email": "user@example.com",
+      "company_name": "Contoh Corp",
+      "data": { "...": "..." },
+      "callback_status": 200,
+      "callback_response": "{\"success\":true}",
+      "callback_error": null,
+      "created_at": "2026-03-06T10:50:00.000Z",
+      "updated_at": "2026-03-06T10:50:05.000Z"
+    }
+  ]
+}
+```
 
 ---
 
@@ -230,7 +354,7 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
    ```js
    const templateRequiredFields = {
      musik:         ['nama', 'judul', ...],
-     invoice:       ['companyName', 'clientName', 'items'],
+     invoice:       ['clientName', 'items'],
      namaTemplate:  ['field1', 'field2'],  // ← tambahkan di sini
    }
    ```
@@ -242,6 +366,7 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 ```
 app/
   Controllers/Http/PdfController.js   ← validasi & dispatch job + endpoint download
+  Controllers/Http/AuthController.js  ← endpoint register user
   Jobs/GeneratePdfJob.js              ← proses generate PDF, simpan ke disk, kirim webhook
   Templates/                          ← logika template (isi PDF)
     musik.js
@@ -263,7 +388,29 @@ public/
 
 start/
   routes.js                           ← definisi route API & download endpoint
+  kernel.js                           ← registrasi middleware `companyAuth`
+  queueWorker.js                      ← auto-start queue worker saat server jalan
+
+database/migrations/
+  ...company.js                       ← tabel perusahaan (company_id, name, api_key)
+  ...add_company_to_users.js          ← kolom company_id di users
 ```
+
+---
+
+## Menyiapkan data awal
+
+```sql
+-- Buat perusahaan + API key
+INSERT INTO companies (name, api_key, created_at, updated_at)
+VALUES ('Contoh Corp', 'YOUR_COMPANY_API_KEY', NOW(), NOW());
+
+-- Buat user yang valid untuk email request
+INSERT INTO users (username, email, password, created_at, updated_at)
+VALUES ('demo', 'user@example.com', '$2a$10$hash_password', NOW(), NOW());
+```
+
+`api_key` dari tabel `companies` dipakai di header `a-api-key` ketika memanggil API.
 
 ---
 

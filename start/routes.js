@@ -24,7 +24,10 @@ Route.on('/').render('welcome')
 |--------------------------------------------------------------------------
 */
 Route.group(() => {
-  Route.post('/generate-pdf', 'PdfController.generate')
+  Route.post('/register', 'AuthController.register')
+  Route.post('/login', 'AuthController.login')
+  Route.post('/generate-pdf', 'PdfController.generate').middleware(['companyAuth'])
+  Route.get('/generated-pdfs', 'GeneratedPdfController.index').middleware(['auth:jwt'])
 }).prefix('/api/v1')
 
 // Download PDF yang sudah tersimpan di public/download/

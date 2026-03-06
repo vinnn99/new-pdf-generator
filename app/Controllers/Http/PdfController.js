@@ -8,9 +8,11 @@ class PdfController {
   async generate({ request, response }) {
     try {
       const payload = request.all()
+      const company = request.company
+      const user = request.user
 
       // Manual validation
-      const requiredFields = ['data', 'template', 'callback']
+      const requiredFields = ['data', 'template', 'callback', 'email']
 
       // Required fields per template
       const templateRequiredFields = {
@@ -19,7 +21,7 @@ class PdfController {
           'pencipta', 'asNama', 'bankName', 'npwp',
           'imail', 'phone', 'norek'
         ],
-        invoice: ['companyName', 'clientName', 'items'],
+        invoice: ['clientName', 'items'],
       }
 
       const errors = []
@@ -46,6 +48,18 @@ class PdfController {
           errors
         })
       }
+
+      // Sisipkan companyName dari hasil middleware (API key)
+      if (company) {
+        payload.companyName = company.name
+        if (payload.data && typeof payload.data === 'object' && !payload.data.companyName) {
+          payload.data.companyName = company.name
+        }
+      }
+
+      // Sisipkan user/company id untuk pencatatan hasil
+      payload.userId = user ? user.id : null
+      payload.companyId = company ? company.company_id : null
 
       // Push job to queue
       await JobService.dispatch('App/Jobs/GeneratePdfJob', payload, {
