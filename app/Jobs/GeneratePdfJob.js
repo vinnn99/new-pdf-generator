@@ -80,7 +80,20 @@ class GeneratePdfJob {
 
       // Simpan PDF dengan nama unik: {template}_{timestamp}_{random}.pdf
       const uniqueId  = Date.now().toString(36) + Math.random().toString(36).slice(2, 7).toUpperCase()
-      const filename  = `${template}_${uniqueId}.pdf`
+
+      // Khusus template payslip: YYYY-MM-PAYSLIP-[NIP]-[NAMA]-[UNIK].pdf
+      let filename
+      if (template === 'payslip') {
+        const now = new Date()
+        const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        const nip = payloadData && payloadData.employeeId ? String(payloadData.employeeId) : 'NIP'
+        const nama = payloadData && payloadData.employeeName ? String(payloadData.employeeName) : 'NAME'
+        const slipTitleRaw = payloadData && payloadData.slipTitle ? String(payloadData.slipTitle) : 'PAYSLIP'
+        const safe = (str) => (str || '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, '_')
+        filename = `${ym}-${safe(slipTitleRaw)}-${safe(nip)}-${safe(nama)}-${uniqueId}.pdf`
+      } else {
+        filename  = `${template}_${uniqueId}.pdf`
+      }
       const filePath  = path.join(downloadDir, filename)
       fs.writeFileSync(filePath, pdfBuffer)
       console.log(`PDF saved to: ${filePath}`)

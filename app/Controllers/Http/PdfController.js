@@ -11,8 +11,12 @@ class PdfController {
       const company = request.company
       const user = request.user
 
+      console.log('[pdf.generate] raw payload =', JSON.stringify(payload, null, 2))
+      console.log('[pdf.generate] attached company =', company)
+      console.log('[pdf.generate] attached user =', user)
+
       // Manual validation
-      const requiredFields = ['data', 'template', 'callback', 'email']
+      const requiredFields = ['data', 'template', 'email']
 
       // Required fields per template
       const templateRequiredFields = {
@@ -22,6 +26,8 @@ class PdfController {
           'imail', 'phone', 'norek'
         ],
         invoice: ['clientName', 'items'],
+        thr: ['employeeName', 'position', 'period', 'payoutDate', 'baseSalary'],
+        payslip: ['employeeName', 'position', 'period'],
       }
 
       const errors = []
