@@ -29,7 +29,8 @@
     "@adonisjs/validator": "^5.1.0",
     "mysql": "^2.18.1",
     "pdfmake": "^0.2.10",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "nodemailer": "^6.9.8"
   },
   "autoload": {
     "App": "./app"

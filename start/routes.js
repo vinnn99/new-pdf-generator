@@ -28,6 +28,7 @@ Route.group(() => {
   Route.post('/login', 'AuthController.login')
   Route.post('/generate-pdf', 'PdfController.generate').middleware(['companyAuth'])
   Route.get('/generated-pdfs', 'GeneratedPdfController.index').middleware(['auth:jwt'])
+  Route.post('/send-slip-emails', 'BulkEmailController.sendSlips')
 }).prefix('/api/v1')
 
 // Download PDF yang sudah tersimpan di public/download/
