@@ -414,6 +414,66 @@ VALUES ('demo', 'user@example.com', '$2a$10$hash_password', NOW(), NOW());
 
 ---
 
+## Bulk API (Upload XLSX -> Queue PDF)
+
+Autentikasi: login dulu (`/api/v1/login`) lalu kirim header `Authorization: Bearer <token>`. Tidak perlu `x-api-key` di endpoint ini. Semua endpoint menerima `multipart/form-data` dengan field `file` berisi XLS/XLSX. Opsi umum: `sheet` (nama sheet, default sheet pertama), `dryRun` (true/false, hanya validasi), `callback_url`, `callback_header` (JSON), `slip_title`, `company/company_name`, `note` (khusus THR).  
+Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang login sebagai penerima.
+
+### Endpoint
+- `POST /api/v1/bulk/payslip`  
+  - Minimal kolom: `employeeName`, `position`, `period/periode`. Kolom `email` boleh ditambahkan jika penerima berbeda dari akun login.  
+  - Earnings otomatis jika ada: `Gaji Pokok`, `Tunjangan makan`, `Tunjangan Transport`, `Tunjangan Komunikasi`, `Tunjangan Jabatan`, atau kolom bebas `earnings`.  
+  - Deductions: `BPJS Ketenagakerjaan`, `PPH 21`/`PPH21`, atau kolom bebas `deductions`.  
+  - Format Excel contoh tersedia: `resources/templates/payslip-bulk-template.xlsx` (atau buat via `node scripts/create-bulk-template.js`). Header kolom:  
+    `employeeID | employeeName | position | departement | ptkp | periode | joinDate | targetHK | attendance | Gaji Pokok | Tunjangan makan | Tunjangan Transport | Tunjangan Komunikasi | Tunjangan Jabatan | BPJS Ketenagakerjaan | PPH 21 | email (opsional)`
+
+- `POST /api/v1/bulk/insentif`  
+  - Minimal: `employeeName`, `position`, `period/periode`. Kolom `email` opsional jika penerima bukan akun login.  
+  - Earnings otomatis: `INSENTIF SAMPLING`, `INSENTIF SELLOUT` (dua ejaan), `INSENTIF KERAJINAN`, `INSENTIF TL`, plus `earnings` bebas.  
+  - Deductions: `PPH21`/`PPH 21`, atau `deductions` bebas.  
+  - `slip_title` default: "Payslip Insentif".
+  - Contoh header Excel yang disarankan:  
+    `employeeId | employeeName | position | departement | periode | joinDate | ptkp | targetHK | attendance | INSENTIF SAMPLING | INSENTIF SELLOUT | INSENTIF KERAJINAN | INSENTIF TL | earnings | deductions | note | callback_url | callback_header | email (opsional)`
+
+- `POST /api/v1/bulk/thr`  
+  - Minimal: `employeeName`, `position`, `period/periode`. Kolom `email` opsional jika penerima bukan akun login.  
+  - Earnings: kolom `THR` otomatis jadi earning "THR", plus `earnings` bebas.  
+  - Deductions: `deductions` bebas.  
+  - `slip_title` default: "Payslip THR"; `note` default: "Biaya Admin jika Beda Bank ( TEMA BCA )".
+  - Contoh header Excel yang disarankan:  
+    `employeeId | employeeName | position | departement | periode | joinDate | ptkp | targetHK | attendance | THR | earnings | deductions | note | callback_url | callback_header | email (opsional)`
+
+Kolom opsional umum (semua mode): `employeeId`, `department/departement/departemen`, `joinDate`, `ptkp`, `targetHK`, `attendance`, `note`, `data_json` (JSON string untuk override/tambah field data), `callback_url`, `callback_header`.
+
+### Contoh cURL
+```bash
+curl -X POST http://localhost:3334/api/v1/bulk/payslip \
+  -H "Authorization: Bearer <JWT_TOKEN>" \
+  -F "file=@payroll.xlsx" \
+  -F "sheet=Sheet1" \
+  -F "dryRun=true"
+```
+
+### Respons
+`200 OK` dengan ringkasan: `status`, `mode`, `total`, `queued`, `failed`, `dryRun`, `sheet`, dan `results[]` per baris (`queued`, `failed`, atau `dry-run` dengan pesan error jika ada). Job sukses masuk queue `GeneratePdfJob` dan webhook dikirim bila callback tersedia.
+
+---
+
+## Bulk Kirim Email Slip
+
+Endpoint: `POST /api/v1/send-slip-emails` (auth: JWT).  
+Form-data:
+- `file` (wajib): XLS/XLSX dengan kolom (case-insensitive): `sentTo`, `employeeId`, `employeeName`, `slipTitle`, `body`, `cc`, `bcc`.
+- `periode` (opsional): contoh `2026-03`; hanya file lampiran yang nama filenya diawali nilai ini yang akan dikirim.
+
+Perilaku:
+- Lampiran dicari di `public/download/{companyName}/{email_user_company}/` untuk setiap user dalam perusahaan (nama folder disanitasi).
+- File dipilih jika nama file mengandung `employeeId` (case-insensitive), cocok nama (jika ada), dan (jika `periode` diisi) nama file diawali prefix periode.
+- Maks 3 lampiran per baris email.
+- Log tercatat di `logs/bulk-email.log`.
+
+---
+
 ## Font
 
 Font yang dipakai: **Roboto Condensed** (Regular, Bold, Italic, BoldItalic).

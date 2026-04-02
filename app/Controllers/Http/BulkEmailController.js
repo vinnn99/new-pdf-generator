@@ -6,6 +6,7 @@ const XLSX = require('xlsx')
 const fs = require('fs')
 const path = require('path')
 const JobService = require('../../Services/JobService')
+const Database = use('Database')
 
 const LOG_DIR = path.join(Helpers.appRoot(), 'logs')
 const LOG_FILE = path.join(LOG_DIR, 'bulk-email.log')
@@ -16,14 +17,26 @@ class BulkEmailController {
    * Multipart form-data:
    *   - file: .xlsx file with columns (case-insensitive):
    *       sentTo (wajib) | employeeId | employeeName | slipTitle | body | cc | bcc
-   *   Attachments searched in:
-   *     public/download/PT. ORIGIN MAGNA INOVATION/insentif@indinesia.id/
-   *     public/download/PT. OPRIGIN MAGNA INOVATION/tema@indinesia.id/
-   *     public/download/PT. ORIGIN MAGNA INOVATION/thr@indinesia.id/
+   *   - periode (opsional): contoh "2026-03"; hanya file lampiran yang nama filenya berawalan nilai ini yang akan dipakai.
+   *   Attachments dicari di:
+   *     public/download/{companyName}/{email_user_company}/
+   *   (setiap email milik perusahaan akan dipakai sebagai subfolder lampiran)
    *   File dipilih jika nama file mengandung employeeId (case-insensitive).
    */
-  async sendSlips({ request, response }) {
+  async sendSlips({ request, response, auth }) {
     try {
+      const user = await auth.getUser()
+      if (!user || !user.company_id) {
+        return response.status(401).json({ status: 'error', message: 'User belum terhubung ke perusahaan' })
+      }
+      const company = await Database.table('companies').where('company_id', user.company_id).first()
+      if (!company) {
+        return response.status(401).json({ status: 'error', message: 'Perusahaan user tidak ditemukan' })
+      }
+      const companyUsers = await Database.table('users')
+        .where('company_id', company.company_id)
+        .select('email')
+
       const smtpHost = Env.get('SMTP_HOST')
       const smtpPort = Env.get('SMTP_PORT')
       const smtpUser = Env.get('SMTP_USER')
@@ -54,15 +67,15 @@ class BulkEmailController {
       const sheetName = workbook.SheetNames[0]
       const sheet = workbook.Sheets[sheetName]
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+      const periodPrefix = (request.input('periode') || request.input('period') || '').toString().trim().toLowerCase()
 
       ensureLogDir()
 
-      const baseRoot = path.join(Helpers.publicPath(), 'download', 'PT. ORIGIN MAGNA INOVATION')
-      const bases = [
-        { dir: path.join(baseRoot, 'tema@indinesia.id') },
-        { dir: path.join(baseRoot, 'insentif@indinesia.id') },
-        { dir: path.join(baseRoot, 'thr@indinesia.id') },
-      ]
+      const baseRoot = path.join(Helpers.publicPath(), 'download', sanitize(company.name))
+      const bases = companyUsers
+        .map((u) => (u.email || '').trim())
+        .filter(Boolean)
+        .map((email) => ({ dir: path.join(baseRoot, sanitize(email)) }))
 
       const results = []
       let queuedCount = 0
@@ -116,9 +129,10 @@ class BulkEmailController {
           const targetName = normalizeName(employeeName)
           const match = files.find((f) => {
             const lower = f.toLowerCase()
+            const periodOk = !periodPrefix || lower.startsWith(periodPrefix)
             const hasId = lower.includes(targetId)
             const hasName = targetName ? lower.includes(targetName) : true
-            return hasId && hasName
+            return periodOk && hasId && hasName
           })
           if (match) {
             attachments.push({
@@ -205,6 +219,10 @@ function normalizeRow(row) {
     acc[normKey] = row[key]
     return acc
   }, {})
+}
+
+function sanitize(str) {
+  return (str || 'unknown').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim()
 }
 
 module.exports = BulkEmailController

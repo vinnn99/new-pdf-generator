@@ -28,7 +28,10 @@ Route.group(() => {
   Route.post('/login', 'AuthController.login')
   Route.post('/generate-pdf', 'PdfController.generate').middleware(['companyAuth'])
   Route.get('/generated-pdfs', 'GeneratedPdfController.index').middleware(['auth:jwt'])
-  Route.post('/send-slip-emails', 'BulkEmailController.sendSlips')
+  Route.post('/send-slip-emails', 'BulkEmailController.sendSlips').middleware(['auth:jwt'])
+  Route.post('/bulk/payslip', 'BulkPdfController.payslipFromExcel').middleware(['auth:jwt'])
+  Route.post('/bulk/insentif', 'BulkPdfController.insentifFromExcel').middleware(['auth:jwt'])
+  Route.post('/bulk/thr', 'BulkPdfController.thrFromExcel').middleware(['auth:jwt'])
 }).prefix('/api/v1')
 
 // Download PDF yang sudah tersimpan di public/download/

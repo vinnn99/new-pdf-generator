@@ -19,7 +19,6 @@ const outputPath = outputArg ? path.resolve(outputArg) : path.resolve(defaultPat
 
 const rows = [
   [
-    'email',
     'employeeID',
     'employeeName',
     'position',
@@ -38,7 +37,6 @@ const rows = [
     'PPH 21'
   ],
   [
-    'karyawan@example.com',
     'EMP-001',
     'Budi Santoso',
     'Software Engineer',
