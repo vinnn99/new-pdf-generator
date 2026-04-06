@@ -81,25 +81,38 @@ class GeneratePdfJob {
       // Simpan PDF dengan nama unik: {template}_{timestamp}_{random}.pdf
       const uniqueId  = Date.now().toString(36) + Math.random().toString(36).slice(2, 7).toUpperCase()
 
-      // Khusus template payslip: YYYY-MM-PAYSLIP-[NIP]-[NAMA]-[UNIK].pdf
+      // Helper untuk penamaan file
+      const safe = (str) => (str || '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, '_')
+      const periodFromPayload = payloadData && (payloadData.period || payloadData.periode)
+      const normalizedPeriod = periodFromPayload
+        ? safe(String(periodFromPayload).trim().replace(/\//g, '-'))
+        : (() => {
+            const now = new Date()
+            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+          })()
+
+      // Penamaan file per template
       let filename
       if (template === 'payslip') {
-        const now = new Date()
-        const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
         const nip = payloadData && payloadData.employeeId ? String(payloadData.employeeId) : 'NIP'
         const nama = payloadData && payloadData.employeeName ? String(payloadData.employeeName) : 'NAME'
         const slipTitleRaw = payloadData && payloadData.slipTitle ? String(payloadData.slipTitle) : 'PAYSLIP'
-        const safe = (str) => (str || '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, '_')
-        filename = `${ym}-${safe(slipTitleRaw)}-${safe(nip)}-${safe(nama)}-${uniqueId}.pdf`
+        filename = `${normalizedPeriod}-${safe(slipTitleRaw)}-${safe(nip)}-${safe(nama)}-${uniqueId}.pdf`
+      } else if (template === 'insentif') {
+        const nip = payloadData && payloadData.employeeId ? String(payloadData.employeeId) : 'NIP'
+        const nama = payloadData && payloadData.employeeName ? String(payloadData.employeeName) : 'NAME'
+        const slipTitleRaw = payloadData && payloadData.slipTitle ? String(payloadData.slipTitle) : 'INSENTIF'
+        filename = `${normalizedPeriod}-${safe(slipTitleRaw)}-${safe(nip)}-${safe(nama)}-${uniqueId}.pdf`
+      } else if (template === 'thr') {
+        const nip = payloadData && payloadData.employeeId ? String(payloadData.employeeId) : 'NIP'
+        const nama = payloadData && payloadData.employeeName ? String(payloadData.employeeName) : 'NAME'
+        const slipTitleRaw = payloadData && payloadData.slipTitle ? String(payloadData.slipTitle) : 'THR'
+        filename = `${normalizedPeriod}-${safe(slipTitleRaw)}-${safe(nip)}-${safe(nama)}-${uniqueId}.pdf`
       } else if (template === 'ba-penempatan') {
         const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
         const outlet  = payloadData && payloadData.outlet ? String(payloadData.outlet) : 'OUTLET'
         const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
-        const safe = (str) => (str || '')
-          .replace(/\//g, '-') // khusus letterNo: ganti "/" jadi "-"
-          .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
-          .replace(/\s+/g, '_')
-        const safeLetter = safe(letterNo)
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
         filename = `ba-penempatan.${safe(mdsName)}.${safe(outlet)}.${safeLetter}.${uniqueId}.pdf`
       } else {
         filename  = `${template}_${uniqueId}.pdf`

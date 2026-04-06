@@ -19,8 +19,8 @@ class BulkEmailController {
    *       sentTo (wajib) | employeeId | employeeName | slipTitle | body | cc | bcc
    *   - periode (opsional): contoh "2026-03"; hanya file lampiran yang nama filenya berawalan nilai ini yang akan dipakai.
    *   Attachments dicari di:
-   *     public/download/{companyName}/{email_user_company}/
-   *   (setiap email milik perusahaan akan dipakai sebagai subfolder lampiran)
+   *     public/download/{companyName}/{email_login_user}/
+   *   (hanya folder email user yang sedang login yang dipakai)
    *   File dipilih jika nama file mengandung employeeId (case-insensitive).
    */
   async sendSlips({ request, response, auth }) {
@@ -33,10 +33,6 @@ class BulkEmailController {
       if (!company) {
         return response.status(401).json({ status: 'error', message: 'Perusahaan user tidak ditemukan' })
       }
-      const companyUsers = await Database.table('users')
-        .where('company_id', company.company_id)
-        .select('email')
-
       const smtpHost = Env.get('SMTP_HOST')
       const smtpPort = Env.get('SMTP_PORT')
       const smtpUser = Env.get('SMTP_USER')
@@ -72,10 +68,11 @@ class BulkEmailController {
       ensureLogDir()
 
       const baseRoot = path.join(Helpers.publicPath(), 'download', sanitize(company.name))
-      const bases = companyUsers
-        .map((u) => (u.email || '').trim())
-        .filter(Boolean)
-        .map((email) => ({ dir: path.join(baseRoot, sanitize(email)) }))
+      const loginEmail = (user.email || '').trim()
+      if (!loginEmail) {
+        return response.status(401).json({ status: 'error', message: 'Email user login kosong' })
+      }
+      const bases = [{ dir: path.join(baseRoot, sanitize(loginEmail)) }]
 
       const results = []
       let queuedCount = 0
@@ -127,14 +124,14 @@ class BulkEmailController {
           const files = fs.readdirSync(dir)
           const targetId = employeeId.toLowerCase()
           const targetName = normalizeName(employeeName)
-          const match = files.find((f) => {
+          const matches = files.filter((f) => {
             const lower = f.toLowerCase()
             const periodOk = !periodPrefix || lower.startsWith(periodPrefix)
             const hasId = lower.includes(targetId)
             const hasName = targetName ? lower.includes(targetName) : true
             return periodOk && hasId && hasName
           })
-          if (match) {
+          for (const match of matches) {
             attachments.push({
               filename: match,
               path: path.join(dir, match)

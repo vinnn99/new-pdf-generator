@@ -81,7 +81,11 @@ class BulkPdfController {
         const row = rows[i]
         try {
           const lower = normalizeRow(row)
-          const email = extractEmail(lower) || (user.email || '').toLowerCase()
+          // Untuk semua mode bulk (payslip, insentif, thr, ba-penempatan): abaikan kolom email di Excel, selalu gunakan email user yang login.
+          const forceLoginEmail = true
+          const email = forceLoginEmail
+            ? (user.email || '').toLowerCase()
+            : (extractEmail(lower) || (user.email || '')).toLowerCase()
           if (!email) throw new Error('email kosong (tidak ada di kolom dan akun login tanpa email)')
 
           const payload = buildPayloadForMode(lower, mode, opts)
@@ -157,14 +161,35 @@ function normalizeRow(row) {
 }
 
 function extractEmail(lower) {
-  return (
-    (lower.email) ||
-    lower['email address'] ||
-    lower['email_address'] ||
-    lower['emailaddress'] ||
-    lower.mail ||
-    ''
-  ).toString().trim().toLowerCase()
+  // Ambil email dari beberapa alias kolom; jika kosong baru fallback ke email user login
+  const pick = (keys) => {
+    for (const k of keys) {
+      if (lower[k] === undefined || lower[k] === null) continue
+      const val = lower[k].toString().trim()
+      if (val) return val
+    }
+    return ''
+  }
+
+  const email = pick([
+    'email',
+    'email address',
+    'email_address',
+    'emailaddress',
+    'mail',
+    // variasi yang sering dipakai user
+    'email penerima',
+    'email_user_company',
+    'email user company',
+    'email_user',
+    'email user',
+    'user_email',
+    'user email',
+    'sentto', // reuse kolom sheet pengiriman email
+    'to'
+  ])
+
+  return email.toLowerCase()
 }
 
 function parseMoneyList(str) {
