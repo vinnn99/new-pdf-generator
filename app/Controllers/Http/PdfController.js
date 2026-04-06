@@ -28,6 +28,7 @@ class PdfController {
         invoice: ['clientName', 'items'],
         thr: ['employeeName', 'position', 'period', 'payoutDate', 'baseSalary'],
         payslip: ['employeeName', 'position', 'period'],
+        'ba-penempatan': ['letterNo', 'mdsName', 'nik', 'placementDate', 'outlet'],
       }
 
       const errors = []

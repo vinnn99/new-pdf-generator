@@ -279,6 +279,38 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 > **Field wajib invoice:** `clientName`, `items`
 > `companyName` diisi otomatis dari API key; lainnya opsional — jika tidak diisi akan pakai nilai default.
 
+### `ba-penempatan` — Berita Acara Penempatan MDS (Outlet)
+
+```json
+{
+  "template": "ba-penempatan",
+  "email": "user@email.com",
+  "data": {
+    "letterNo": "075/OMI-TM/BAK/III/2026",
+    "region": "SMS",                     // opsional, default "SMS"
+    "mdsName": "SANTI",
+    "nik": "1505046404980001",
+    "birthDate": "1998-04-24",
+    "placementDate": "2026-04-01",
+    "status": "STAY",
+    "category": "BIR",
+    "outlet": "GLOBAL CAFE",
+    "reason": "Alasan penempatan / catatan",
+    "location": "Jakarta",               // opsional, default "Jakarta"
+    "letterDate": "2026-03-30",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
+  },
+  "callback": {
+    "url": "https://webhook.site/xxx"
+  }
+}
+```
+
+> **Field wajib `ba-penempatan`:** `letterNo`, `mdsName`, `placementDate`, `outlet` (validasi di API). Nama file output: `ba-penempatan.[namaMDS].[outlet].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+
 ---
 
 ### List Generated PDF (butuh login JWT)
@@ -355,6 +387,7 @@ Response contoh:
    const templateRequiredFields = {
      musik:         ['nama', 'judul', ...],
      invoice:       ['clientName', 'items'],
+     'ba-penempatan': ['letterNo', 'mdsName', 'placementDate', 'outlet'],
      namaTemplate:  ['field1', 'field2'],  // ← tambahkan di sini
    }
    ```
@@ -443,6 +476,12 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
   - Contoh header Excel yang disarankan:  
     `employeeId | employeeName | position | departement | periode | joinDate | ptkp | targetHK | attendance | THR | earnings | deductions | note | callback_url | callback_header | email (opsional)`
 
+- `POST /api/v1/bulk/ba-penempatan`  
+  - Minimal: `letterNo`, `mdsName`, `placementDate`, `outlet`. Kolom `email` opsional jika penerima berbeda dari akun login.  
+  - Kolom opsional: `region/wilayah`, `nik`, `birthDate/tanggal lahir`, `status`, `category/kategori`, `reason/alasan`, `location/lokasi`, `letterDate/tanggal surat`, `signerLeftName/Title`, `signerRightName/Title`, `callback_url`, `callback_header`, `data_json`.  
+  - Contoh header Excel yang disarankan:  
+    `letterNo | mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional) | callback_url | callback_header`
+
 Kolom opsional umum (semua mode): `employeeId`, `department/departement/departemen`, `joinDate`, `ptkp`, `targetHK`, `attendance`, `note`, `data_json` (JSON string untuk override/tambah field data), `callback_url`, `callback_header`.
 
 ### Contoh cURL
@@ -470,6 +509,18 @@ Perilaku:
 - Lampiran dicari di `public/download/{companyName}/{email_user_company}/` untuk setiap user dalam perusahaan (nama folder disanitasi).
 - File dipilih jika nama file mengandung `employeeId` (case-insensitive), cocok nama (jika ada), dan (jika `periode` diisi) nama file diawali prefix periode.
 - Maks 3 lampiran per baris email.
+- Log tercatat di `logs/bulk-email.log`.
+
+## Bulk Kirim Email BA Penempatan
+
+Endpoint: `POST /api/v1/send-ba-penempatan-emails` (auth: JWT).  
+Form-data:
+- `file` (wajib): XLS/XLSX dengan kolom (case-insensitive): `sentTo`, `mdsName`, `outlet`, `letterNo`, `subject` (opsional), `body` (opsional), `cc`, `bcc`.
+
+Perilaku:
+- Lampiran dicari di `public/download/{companyName}/{email_user_company}/` untuk setiap user dalam perusahaan.
+- File yang dikirim hanya template `ba-penempatan` dengan pola nama `ba-penempatan.[mdsName].[outlet].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`, spasi jadi `_`, karakter ilegal jadi `_`).
+- Satu lampiran per email (pertama yang cocok).
 - Log tercatat di `logs/bulk-email.log`.
 
 ---

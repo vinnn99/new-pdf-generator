@@ -91,6 +91,16 @@ class GeneratePdfJob {
         const slipTitleRaw = payloadData && payloadData.slipTitle ? String(payloadData.slipTitle) : 'PAYSLIP'
         const safe = (str) => (str || '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, '_')
         filename = `${ym}-${safe(slipTitleRaw)}-${safe(nip)}-${safe(nama)}-${uniqueId}.pdf`
+      } else if (template === 'ba-penempatan') {
+        const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
+        const outlet  = payloadData && payloadData.outlet ? String(payloadData.outlet) : 'OUTLET'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safe = (str) => (str || '')
+          .replace(/\//g, '-') // khusus letterNo: ganti "/" jadi "-"
+          .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+          .replace(/\s+/g, '_')
+        const safeLetter = safe(letterNo)
+        filename = `ba-penempatan.${safe(mdsName)}.${safe(outlet)}.${safeLetter}.${uniqueId}.pdf`
       } else {
         filename  = `${template}_${uniqueId}.pdf`
       }

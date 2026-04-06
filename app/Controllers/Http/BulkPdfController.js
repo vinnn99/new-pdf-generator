@@ -20,6 +20,10 @@ class BulkPdfController {
     return this._handleExcel(ctx, 'thr')
   }
 
+  async baPenempatanFromExcel(ctx) {
+    return this._handleExcel(ctx, 'ba-penempatan')
+  }
+
   /**
    * mode: payslip | insentif | thr
    */
@@ -190,6 +194,7 @@ function toNumber(val) {
 function buildPayloadForMode(lower, mode, opts) {
   if (mode === 'insentif') return buildInsentifPayload(lower, opts)
   if (mode === 'thr') return buildThrPayload(lower, opts)
+  if (mode === 'ba-penempatan') return buildBaPenempatanPayload(lower, opts)
   return buildPayslipPayload(lower, opts)
 }
 
@@ -341,6 +346,47 @@ function buildThrPayload(lower, opts) {
     earnings,
     deductions,
     note: lower.note || opts.defaultNote || 'Biaya Admin jika Beda Bank ( TEMA BCA )'
+  }
+
+  return payload
+}
+
+function buildBaPenempatanPayload(lower, opts) {
+  const payload = basePayload(lower, opts)
+  payload.template = 'ba-penempatan'
+
+  const pick = (keys) => {
+    for (const k of keys) {
+      if (lower[k] !== undefined && lower[k] !== '') return lower[k]
+    }
+    return ''
+  }
+
+  payload.data = {
+    ...payload.data,
+    companyName: lower.companyname || opts.defaultCompany,
+    letterNo: pick(['letterno', 'letter no', 'no surat', 'letter_number', 'letter number']),
+    region: pick(['region', 'wilayah']),
+    mdsName: pick(['mdsname', 'mds name', 'nama mds']),
+    nik: pick(['nik']),
+    birthDate: pick(['birthdate', 'birth date', 'tanggal lahir', 'tgl lahir']),
+    placementDate: pick(['placementdate', 'placement date', 'tanggal penempatan', 'tgl penempatan']),
+    status: pick(['status']),
+    category: pick(['category', 'kategori']),
+    outlet: pick(['outlet']),
+    reason: pick(['reason', 'alasan']),
+    location: pick(['location', 'lokasi']),
+    letterDate: pick(['letterdate', 'letter date', 'tanggal surat']),
+    signerLeftName: pick(['signerleftname', 'signer left name', 'penandatangan kiri']),
+    signerLeftTitle: pick(['signerlefttitle', 'signer left title', 'jabatan kiri']),
+    signerRightName: pick(['signerrightname', 'signer right name', 'penandatangan kanan']),
+    signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
+  }
+
+  const required = ['letterNo', 'mdsName', 'placementDate', 'outlet']
+  const missing = required.filter((k) => !payload.data[k])
+  if (missing.length) {
+    throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
   }
 
   return payload
