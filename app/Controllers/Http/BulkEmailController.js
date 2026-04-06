@@ -216,17 +216,11 @@ class BulkEmailController {
         .where('company_id', company.company_id)
         .select('email')
 
-      const smtpHost = Env.get('SMTP_HOST')
-      const smtpPort = Env.get('SMTP_PORT')
-      const smtpUser = Env.get('SMTP_USER')
-      const smtpPass = Env.get('SMTP_PASS')
-      const smtpSecure = Env.get('SMTP_SECURE', 'false') === 'true'
-      const mailFrom = Env.get('MAIL_FROM') || smtpUser
-
+      const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, mailFrom } = pickSmtpConfig(company)
       if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
         return response.status(500).json({
           status: 'error',
-          message: 'Konfigurasi SMTP tidak lengkap di .env'
+          message: 'Konfigurasi SMTP belum lengkap di perusahaan atau .env'
         })
       }
 
@@ -396,6 +390,42 @@ function normalizeRow(row) {
 
 function sanitize(str) {
   return (str || 'unknown').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim()
+}
+
+function truthy(val) {
+  if (val === true || val === false) return val
+  const str = String(val || '').toLowerCase()
+  return ['1', 'true', 'yes', 'y'].includes(str)
+}
+
+function pickSmtpConfig(company) {
+  const envHost = Env.get('SMTP_HOST')
+  const envPort = Env.get('SMTP_PORT')
+  const envUser = Env.get('SMTP_USER')
+  const envPass = Env.get('SMTP_PASS')
+  const envSecure = Env.get('SMTP_SECURE', 'false')
+  const envFrom = Env.get('MAIL_FROM') || envUser
+
+  const companyComplete = company &&
+    company.smtp_host &&
+    company.smtp_port &&
+    company.smtp_user &&
+    company.smtp_pass
+
+  const useCompany = !!companyComplete
+
+  const smtpHost = useCompany ? company.smtp_host : envHost
+  const smtpPort = useCompany ? company.smtp_port : envPort
+  const smtpUser = useCompany ? company.smtp_user : envUser
+  const smtpPass = useCompany ? company.smtp_pass : envPass
+  const smtpSecure = useCompany
+    ? truthy(company.smtp_secure)
+    : truthy(envSecure)
+  const mailFrom = useCompany
+    ? (company.mail_from || company.smtp_user)
+    : (envFrom || envUser)
+
+  return { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, mailFrom }
 }
 
 module.exports = BulkEmailController
