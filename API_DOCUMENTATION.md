@@ -46,6 +46,18 @@ Response 200:
 }
 ```
 
+### Change Password (JWT)
+`POST /api/v1/change-password`  
+Headers: `Authorization: Bearer <JWT>`
+```json
+{
+  "oldPassword": "rahasia123",
+  "newPassword": "rahasiaBaru456"
+}
+```
+Rules: both required, min 6; `oldPassword` must match current password.  
+Response 200: `{ "status": "password_changed" }`
+
 ---
 
 ## 2) Generate PDF (single)
@@ -177,7 +189,8 @@ Form-data:
 - `file` (xls/xlsx, max 5 MB) dengan kolom: `sentTo` (wajib) | `employeeId` (wajib) | `employeeName` | `slipTitle` | `body` | `cc` | `bcc`
 - `periode` (opsional, filter lampiran dengan prefix nama file, contoh `2026-03`)
 
-Lampiran dicari di `public/download/{companyName}/{email_user_company}/` dan dipilih berdasar `employeeId` (+nama jika ada). Maks 3 lampiran per email.
+Lampiran dicari hanya di `public/download/{companyName}/{email_login}/` (folder disanitasi sesuai email user login) dan dipilih berdasar `employeeId` (+nama jika ada). Maks 3 lampiran per email.
+SMTP: jika semua field SMTP di tabel `companies` terisi (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, opsional `smtp_secure`, `mail_from`) maka dipakai; jika tidak lengkap, fallback ke `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `MAIL_FROM`).
 
 Response 200:
 ```json
@@ -202,7 +215,7 @@ Auth: `Authorization: Bearer <JWT>`
 Form-data:
 - `file` (xls/xlsx, max 5 MB) dengan kolom: `sentTo` (wajib) | `mdsName` (wajib) | `outlet` (wajib) | `letterNo` (wajib) | `subject` (opsional) | `body` (opsional) | `cc` | `bcc`
 
-Lampiran dicari di `public/download/{companyName}/{email_user_company}/` dan dipilih berdasar pola nama `ba-penempatan.[mdsName].[outlet].[letterNo].[unique].pdf` (karakter `/` di `letterNo` diganti `-`, spasi jadi `_`). Hanya satu lampiran dikirim per baris (pertama yang cocok).
+Lampiran dicari di `public/download/{companyName}/{email_login}/` dan dipilih berdasar pola nama `ba-penempatan.[mdsName].[outlet].[letterNo].[unique].pdf` (karakter `/` di `letterNo` diganti `-`, spasi jadi `_`). Hanya satu lampiran dikirim per baris (pertama yang cocok).
 
 Response 200:
 ```json

@@ -146,6 +146,33 @@ Response (200):
 }
 ```
 
+### Ganti Password (JWT)
+
+```
+POST http://localhost:3334/api/v1/change-password
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{
+  "oldPassword": "rahasia123",
+  "newPassword": "rahasiaBaru456"
+}
+```
+
+Validasi & aturan:
+- `oldPassword` wajib, min 6, harus cocok dengan password saat ini.
+- `newPassword` wajib, min 6.
+
+Response (200):
+
+```json
+{ "status": "password_changed" }
+```
+
 ### Endpoint
 
 ```
@@ -506,10 +533,11 @@ Form-data:
 - `periode` (opsional): contoh `2026-03`; hanya file lampiran yang nama filenya diawali nilai ini yang akan dikirim.
 
 Perilaku:
-- Lampiran dicari di `public/download/{companyName}/{email_user_company}/` untuk setiap user dalam perusahaan (nama folder disanitasi).
+- Lampiran dicari hanya di `public/download/{companyName}/{email_login}/` (folder disanitasi sesuai email user yang login).
 - File dipilih jika nama file mengandung `employeeId` (case-insensitive), cocok nama (jika ada), dan (jika `periode` diisi) nama file diawali prefix periode.
 - Maks 3 lampiran per baris email.
 - Log tercatat di `logs/bulk-email.log`.
+- SMTP: jika semua field SMTP di tabel `companies` terisi (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, opsional `smtp_secure`, `mail_from`) maka dipakai; jika tidak lengkap, fallback ke `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `MAIL_FROM`).
 
 ## Bulk Kirim Email BA Penempatan
 
@@ -518,7 +546,7 @@ Form-data:
 - `file` (wajib): XLS/XLSX dengan kolom (case-insensitive): `sentTo`, `mdsName`, `outlet`, `letterNo`, `subject` (opsional), `body` (opsional), `cc`, `bcc`.
 
 Perilaku:
-- Lampiran dicari di `public/download/{companyName}/{email_user_company}/` untuk setiap user dalam perusahaan.
+- Lampiran dicari di `public/download/{companyName}/{email_login}/`.
 - File yang dikirim hanya template `ba-penempatan` dengan pola nama `ba-penempatan.[mdsName].[outlet].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`, spasi jadi `_`, karakter ilegal jadi `_`).
 - Satu lampiran per email (pertama yang cocok).
 - Log tercatat di `logs/bulk-email.log`.

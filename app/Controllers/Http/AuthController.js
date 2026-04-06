@@ -2,6 +2,7 @@
 
 const Database = use('Database')
 const User = use('App/Models/User')
+const Hash = use('Hash')
 const { validate } = use('Validator')
 
 class AuthController {
@@ -126,6 +127,49 @@ class AuthController {
       return response.status(401).json({
         status: 'error',
         message: 'Kredensial salah atau gagal login',
+        error: error.message
+      })
+    }
+  }
+
+  async changePassword({ request, response, auth }) {
+    try {
+      const user = await auth.getUser()
+      const payload = request.only(['oldPassword', 'newPassword'])
+
+      const rules = {
+        oldPassword: 'required|min:6',
+        newPassword: 'required|min:6'
+      }
+
+      const validation = await validate(payload, rules)
+      if (validation.fails()) {
+        return response.status(422).json({
+          status: 'validation_failed',
+          message: 'Validasi gagal',
+          errors: validation.messages()
+        })
+      }
+
+      const ok = await Hash.verify(payload.oldPassword, user.password)
+      if (!ok) {
+        return response.status(401).json({
+          status: 'error',
+          message: 'Password lama salah'
+        })
+      }
+
+      user.password = payload.newPassword
+      await user.save()
+
+      return response.json({
+        status: 'password_changed'
+      })
+    } catch (error) {
+      console.error('Change password error:', error.message)
+      return response.status(500).json({
+        status: 'error',
+        message: 'Gagal mengganti password',
         error: error.message
       })
     }

@@ -26,6 +26,7 @@ Route.on('/').render('welcome')
 Route.group(() => {
   Route.post('/register', 'AuthController.register')
   Route.post('/login', 'AuthController.login')
+  Route.post('/change-password', 'AuthController.changePassword').middleware(['auth:jwt'])
   Route.post('/generate-pdf', 'PdfController.generate').middleware(['companyAuth'])
   Route.get('/generated-pdfs', 'GeneratedPdfController.index').middleware(['auth:jwt'])
   Route.post('/send-slip-emails', 'BulkEmailController.sendSlips').middleware(['auth:jwt'])
