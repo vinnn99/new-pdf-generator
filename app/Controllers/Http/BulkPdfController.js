@@ -77,6 +77,19 @@ class BulkPdfController {
       let queued = 0
       let failed = 0
 
+      // Cek allowed_templates untuk company user login
+      const company = await Database.table('companies').where('company_id', user.company_id).first()
+      if (!company) throw new Error('Perusahaan tidak ditemukan')
+      const allowed = company.allowed_templates ? (() => {
+        try { return JSON.parse(company.allowed_templates) } catch (e) { return [] }
+      })() : []
+      if (Array.isArray(allowed) && allowed.length > 0 && !allowed.includes(mode)) {
+        return response.status(403).json({
+          status: 'forbidden',
+          message: `Template '${mode}' tidak diizinkan untuk company ini`
+        })
+      }
+
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i]
         try {

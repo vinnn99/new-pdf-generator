@@ -9,9 +9,21 @@ class GeneratedPdfController {
     const perPageRaw = Number(request.input('perPage', 10)) || 10
     const perPage = Math.min(Math.max(perPageRaw, 1), 100)
 
-    const results = await Database
-      .table('generated_pdfs')
-      .where('user_id', user.id)
+    const role = user && String(user.role).toLowerCase()
+    const isAdmin = role === 'admin'
+    const isSuper = role === 'superadmin'
+
+    const query = Database.table('generated_pdfs')
+    if (isSuper) {
+      // superadmin melihat semua
+    } else if (isAdmin) {
+      if (user.company_id) query.where('company_id', user.company_id)
+      else query.whereRaw('1=0') // admin tanpa company tidak boleh melihat apa pun
+    } else {
+      query.where('user_id', user.id)
+    }
+
+    const results = await query
       .orderBy('created_at', 'desc')
       .paginate(page, perPage)
 

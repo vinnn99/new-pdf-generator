@@ -65,6 +65,11 @@ Setiap request harus melewati middleware `companyAuth`:
 - Header `x-api-key` wajib; harus cocok dengan kolom `api_key` di tabel `companies`.
 - Body `email` wajib; harus terdaftar di tabel `users`.
 - `companyName` tidak perlu dikirim; otomatis diambil dari `companies.name` sesuai API key.
+- Role:
+  - `user`: akses sesuai haknya.
+  - `admin`: wajib punya `company_id`, akses hanya ke perusahaannya (user/company/PDF).
+  - `superadmin`: tidak perlu `company_id`, bisa kelola semua user dan company, serta melihat semua PDF.
+  - Superadmin yang ingin generate/bulk PDF harus menyertakan `company_id` (companyId) di body; admin otomatis pakai `company_id` miliknya.
 
 ### Register User
 
@@ -80,7 +85,8 @@ Body:
 {
   "username": "demo",
   "email": "user@example.com",
-  "password": "rahasia123"
+  "password": "rahasia123",
+  "role": "user"   // opsional, default user; boleh admin
 }
 ```
 
@@ -99,6 +105,7 @@ Response (201):
     "id": 1,
     "username": "demo",
     "email": "user@example.com",
+    "role": "user",
     "company": {
       "id": 1,
       "name": "Contoh Corp"
@@ -138,6 +145,7 @@ Response (200):
     "id": 1,
     "username": "demo",
     "email": "user@example.com",
+    "role": "user",
     "company": {
       "id": 1,
       "name": "Contoh Corp"
@@ -145,6 +153,10 @@ Response (200):
   }
 }
 ```
+
+Jika perusahaan user tidak aktif, login akan ditolak (403) dengan pesan "Perusahaan tidak aktif". Jika user tidak aktif, ditolak dengan pesan "User tidak aktif".
+Jika role = admin tetapi `company_id` kosong, login ditolak (403) dengan pesan "Admin tidak terhubung ke perusahaan".
+Superadmin boleh login tanpa `company_id`, tetapi saat generate PDF wajib menyertakan `company_id` (lihat bawah).
 
 ### Ganti Password (JWT)
 
@@ -173,6 +185,115 @@ Response (200):
 { "status": "password_changed" }
 ```
 
+### Buat User (Admin/Superadmin)
+
+```
+POST http://localhost:3334/api/v1/admin/users
+Authorization: Bearer <jwt_token_admin_or_superadmin>
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{
+  "username": "userbaru",
+  "email": "userbaru@example.com",
+  "password": "sekret123",
+  "role": "user",   // atau admin/superadmin
+  "company_id": 1   // wajib untuk user/admin jika dibuat superadmin; admin otomatis pakai company-nya
+}
+```
+
+Catatan:
+- Admin hanya bisa membuat user/admin di perusahaannya dan tidak bisa membuat superadmin.
+- Superadmin bisa membuat user/admin/superadmin; untuk user/admin wajib isi `company_id`.
+- Validasi sama seperti register.
+
+### List User (Admin only)
+
+```
+GET http://localhost:3334/api/v1/admin/users?page=1&perPage=10
+Authorization: Bearer <jwt_token_admin>
+```
+
+Di-paginate (`perPage` maks 100) dan diurutkan `created_at` terbaru.  
+Admin dengan `company_id` hanya melihat user dalam perusahaannya; jika `company_id` null, akan melihat semua user.
+
+### Ubah User (Admin only)
+
+```
+PUT http://localhost:3334/api/v1/admin/users/:id
+Authorization: Bearer <jwt_token_admin>
+Content-Type: application/json
+```
+
+Body (opsional): `username`, `email`, `role` (`user|admin`), `is_active` (boolean).  
+Hanya untuk user dalam perusahaan yang sama. Respons: `{ "status": "updated", "user": {...} }`
+
+### Nonaktifkan User (Admin only)
+
+```
+POST http://localhost:3334/api/v1/admin/users/:id/deactivate
+Authorization: Bearer <jwt_token_admin>
+```
+
+Set `is_active=false` pada user dalam perusahaan admin.
+
+### Reset Password User (Admin only)
+
+```
+POST http://localhost:3334/api/v1/admin/users/:id/password
+Authorization: Bearer <jwt_token_admin>
+Content-Type: application/json
+```
+
+Body: `{ "password": "minimal6karakter" }`  
+Password di-hash otomatis melalui hook model User.
+
+### List Company (Admin only)
+
+```
+GET http://localhost:3334/api/v1/admin/companies?page=1&perPage=10
+Authorization: Bearer <jwt_token_admin>
+```
+
+Pagination (`perPage` maks 100) dan diurutkan `created_at` terbaru.  
+Admin yang punya `company_id` hanya melihat company-nya sendiri; admin tanpa `company_id` melihat semua company.
+
+### Buat Company (Admin only)
+
+```
+POST http://localhost:3334/api/v1/admin/companies
+Authorization: Bearer <jwt_token_admin>
+Content-Type: application/json
+```
+
+Body wajib: `name`, `api_key` (unik). Opsional: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_secure` (bool), `mail_from`, `is_active` (default true).
+Catatan: hanya admin tanpa `company_id` yang boleh membuat company baru.
+
+### Edit Company (Admin only)
+
+```
+PUT http://localhost:3334/api/v1/admin/companies/:id
+Authorization: Bearer <jwt_token_admin>
+Content-Type: application/json
+```
+
+Body opsional: `name`, `api_key`, SMTP fields, `is_active` (boolean).
+Admin dengan `company_id` hanya boleh mengedit company miliknya.
+
+### Aktivasi/Nonaktifkan Company (Admin only)
+
+```
+POST http://localhost:3334/api/v1/admin/companies/:id/activate
+POST http://localhost:3334/api/v1/admin/companies/:id/deactivate
+Authorization: Bearer <jwt_token_admin>
+```
+
+Jika company nonaktif, semua user perusahaan tersebut tidak bisa login maupun melewati `companyAuth`.
+Admin dengan `company_id` hanya boleh mengubah status company miliknya.
+
 ### Endpoint
 
 ```
@@ -180,6 +301,10 @@ POST http://localhost:3334/api/v1/generate-pdf
 Content-Type: application/json
 Header: x-api-key: YOUR_COMPANY_API_KEY
 ```
+
+Catatan:
+- Superadmin harus menyertakan `company_id`/`companyId` di body agar melewati `companyAuth`.
+- Jika kolom `allowed_templates` pada company tidak kosong, template di luar daftar akan ditolak 403.
 
 ### Struktur request
 
@@ -348,7 +473,8 @@ Header: Authorization: Bearer <jwt_token>
 ```
 
 - Harus login (`/api/v1/login`) untuk mendapatkan JWT.
-- Data yang ditampilkan hanya milik user yang sedang login.
+- User biasa: hanya melihat PDF miliknya.
+- Admin: melihat semua PDF dalam perusahaannya (jika `company_id` kosong, melihat semua).
 - Diurutkan `created_at` terbaru.
 - `perPage` dibatasi maks 100; default 10.
 

@@ -7,7 +7,13 @@ Semua contoh menggunakan environment lokal; sesuaikan host/port di `.env`.
 
 ## Autentikasi & Header
 - `x-api-key`: **wajib** untuk endpoint companyAuth (`/api/v1/register`, `/api/v1/generate-pdf`). Nilai diambil dari kolom `api_key` tabel `companies`.
-- `Authorization: Bearer <JWT>`: **wajib** untuk endpoint yang memakai middleware `auth:jwt` (bulk endpoints, generated-pdfs, bulk email).
+- `Authorization: Bearer <JWT>`: **wajib** untuk endpoint yang memakai middleware `auth:jwt` (bulk endpoints, generated-pdfs, bulk email, admin/superadmin).
+- `Role`: enum `user | admin | superadmin`.
+  - `admin` wajib punya `company_id`, akses dibatasi ke perusahaannya.
+  - `superadmin` tidak perlu `company_id`, bisa kelola semua user & company.
+- `is_active`: boolean pada user; login ditolak jika `is_active=false`.
+- `Company is_active`: jika perusahaan tidak aktif, semua user di perusahaan tersebut tidak bisa login dan tidak lolos `companyAuth`.
+- Superadmin yang ingin generate PDF harus menyertakan `company_id` (atau `companyId`) di body; admin otomatis memakai `company_id` miliknya.
 - `Content-Type`: `application/json` untuk body JSON, `multipart/form-data` untuk upload Excel.
 
 ---
@@ -21,14 +27,15 @@ Headers: `x-api-key`
 {
   "username": "demo",
   "email": "user@example.com",
-  "password": "rahasia123"
+  "password": "rahasia123",
+  "role": "user"   // opsional, default "user"; boleh "admin" jika diizinkan
 }
 ```
 Response 201:
 ```json
 {
   "status": "registered",
-  "user": { "id": 1, "username": "demo", "email": "user@example.com", "company": { "id": 1, "name": "Contoh Corp" } }
+  "user": { "id": 1, "username": "demo", "email": "user@example.com", "role": "user", "company": { "id": 1, "name": "Contoh Corp" } }
 }
 ```
 
@@ -42,9 +49,14 @@ Response 200:
 {
   "status": "logged_in",
   "token": { "type": "bearer", "token": "<jwt_token>", "refreshToken": null },
-  "user": { "id": 1, "username": "demo", "email": "user@example.com", "company": { "id": 1, "name": "Contoh Corp" } }
+  "user": { "id": 1, "username": "demo", "email": "user@example.com", "role": "user", "company": { "id": 1, "name": "Contoh Corp" } }
 }
 ```
+Jika `is_active=false`, respons 403: `{ "status": "error", "message": "User tidak aktif" }`
+Jika perusahaan user tidak aktif, respons 403: `{ "status": "error", "message": "Perusahaan tidak aktif" }`
+Jika `role=admin` tanpa `company_id`, respons 403: `{ "status": "error", "message": "Admin tidak terhubung ke perusahaan" }`
+Superadmin boleh login tanpa `company_id`, tetapi wajib menyertakan `company_id` saat generate/bulk PDF.
+Superadmin boleh login tanpa `company_id`, tetapi saat generate PDF wajib menyertakan `company_id` (lihat generate PDF).
 
 ### Change Password (JWT)
 `POST /api/v1/change-password`  
@@ -57,6 +69,103 @@ Headers: `Authorization: Bearer <JWT>`
 ```
 Rules: both required, min 6; `oldPassword` must match current password.  
 Response 200: `{ "status": "password_changed" }`
+
+### Buat User (Admin/Superadmin)
+`POST /api/v1/admin/users`  
+Headers: `Authorization: Bearer <JWT admin/superadmin>`
+```json
+{
+  "username": "userbaru",
+  "email": "userbaru@example.com",
+  "password": "sekret123",
+  "role": "user",        // atau admin/superadmin
+  "company_id": 1        // wajib untuk role user/admin saat dibuat superadmin; admin otomatis pakai company-nya
+}
+```
+Response 201:
+```json
+{
+  "status": "created",
+  "user": {
+    "id": 2,
+    "username": "userbaru",
+    "email": "userbaru@example.com",
+    "role": "user",
+    "company_id": 1
+  }
+}
+```
+Catatan:
+- Admin: selalu memakai `company_id` miliknya, tidak bisa membuat superadmin.
+- Superadmin: boleh membuat user/admin/superadmin; untuk user/admin harus isi `company_id`.
+
+### List User (Admin/Superadmin)
+`GET /api/v1/admin/users?page=1&perPage=10`  
+Headers: `Authorization: Bearer <JWT admin/superadmin>`  
+Pagination (`perPage` maks 100), urut `created_at` desc.  
+Admin: hanya melihat user di perusahaannya. Superadmin: semua user.
+
+### Ubah User (Admin/Superadmin)
+`PUT /api/v1/admin/users/:id`  
+Headers: `Authorization: Bearer <JWT admin/superadmin>`
+Body (opsional): `username`, `email`, `role` (`user|admin|superadmin`), `is_active` (boolean), `company_id` (hanya superadmin)  
+Admin: hanya bisa ubah user di perusahaannya, tidak bisa set role superadmin atau ubah `company_id`.  
+Superadmin: bebas ubah role (termasuk superadmin) dan `company_id`.
+
+### Nonaktifkan User (Admin/Superadmin)
+`POST /api/v1/admin/users/:id/deactivate`  
+Headers: `Authorization: Bearer <JWT admin/superadmin>`  
+Admin hanya bisa nonaktifkan user perusahaannya; superadmin semua.  
+Respons 200: `{ "status": "deactivated", "user_id": 5 }`
+
+### Reset Password User (Admin/Superadmin)
+`POST /api/v1/admin/users/:id/password`  
+Headers: `Authorization: Bearer <JWT admin/superadmin>`  
+Body: `{ "password": "minimal6karakter" }`  
+Admin dibatasi perusahaan sendiri; superadmin semua.  
+Respons 200: `{ "status": "password_reset", "user_id": 5 }`
+
+### Daftar Company (Admin/Superadmin)
+`GET /api/v1/admin/companies?page=1&perPage=10`  
+Headers: `Authorization: Bearer <JWT admin/superadmin>`  
+Pagination (`perPage` maks 100), urut `created_at` desc.  
+Admin dengan `company_id` hanya melihat company-nya sendiri; superadmin melihat semua.
+
+### Buat Company (Superadmin)
+`POST /api/v1/admin/companies`  
+Headers: `Authorization: Bearer <JWT superadmin>`  
+Body: `name` (wajib), `api_key` (wajib & unik), optional `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_secure` (bool), `mail_from`, `is_active` (default true).  
+Response 201: `{ "status": "created", "company": { ... } }`
+Catatan: superadmin bisa membuat company baru; admin yang sudah punya `company_id` tidak diizinkan.
+
+### Edit Company (Admin/Superadmin)
+`PUT /api/v1/admin/companies/:id`  
+Headers: `Authorization: Bearer <JWT admin/superadmin>`  
+Body opsional: `name`, `api_key` (unik), SMTP fields, `is_active` (bool).  
+Response 200: `{ "status": "updated", "company": { ... } }`
+Admin dengan `company_id` hanya boleh mengedit company miliknya; superadmin bebas.
+
+### Aktifkan Company (Admin/Superadmin)
+`POST /api/v1/admin/companies/:id/activate`  
+Response 200: `{ "status": "activated", "company": { ... } }`  
+Admin dengan `company_id` hanya boleh mengubah status company miliknya; superadmin bebas.
+
+### Nonaktifkan Company (Admin/Superadmin)
+`POST /api/v1/admin/companies/:id/deactivate`  
+Response 200: `{ "status": "deactivated", "company": { ... } }`  
+Admin dengan `company_id` hanya boleh mengubah status company miliknya; superadmin bebas.  
+Catatan: ketika nonaktif, semua user perusahaan tersebut tidak dapat login / melewati `companyAuth`.
+
+### Daftar Template (Superadmin)
+`GET /api/v1/admin/templates`  
+Headers: `Authorization: Bearer <JWT superadmin>`  
+Mengembalikan semua template yang tersedia di `resources/pdf-templates/`.
+
+### Atur Template Per Company (Superadmin)
+`POST /api/v1/admin/companies/:id/templates`  
+Headers: `Authorization: Bearer <JWT superadmin>`  
+Body: `templates` (array atau string dipisah koma)  
+Menyimpan ke kolom `allowed_templates`; generate/bulk akan memeriksa daftar ini (jika kosong, semua template diizinkan).
 
 ---
 
@@ -93,6 +202,9 @@ Response 202:
 ```json
 { "status": "queued", "message": "PDF generation is being processed" }
 ```
+Catatan:
+- Superadmin harus menyertakan `company_id` (atau `companyId`) di body agar lolos `companyAuth`.
+- Template yang boleh dipakai mengikuti `allowed_templates` pada company; jika daftar tidak kosong dan template tidak ada di dalamnya, respons 403.
 Webhook payload (on success):
 ```json
 {
@@ -143,6 +255,9 @@ Response 200:
   ]
 }
 ```
+Hak akses:
+- User biasa: hanya melihat PDF yang ia generate sendiri.
+- Admin: melihat semua PDF dalam perusahaannya (jika `company_id` null, akan melihat semua).
 
 ---
 
@@ -155,6 +270,8 @@ Content-Type: `multipart/form-data` dengan field `file` (xls/xlsx, max 10 MB). O
 - `POST /api/v1/bulk/insentif`
 - `POST /api/v1/bulk/thr`
 - `POST /api/v1/bulk/ba-penempatan`
+
+Catatan: Template yang di-bulk harus termasuk dalam `allowed_templates` company; jika tidak, request ditolak 403 sebelum baris diproses.
 
 Response 200:
 ```json

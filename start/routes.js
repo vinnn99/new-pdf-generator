@@ -27,6 +27,22 @@ Route.group(() => {
   Route.post('/register', 'AuthController.register')
   Route.post('/login', 'AuthController.login')
   Route.post('/change-password', 'AuthController.changePassword').middleware(['auth:jwt'])
+
+  // Admin - user management
+  Route.get('/admin/users', 'AdminUserController.index').middleware(['auth:jwt'])
+  Route.post('/admin/users', 'AdminUserController.store').middleware(['auth:jwt'])
+  Route.put('/admin/users/:id', 'AdminUserController.update').middleware(['auth:jwt'])
+  Route.post('/admin/users/:id/deactivate', 'AdminUserController.deactivate').middleware(['auth:jwt'])
+  Route.post('/admin/users/:id/password', 'AdminUserController.resetPassword').middleware(['auth:jwt'])
+
+  // Admin - company management
+  Route.get('/admin/companies', 'AdminCompanyController.index').middleware(['auth:jwt'])
+  Route.post('/admin/companies', 'AdminCompanyController.store').middleware(['auth:jwt'])
+  Route.put('/admin/companies/:id', 'AdminCompanyController.update').middleware(['auth:jwt'])
+  Route.post('/admin/companies/:id/activate', 'AdminCompanyController.activate').middleware(['auth:jwt'])
+  Route.post('/admin/companies/:id/deactivate', 'AdminCompanyController.deactivate').middleware(['auth:jwt'])
+  Route.get('/admin/templates', 'AdminCompanyController.templates').middleware(['auth:jwt'])
+  Route.post('/admin/companies/:id/templates', 'AdminCompanyController.setTemplates').middleware(['auth:jwt'])
   Route.post('/generate-pdf', 'PdfController.generate').middleware(['companyAuth'])
   Route.get('/generated-pdfs', 'GeneratedPdfController.index').middleware(['auth:jwt'])
   Route.post('/send-slip-emails', 'BulkEmailController.sendSlips').middleware(['auth:jwt'])

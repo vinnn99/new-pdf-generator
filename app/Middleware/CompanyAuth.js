@@ -35,14 +35,23 @@ class CompanyAuth {
       })
     }
 
-    if (!user.company_id) {
+    const role = (user.role || '').toLowerCase()
+
+    let companyId = user.company_id
+    // Superadmin boleh override company_id via body jika dikirim
+    if (role === 'superadmin') {
+      const overrideCompanyId = request.input('company_id') || request.input('companyId')
+      if (overrideCompanyId) companyId = Number(overrideCompanyId)
+    }
+
+    if (!companyId) {
       return response.status(401).json({
         status: 'error',
         message: 'User belum terhubung ke perusahaan'
       })
     }
 
-    const company = await Database.table('companies').where('company_id', user.company_id).first()
+    const company = await Database.table('companies').where('company_id', companyId).first()
     console.log('[companyAuth] company row (by user.company_id) =', company)
 
     if (!company) {
@@ -56,6 +65,13 @@ class CompanyAuth {
       return response.status(401).json({
         status: 'error',
         message: 'API key tidak cocok dengan perusahaan user'
+      })
+    }
+
+    if (company.is_active === false) {
+      return response.status(403).json({
+        status: 'error',
+        message: 'Perusahaan tidak aktif'
       })
     }
 

@@ -56,6 +56,21 @@ class PdfController {
         })
       }
 
+      // Validasi template diizinkan untuk company
+      if (company) {
+        const allowed = company.allowed_templates ? (() => {
+          try { return JSON.parse(company.allowed_templates) } catch (e) { return [] }
+        })() : []
+        if (Array.isArray(allowed) && allowed.length > 0) {
+          if (!allowed.includes(payload.template)) {
+            return response.status(403).json({
+              status: 'forbidden',
+              message: `Template '${payload.template}' tidak diizinkan untuk company ini`
+            })
+          }
+        }
+      }
+
       // Sisipkan companyName dari hasil middleware (API key)
       if (company) {
         payload.companyName = company.name

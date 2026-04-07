@@ -25,13 +25,14 @@ class AuthController {
         })
       }
 
-      const payload = request.only(['username', 'email', 'password'])
+      const payload = request.only(['username', 'email', 'password', 'role'])
       if (payload.email) payload.email = payload.email.toLowerCase()
 
       const rules = {
         username: 'required|unique:users,username',
         email: 'required|email|unique:users,email',
-        password: 'required|min:6'
+        password: 'required|min:6',
+        role: 'in:user,admin,superadmin'
       }
 
       const validation = await validate(payload, rules)
@@ -43,11 +44,19 @@ class AuthController {
         })
       }
 
+      const role = ['admin', 'superadmin'].includes(payload.role) ? payload.role : 'user'
+
+      // Admin wajib punya company_id; superadmin boleh tanpa company
+      if (role === 'admin' && !company.company_id) {
+        return response.status(400).json({ status: 'error', message: 'Admin wajib terhubung ke perusahaan' })
+      }
+
       const user = await User.create({
         username: payload.username,
         email: payload.email,
         password: payload.password,
-        company_id: company.company_id
+        company_id: role === 'superadmin' ? null : company.company_id,
+        role
       })
 
       return response.status(201).json({
@@ -56,6 +65,7 @@ class AuthController {
           id: user.id,
           username: user.username,
           email: user.email,
+          role: user.role,
           company: {
             id: company.company_id,
             name: company.name
@@ -102,12 +112,34 @@ class AuthController {
         })
       }
 
+      // Admin wajib punya company_id
+      if (user.role === 'admin' && !user.company_id) {
+        return response.status(403).json({
+          status: 'error',
+          message: 'Admin tidak terhubung ke perusahaan'
+        })
+      }
+
+      if (user.is_active === false) {
+        return response.status(403).json({
+          status: 'error',
+          message: 'User tidak aktif'
+        })
+      }
+
       // Generate JWT token
       const token = await auth.authenticator('jwt').attempt(payload.email, payload.password)
 
       let company = null
       if (user.company_id) {
         company = await Database.table('companies').where('company_id', user.company_id).first()
+      }
+
+      if (company && company.is_active === false) {
+        return response.status(403).json({
+          status: 'error',
+          message: 'Perusahaan tidak aktif'
+        })
       }
 
       return response.status(200).json({
@@ -117,6 +149,7 @@ class AuthController {
           id: user.id,
           username: user.username,
           email: user.email,
+          role: user.role,
           company: company
             ? { id: company.company_id, name: company.name }
             : null
