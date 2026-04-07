@@ -1,5 +1,7 @@
 'use strict'
 
+const Env = use('Env')
+
 module.exports = {
   /*
   |--------------------------------------------------------------------------
@@ -16,7 +18,7 @@ module.exports = {
   | Function - Receives the current origin and should return one of the above values.
   |
   */
-  origin: false,
+  origin: Env.get('CORS_ORIGIN', true),
 
   /*
   |--------------------------------------------------------------------------
@@ -29,7 +31,7 @@ module.exports = {
   | Array - An array of allowed methods
   |
   */
-  methods: ['GET', 'PUT', 'PATCH', 'POST', 'DELETE'],
+  methods: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'PATCH', 'POST', 'DELETE'],
 
   /*
   |--------------------------------------------------------------------------
@@ -73,7 +75,7 @@ module.exports = {
   | boolean.
   |
   */
-  credentials: false,
+  credentials: Env.get('CORS_CREDENTIALS', true),
 
   /*
   |--------------------------------------------------------------------------
