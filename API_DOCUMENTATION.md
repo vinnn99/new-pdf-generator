@@ -38,6 +38,10 @@ Response 201:
   "user": { "id": 1, "username": "demo", "email": "user@example.com", "role": "user", "company": { "id": 1, "name": "Contoh Corp" } }
 }
 ```
+Contoh error 422:
+```json
+{ "status": "validation_failed", "message": "Validasi gagal", "errors": [{ "field": "email", "validation": "unique" }] }
+```
 
 ### Login
 `POST /api/v1/login`
@@ -69,6 +73,10 @@ Headers: `Authorization: Bearer <JWT>`
 ```
 Rules: both required, min 6; `oldPassword` must match current password.  
 Response 200: `{ "status": "password_changed" }`
+Contoh error 401 (old password salah):
+```json
+{ "status": "error", "message": "Password lama salah" }
+```
 
 ### Buat User (Admin/Superadmin)
 `POST /api/v1/admin/users`  
@@ -130,6 +138,19 @@ Respons 200: `{ "status": "password_reset", "user_id": 5 }`
 Headers: `Authorization: Bearer <JWT admin/superadmin>`  
 Pagination (`perPage` maks 100), urut `created_at` desc.  
 Admin dengan `company_id` hanya melihat company-nya sendiri; superadmin melihat semua.
+Contoh respons:
+```json
+{
+  "status": "ok",
+  "total": 2,
+  "perPage": 10,
+  "page": 1,
+  "lastPage": 1,
+  "data": [
+    { "company_id": 1, "name": "Contoh Corp", "api_key": "abc123", "is_active": true, "allowed_templates": "[\"payslip\",\"ba-penempatan\"]" }
+  ]
+}
+```
 
 ### Buat Company (Superadmin)
 `POST /api/v1/admin/companies`  
@@ -137,6 +158,19 @@ Headers: `Authorization: Bearer <JWT superadmin>`
 Body: `name` (wajib), `api_key` (wajib & unik), optional `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_secure` (bool), `mail_from`, `is_active` (default true).  
 Response 201: `{ "status": "created", "company": { ... } }`
 Catatan: superadmin bisa membuat company baru; admin yang sudah punya `company_id` tidak diizinkan.
+Contoh respons:
+```json
+{
+  "status": "created",
+  "company": {
+    "company_id": 3,
+    "name": "Perusahaan Baru",
+    "api_key": "NEWKEY123",
+    "is_active": true,
+    "allowed_templates": "[\"payslip\",\"ba-penempatan\"]"
+  }
+}
+```
 
 ### Edit Company (Admin/Superadmin)
 `PUT /api/v1/admin/companies/:id`  
@@ -166,6 +200,18 @@ Mengembalikan semua template yang tersedia di `resources/pdf-templates/`.
 Headers: `Authorization: Bearer <JWT superadmin>`  
 Body: `templates` (array atau string dipisah koma)  
 Menyimpan ke kolom `allowed_templates`; generate/bulk akan memeriksa daftar ini (jika kosong, semua template diizinkan).
+Contoh request body:
+```json
+{ "templates": ["payslip", "ba-penempatan"] }
+```
+Contoh respons:
+```json
+{
+  "status": "updated",
+  "allowed_templates": ["payslip","ba-penempatan"],
+  "company": { "company_id": 1, "name": "Contoh Corp", "allowed_templates": "[\"payslip\",\"ba-penempatan\"]" }
+}
+```
 
 ---
 
@@ -201,6 +247,10 @@ Headers: `x-api-key`, `Content-Type: application/json`
 Response 202:
 ```json
 { "status": "queued", "message": "PDF generation is being processed" }
+```
+Contoh error 403 (template tidak diizinkan):
+```json
+{ "status": "forbidden", "message": "Template 'musik' tidak diizinkan untuk company ini" }
 ```
 Catatan:
 - Superadmin harus menyertakan `company_id` (atau `companyId`) di body agar lolos `companyAuth`.
@@ -272,6 +322,33 @@ Content-Type: `multipart/form-data` dengan field `file` (xls/xlsx, max 10 MB). O
 - `POST /api/v1/bulk/ba-penempatan`
 
 Catatan: Template yang di-bulk harus termasuk dalam `allowed_templates` company; jika tidak, request ditolak 403 sebelum baris diproses.
+
+Contoh request `bulk/payslip` (form-data):
+- Header: `Authorization: Bearer <JWT>`
+- Body:
+  - `file`: attach `payroll.xlsx`
+  - `sheet`: `Sheet1`
+  - `dryRun`: `false`
+
+Contoh respons sukses:
+```json
+{
+  "status": "ok",
+  "mode": "payslip",
+  "total": 5,
+  "queued": 5,
+  "failed": 0,
+  "dryRun": false,
+  "sheet": "Sheet1",
+  "results": [
+    { "row": 1, "email": "user@example.com", "status": "queued" }
+  ]
+}
+```
+Contoh error 403 (template tidak diizinkan):
+```json
+{ "status": "forbidden", "message": "Template 'payslip' tidak diizinkan untuk company ini" }
+```
 
 Response 200:
 ```json
