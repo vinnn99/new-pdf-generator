@@ -75,6 +75,8 @@ module.exports = function baPenempatanTemplate(payloadData = {}) {
 
   const headerImage = path.join(__dirname, '..', '..', 'resources', 'images', 'header_omi.png')
   const footerImage = path.join(__dirname, '..', '..', 'resources', 'images', 'footer_omi.png')
+  const signatureLeftImage = path.join(__dirname, '..', '..', 'resources', 'images', 'signature_adi.jpeg')
+  const signatureRightImage = path.join(__dirname, '..', '..', 'resources', 'images', 'signature_kiki.jpeg')
   const pageWidth = 595.28  // A4 width in points (72 DPI)
   const pageHeight = 841.89 // A4 height in points
 
@@ -175,9 +177,16 @@ module.exports = function baPenempatanTemplate(payloadData = {}) {
       },
 
       {
-        text: `${location}, ${formatDateTitle(letterDate)}`,
-        alignment: 'right',
-        style: 'detailValue',
+        columns: [
+          { width: '50%', text: '' },
+          {
+            width: '50%',
+            text: `${location}, ${formatDateTitle(letterDate)}`,
+            alignment: 'center',
+            style: 'detailValue',
+          },
+        ],
+        columnGap: 0,
         margin: [0, 0, 0, 30],
       },
 
@@ -186,7 +195,8 @@ module.exports = function baPenempatanTemplate(payloadData = {}) {
           {
             width: '50%',
             stack: [
-              { text: 'Hormat Kami,', style: 'paragraph', margin: [0, 0, 0, 50], alignment: 'left' },
+              { text: 'Hormat Kami,', style: 'paragraph', margin: [0, 0, 0, 12], alignment: 'center' },
+              { image: signatureLeftImage, width: 120, alignment: 'center', margin: [0, 8, 0, 12] },
               {
                 stack: [
                   { text: signerLeftName, style: 'signName', alignment: 'center' },
@@ -195,12 +205,13 @@ module.exports = function baPenempatanTemplate(payloadData = {}) {
                 alignment: 'center'
               },
             ],
-            alignment: 'left',
+            alignment: 'center',
           },
           {
             width: '50%',
             stack: [
-              { text: 'Menyetujui,', style: 'paragraph', margin: [0, 0, 0, 50], alignment: 'right' },
+              { text: 'Menyetujui,', style: 'paragraph', margin: [0, 0, 0, 12], alignment: 'center' },
+              { image: signatureRightImage, width: 120, alignment: 'center', margin: [0, 8, 0, 12] },
               {
                 stack: [
                   { text: signerRightName, style: 'signName', alignment: 'center' },
@@ -209,7 +220,7 @@ module.exports = function baPenempatanTemplate(payloadData = {}) {
                 alignment: 'center'
               },
             ],
-            alignment: 'right',
+            alignment: 'center',
           },
         ],
         columnGap: 40,
@@ -217,7 +228,7 @@ module.exports = function baPenempatanTemplate(payloadData = {}) {
     ],
 
     styles: {
-      title: { fontSize: 18, bold: true, color: '#1b3b6f', letterSpacing: 0.5 },
+      title: { fontSize: 18, bold: true, color: '#000000', letterSpacing: 0.5 },
       letterNo: { fontSize: 11, color: '#4a4a4a' },
       intro: { fontSize: 11, bold: true, color: '#1f2d3d' },
       detailLabel: { fontSize: 11, bold: true },

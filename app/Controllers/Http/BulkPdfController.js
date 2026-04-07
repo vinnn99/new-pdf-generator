@@ -216,6 +216,58 @@ function toNumber(val) {
   return Number.isFinite(n) ? n : 0
 }
 
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+
+function toYmd(y, m, d) {
+  if (!y || !m || !d) return ''
+  return `${y}-${pad2(m)}-${pad2(d)}`
+}
+
+/**
+ * Parse tanggal dari Excel tanpa menggeser zona waktu.
+ * Mendukung:
+ *  - Serial number Excel (date code)
+ *  - Objek Date
+ *  - String dengan pemisah / atau -
+ * Mengembalikan string ISO pendek (YYYY-MM-DD) atau '' jika tidak valid.
+ */
+function parseExcelDate(val) {
+  if (val === undefined || val === null || val === '') return ''
+
+  // Excel date code (number of days since 1900-01-00)
+  if (typeof val === 'number') {
+    const parsed = XLSX.SSF && XLSX.SSF.parse_date_code ? XLSX.SSF.parse_date_code(val) : null
+    if (parsed && parsed.y && parsed.m && parsed.d) {
+      return toYmd(parsed.y, parsed.m, parsed.d)
+    }
+  }
+
+  // JS Date object
+  if (val instanceof Date && !Number.isNaN(val.getTime())) {
+    return toYmd(val.getFullYear(), val.getMonth() + 1, val.getDate())
+  }
+
+  // String formats: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, MM/DD/YYYY (fallback)
+  const str = String(val).trim()
+  if (!str) return ''
+
+  let m
+  // 2026-04-07 or 2026/04/07
+  m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/)
+  if (m) return toYmd(Number(m[1]), Number(m[2]), Number(m[3]))
+
+  // 07-04-2026 or 07/04/2026 (as used di Indonesia: dd-mm-yyyy)
+  m = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/)
+  if (m) {
+    const year = Number(m[3].length === 2 ? `20${m[3]}` : m[3])
+    return toYmd(year, Number(m[2]), Number(m[1]))
+  }
+
+  return str // fallback; template akan render apa adanya
+}
+
 function buildPayloadForMode(lower, mode, opts) {
   if (mode === 'insentif') return buildInsentifPayload(lower, opts)
   if (mode === 'thr') return buildThrPayload(lower, opts)
@@ -394,14 +446,14 @@ function buildBaPenempatanPayload(lower, opts) {
     region: pick(['region', 'wilayah']),
     mdsName: pick(['mdsname', 'mds name', 'nama mds']),
     nik: pick(['nik']),
-    birthDate: pick(['birthdate', 'birth date', 'tanggal lahir', 'tgl lahir']),
-    placementDate: pick(['placementdate', 'placement date', 'tanggal penempatan', 'tgl penempatan']),
+    birthDate: parseExcelDate(pick(['birthdate', 'birth date', 'tanggal lahir', 'tgl lahir'])),
+    placementDate: parseExcelDate(pick(['placementdate', 'placement date', 'tanggal penempatan', 'tgl penempatan'])),
     status: pick(['status']),
     category: pick(['category', 'kategori']),
     outlet: pick(['outlet']),
     reason: pick(['reason', 'alasan']),
     location: pick(['location', 'lokasi']),
-    letterDate: pick(['letterdate', 'letter date', 'tanggal surat']),
+    letterDate: parseExcelDate(pick(['letterdate', 'letter date', 'tanggal surat'])),
     signerLeftName: pick(['signerleftname', 'signer left name', 'penandatangan kiri']),
     signerLeftTitle: pick(['signerlefttitle', 'signer left title', 'jabatan kiri']),
     signerRightName: pick(['signerrightname', 'signer right name', 'penandatangan kanan']),
