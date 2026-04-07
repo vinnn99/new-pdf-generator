@@ -114,6 +114,36 @@ class GeneratePdfJob {
         const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
         const safeLetter = safe(letterNo.replace(/\//g, '-'))
         filename = `ba-penempatan.${safe(mdsName)}.${safe(outlet)}.${safeLetter}.${uniqueId}.pdf`
+      } else if (template === 'ba-request-id') {
+        const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
+        const area     = payloadData && payloadData.area ? String(payloadData.area) : 'AREA'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
+        filename = `ba-request-id.${safe(mdsName)}.${safe(area)}.${safeLetter}.${uniqueId}.pdf`
+      } else if (template === 'ba-hold') {
+        const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
+        const region  = payloadData && payloadData.region ? String(payloadData.region) : 'REGION'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
+        filename = `ba-hold.${safe(mdsName)}.${safe(region)}.${safeLetter}.${uniqueId}.pdf`
+      } else if (template === 'ba-rolling') {
+        const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
+        const region  = payloadData && payloadData.region ? String(payloadData.region) : 'REGION'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
+        filename = `ba-rolling.${safe(mdsName)}.${safe(region)}.${safeLetter}.${uniqueId}.pdf`
+      } else if (template === 'ba-hold-activate') {
+        const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
+        const region  = payloadData && payloadData.region ? String(payloadData.region) : 'REGION'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
+        filename = `ba-hold-activate.${safe(mdsName)}.${safe(region)}.${safeLetter}.${uniqueId}.pdf`
+      } else if (template === 'ba-terminated') {
+        const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
+        const region  = payloadData && payloadData.region ? String(payloadData.region) : 'REGION'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
+        filename = `ba-terminated.${safe(mdsName)}.${safe(region)}.${safeLetter}.${uniqueId}.pdf`
       } else {
         filename  = `${template}_${uniqueId}.pdf`
       }

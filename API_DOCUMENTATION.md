@@ -89,6 +89,109 @@ Headers: `x-api-key`, `Content-Type: application/json`
   "callback": { "url": "https://webhook.site/xxx" }
 }
 ```
+Contoh payload `ba-request-id`:
+```json
+{
+  "template": "ba-request-id",
+  "email": "user@example.com",
+  "data": {
+    "letterNo": "102/OMI-TM/BAK/IV/2026",
+    "area": "JTU",
+    "mdsName": "MUHAMAD MUZAENI",
+    "nik": "3328091505990007",
+    "birthDate": "1999-05-15",
+    "joinDate": "2026-04-09",
+    "status": "MOBILE",
+    "stores": [
+      "GAB TK EKONOMI@*OBP",
+      "GAB TK EKONOMI@*OBP - SLEROK",
+      "GAB TK EKONOMI@*OBP - TEKSIN"
+    ],
+    "reason": "REQUEST ID MDS"
+  }
+}
+```
+Contoh payload `ba-hold`:
+```json
+{
+  "template": "ba-hold",
+  "email": "user@example.com",
+  "data": {
+    "letterNo": "097/OMI-TM/BAK/IV/2026",
+    "region": "JTU",
+    "holdDate": "2026-04-01",
+    "mdsName": "INTAN DESMA SYAWALIA",
+    "mdsCode": "MDSUJTU207",
+    "status": "STAY",
+    "outlet": "Tk Harry & Sons@ *Obp",
+    "reason": "IJIN JAGA SUAMI KARENA SUAMINYA KECELAKAN",
+    "letterDate": "2026-04-06",
+    "location": "Jakarta"
+  }
+}
+```
+Contoh payload `ba-rolling`:
+```json
+{
+  "template": "ba-rolling",
+  "email": "user@example.com",
+  "data": {
+    "letterNo": "099/OMI-TM/BAK/IV/2026",
+    "region": "JTU",
+    "rollingDate": "2026-04-07",
+    "mdsName": "NUZULUL NINA QURANI",
+    "mdsCode": "MDSUJTU255",
+    "status": "STAY",
+    "outletFrom": "DJ TEDDY GAB",
+    "outletTo": "MAK SUTINAH*OBP",
+    "reason": "KARENA TIDAK KUAT DENGAN PERLAKUAN OWNER DENGAN KATA - KATA KEBUN BINATANG ( TEKANAN BATIN )",
+    "letterDate": "2026-04-06",
+    "location": "Jakarta"
+  }
+}
+```
+Contoh payload `ba-hold-activate`:
+```json
+{
+  "template": "ba-hold-activate",
+  "email": "user@example.com",
+  "data": {
+    "letterNo": "098/OMI-TM/BAK/IV/2026",
+    "region": "JTU",
+    "reactivateDate": "2026-04-06",
+    "mdsName": "INTAN DESMA SYAWALIA",
+    "mdsCode": "MDSUJTU207",
+    "status": "STAY",
+    "outlet": "Tk Harry & Sons@ *Obp",
+    "holdReason": "IJIN JAGA SUAMI KARENA SUAMINYA KECELAKAN",
+    "letterDate": "2026-04-06",
+    "location": "Jakarta"
+  }
+}
+```
+Contoh payload `ba-terminated`:
+```json
+{
+  "template": "ba-terminated",
+  "email": "user@example.com",
+  "data": {
+    "letterNo": "084/OMI-TM/BAK/III/2026",
+    "region": "LPB",
+    "terminateDate": "2026-04-01",
+    "mdsName": "REVINKA NOOR ALQAMARIAH",
+    "mdsCode": "MDSULPB182",
+    "status": "STAY",
+    "outlet": "TOKO POM SIMBAL *OBP - ALT DERRY YUNG",
+    "reasons": [
+      "MDS TIDAK MENGIKUTI PERATURAN YANG SUDAH DITENTUKAN MENGENAI LIBUR LEBARAN",
+      "TIDAK MENJALANKAN KETENTUAN & INSTRUKSI DARI TL",
+      "PIHAK TOKO REQUEST MENGGANTI MDS"
+    ],
+    "letterDate": "2026-03-31",
+    "location": "Jakarta"
+  }
+}
+```
 Response 202:
 ```json
 { "status": "queued", "message": "PDF generation is being processed" }
@@ -113,10 +216,20 @@ Webhook payload (on success):
 - `payslip`: `employeeName`, `position`, `period`
 - `thr`: `employeeName`, `position`, `period`, `payoutDate`, `baseSalary`
 - `ba-penempatan`: `letterNo`, `mdsName`, `placementDate`, `outlet`
+- `ba-request-id`: `letterNo`, `mdsName`, `nik`, `joinDate`
+- `ba-hold`: `letterNo`, `region`, `holdDate`, `mdsName`, `mdsCode`, `status`, `outlet`
+- `ba-rolling`: `letterNo`, `region`, `rollingDate`, `mdsName`, `mdsCode`, `status`, `outletFrom`, `outletTo`
+- `ba-hold-activate`: `letterNo`, `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`
+- `ba-terminated`: `letterNo`, `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`
 
 **Penamaan file:**
 - `payslip`: `YYYY-MM-<slipTitle>-<NIP>-<Nama>-<unik>.pdf`
 - `ba-penempatan`: `ba-penempatan.<mdsName>.<outlet>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
+- `ba-request-id`: `ba-request-id.<mdsName>.<area>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
+- `ba-hold`: `ba-hold.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
+- `ba-rolling`: `ba-rolling.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
+- `ba-hold-activate`: `ba-hold-activate.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
+- `ba-terminated`: `ba-terminated.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - Lainnya: `<template>_<unik>.pdf`
 
 ---
@@ -155,6 +268,11 @@ Content-Type: `multipart/form-data` dengan field `file` (xls/xlsx, max 10 MB). O
 - `POST /api/v1/bulk/insentif`
 - `POST /api/v1/bulk/thr`
 - `POST /api/v1/bulk/ba-penempatan`
+- `POST /api/v1/bulk/ba-request-id`
+- `POST /api/v1/bulk/ba-hold`
+- `POST /api/v1/bulk/ba-rolling`
+- `POST /api/v1/bulk/ba-hold-activate`
+- `POST /api/v1/bulk/ba-terminated`
 
 Response 200:
 ```json
@@ -177,6 +295,11 @@ Response 200:
 - **Insentif**: `employeeId | employeeName | position | departement | periode | INSENTIF SAMPLING | INSENTIF SELLOUT | INSENTIF KERAJINAN | INSENTIF TL | earnings | deductions | email (opsional)`
 - **THR**: `employeeId | employeeName | position | departement | periode | THR | earnings | deductions | note | email (opsional)`
 - **BA Penempatan**: `letterNo | mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional) | callback_url | callback_header`
+- **BA Request ID**: `letterNo | area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | email (opsional)`
+- **BA HOLD**: `letterNo | region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
+- **BA Rolling**: `letterNo | region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | email (opsional)`
+- **BA HOLD Activate**: `letterNo | region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | email (opsional)`
+- **BA Terminated**: `letterNo | region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | email (opsional)`
 
 Kolom umum: `callback_url`, `callback_header` (JSON), `data_json` (override/extra field), `email` (jika penerima berbeda dari akun login).
 
@@ -233,7 +356,35 @@ Response 200:
 
 ---
 
-## 7) Download PDF
+## 7) Bulk Kirim Email BA (Request ID, HOLD, Rolling, HOLD Activate, Terminated)
+Auth: `Authorization: Bearer <JWT>`  
+Form-data:
+- `file` (xls/xlsx, max 5 MB) dengan kolom minimal: `sentTo`, lalu field wajib per template di bawah. Kolom `subject`, `body`, `cc`, `bcc` opsional.  
+Lampiran dicari di `public/download/{companyName}/{email_user_company}/`; hanya satu lampiran pertama yang cocok dikirim.
+
+- `POST /api/v1/send-ba-request-id-emails`  
+  - Wajib: `mdsName`, `area/region/wilayah`, `letterNo`  
+  - Pola lampiran: `ba-request-id.[mdsName].[area].[letterNo].[unik].pdf`
+
+- `POST /api/v1/send-ba-hold-emails`  
+  - Wajib: `mdsName`, `region/wilayah`, `letterNo`  
+  - Pola: `ba-hold.[mdsName].[region].[letterNo].[unik].pdf`
+
+- `POST /api/v1/send-ba-rolling-emails`  
+  - Wajib: `mdsName`, `region/wilayah`, `letterNo`  
+  - Pola: `ba-rolling.[mdsName].[region].[letterNo].[unik].pdf`
+
+- `POST /api/v1/send-ba-hold-activate-emails`  
+  - Wajib: `mdsName`, `region/wilayah`, `letterNo`  
+  - Pola: `ba-hold-activate.[mdsName].[region].[letterNo].[unik].pdf`
+
+- `POST /api/v1/send-ba-terminated-emails`  
+  - Wajib: `mdsName`, `region/wilayah`, `letterNo`  
+  - Pola: `ba-terminated.[mdsName].[region].[letterNo].[unik].pdf`
+
+---
+
+## 8) Download PDF
 `GET /download/:company/:email/:filename`
 - `company`, `email`, `filename` harus URL-encoded.
 - Hanya file `.pdf` yang dilayani.
@@ -245,7 +396,7 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
 
 ---
 
-## 8) Template Ringkas (payload)
+## 9) Template Ringkas (payload)
 - **musik**: surat perjanjian lisensi musik (lihat contoh di README).
 - **invoice**: invoice dengan tabel item, PPN default 11%.
 - **payslip**: slip gaji; earnings/deductions array atau kolom terpisah di Excel.
@@ -255,7 +406,7 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
 
 ---
 
-## 9) Status & Error
+## 10) Status & Error
 - 202 queued (generate-pdf).
 - 422 validation_failed (field wajib kosong).
 - 401 unauthorized (JWT tidak ada / API key salah / email tidak terdaftar).
@@ -263,7 +414,7 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
 
 ---
 
-## 10) Catatan untuk Frontend (React)
+## 11) Catatan untuk Frontend (React)
 - Endpoint single generate memakai `x-api-key`; bulk & list memakai Bearer JWT.
 - Untuk upload Excel gunakan `FormData` dengan field `file`.
 - Saat dryRun, backend tidak enqueue job tapi mengembalikan payload per baris; gunakan ini untuk preview di UI.

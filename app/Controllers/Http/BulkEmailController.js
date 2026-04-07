@@ -360,6 +360,271 @@ class BulkEmailController {
       })
     }
   }
+
+  /**
+   * Generic sender for BA templates with filename prefix matching.
+   * cfg: {
+   *   template: 'ba-request-id',
+   *   required: ['mdsName', 'area', 'letterNo'],
+   *   prefixParts: (fields) => ['ba-request-id', fields.mdsName, fields.area, fields.letterNo],
+   *   subject: (fields) => string,
+   *   body: (fields, company) => string
+   * }
+   */
+  async _sendBaTemplate({ request, response, auth }, cfg) {
+    try {
+      const user = await auth.getUser()
+      if (!user || !user.company_id) {
+        return response.status(401).json({ status: 'error', message: 'User belum terhubung ke perusahaan' })
+      }
+      const company = await Database.table('companies').where('company_id', user.company_id).first()
+      if (!company) {
+        return response.status(401).json({ status: 'error', message: 'Perusahaan user tidak ditemukan' })
+      }
+      const companyUsers = await Database.table('users')
+        .where('company_id', company.company_id)
+        .select('email')
+
+      const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, mailFrom } = pickSmtpConfig(company)
+      if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+        return response.status(500).json({
+          status: 'error',
+          message: 'Konfigurasi SMTP belum lengkap di perusahaan atau .env'
+        })
+      }
+
+      const upload = request.file('file', {
+        extnames: ['xls', 'xlsx'],
+        size: '5mb'
+      })
+
+      if (!upload) {
+        return response.status(422).json({ status: 'error', message: 'File .xlsx wajib diunggah (field name: file)' })
+      }
+
+      const tmpPath = path.join(Helpers.tmpPath(), `${Date.now()}-${upload.clientName}`)
+      await upload.move(path.dirname(tmpPath), { name: path.basename(tmpPath) })
+
+      const workbook = XLSX.readFile(tmpPath)
+      const sheetName = workbook.SheetNames[0]
+      const sheet = workbook.Sheets[sheetName]
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+      ensureLogDir()
+
+      const baseRoot = path.join(Helpers.publicPath(), 'download', sanitize(company.name))
+      const bases = companyUsers
+        .map((u) => (u.email || '').trim())
+        .filter(Boolean)
+        .map((email) => ({ dir: path.join(baseRoot, sanitize(email)) }))
+
+      const results = []
+      let queuedCount = 0
+      let failedCount = 0
+      let skippedCount = 0
+
+      const pick = (norm, keys) => {
+        for (const k of keys) {
+          if (norm[k] !== undefined && norm[k] !== null && norm[k] !== '') return norm[k]
+        }
+        return ''
+      }
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i]
+        const norm = normalizeRow(row)
+        const to = norm.sentto || norm.email
+
+        const fields = {
+          mdsName: pick(norm, ['mdsname', 'mds name', 'nama', 'nama mds']),
+          outlet: pick(norm, ['outlet', 'outlet penempatan', 'toko']),
+          letterNo: pick(norm, ['letterno', 'letter no', 'letter_no', 'no surat', 'letter number']),
+          area: pick(norm, ['area', 'wilayah', 'region']),
+          region: pick(norm, ['region', 'wilayah']),
+          outletFrom: pick(norm, ['outletfrom', 'outlet from', 'outlet sebelumnya']),
+          outletTo: pick(norm, ['outletto', 'outlet to', 'outlet penempatan']),
+        }
+
+        // Required check
+        const missing = (cfg.required || []).filter((k) => !fields[k])
+        if (!to) {
+          results.push({ row: i + 1, status: 'skipped', message: 'sentTo/email kosong' })
+          skippedCount++
+          continue
+        }
+        if (missing.length) {
+          results.push({ row: i + 1, status: 'failed', to, message: `Field wajib kosong: ${missing.join(', ')}` })
+          failedCount++
+          continue
+        }
+
+        const expectedPrefix = cfg.prefixParts(fields).map(safeName).join('.')
+        const expectedPrefixLower = `${expectedPrefix}.`.toLowerCase()
+
+        const attachments = []
+        for (const base of bases) {
+          const dir = base.dir
+          if (!fs.existsSync(dir)) continue
+          const files = fs.readdirSync(dir)
+          const match = files.find((f) => {
+            const lower = f.toLowerCase()
+            return lower.startsWith(expectedPrefixLower) && lower.endsWith('.pdf')
+          })
+          if (match) {
+            attachments.push({
+              filename: match,
+              path: path.join(dir, match)
+            })
+          }
+        }
+
+        if (attachments.length === 0) {
+          results.push({ row: i + 1, status: 'skipped', to, message: `Lampiran ${cfg.template} tidak ditemukan` })
+          skippedCount++
+          continue
+        }
+
+        const subject = norm.subject || cfg.subject(fields, company)
+        const body = norm.body || cfg.body(fields, company)
+        const cc = norm.cc ? norm.cc.split(';').map(s => s.trim()).filter(Boolean) : []
+        const bcc = norm.bcc ? norm.bcc.split(';').map(s => s.trim()).filter(Boolean) : []
+        const firstAttachment = attachments[0]
+
+        try {
+          await JobService.dispatch('App/Jobs/SendEmailJob', {
+            smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
+            to, cc, bcc, subject, text: body,
+            attachments: [firstAttachment],
+            employeeName: fields.mdsName
+          }, { attempts: 3, timeout: 120000 })
+          results.push({ row: i + 1, status: 'queued', to, attachment: firstAttachment.filename })
+          queuedCount++
+        } catch (err) {
+          results.push({ row: i + 1, status: 'failed', to, message: err.message })
+          failedCount++
+        }
+      }
+
+      try { fs.unlinkSync(tmpPath) } catch (e) { /* ignore */ }
+
+      return response.json({
+        status: 'ok',
+        total: results.length,
+        queued: queuedCount,
+        failed: failedCount,
+        skipped: skippedCount,
+        results
+      })
+    } catch (error) {
+      console.error(`BulkEmail ${cfg.template} error:`, error.message)
+      appendLog({ status: 'fatal', template: cfg.template, error: error.message })
+      return response.status(500).json({
+        status: 'error',
+        message: 'Gagal memproses permintaan',
+        error: error.message
+      })
+    }
+  }
+
+  async sendBaRequestId({ request, response, auth }) {
+    const cfg = {
+      template: 'ba-request-id',
+      required: ['mdsName', 'area', 'letterNo'],
+      prefixParts: (f) => ['ba-request-id', f.mdsName, f.area, f.letterNo],
+      subject: (f) => `Berita Acara Request ID - ${f.mdsName || f.letterNo || ''}`,
+      body: (f, company) => [
+        `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
+        '',
+        'Berikut terlampir Berita Acara Request ID MDS.',
+        f.area ? `Area: ${f.area}` : null,
+        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        '',
+        company && company.name ? company.name : '',
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ].filter(Boolean).join('\n')
+    }
+    return this._sendBaTemplate({ request, response, auth }, cfg)
+  }
+
+  async sendBaHold({ request, response, auth }) {
+    const cfg = {
+      template: 'ba-hold',
+      required: ['mdsName', 'region', 'letterNo'],
+      prefixParts: (f) => ['ba-hold', f.mdsName, f.region, f.letterNo],
+      subject: (f) => `Berita Acara HOLD - ${f.mdsName || f.letterNo || ''}`,
+      body: (f, company) => [
+        `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
+        '',
+        'Berikut terlampir Berita Acara HOLD MDS.',
+        f.region ? `Wilayah: ${f.region}` : null,
+        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        '',
+        company && company.name ? company.name : '',
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ].filter(Boolean).join('\n')
+    }
+    return this._sendBaTemplate({ request, response, auth }, cfg)
+  }
+
+  async sendBaRolling({ request, response, auth }) {
+    const cfg = {
+      template: 'ba-rolling',
+      required: ['mdsName', 'region', 'letterNo'],
+      prefixParts: (f) => ['ba-rolling', f.mdsName, f.region, f.letterNo],
+      subject: (f) => `Berita Acara Rolling - ${f.mdsName || f.letterNo || ''}`,
+      body: (f, company) => [
+        `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
+        '',
+        'Berikut terlampir Berita Acara Rolling MDS.',
+        f.region ? `Wilayah: ${f.region}` : null,
+        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        '',
+        company && company.name ? company.name : '',
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ].filter(Boolean).join('\n')
+    }
+    return this._sendBaTemplate({ request, response, auth }, cfg)
+  }
+
+  async sendBaHoldActivate({ request, response, auth }) {
+    const cfg = {
+      template: 'ba-hold-activate',
+      required: ['mdsName', 'region', 'letterNo'],
+      prefixParts: (f) => ['ba-hold-activate', f.mdsName, f.region, f.letterNo],
+      subject: (f) => `Berita Acara HOLD Aktif - ${f.mdsName || f.letterNo || ''}`,
+      body: (f, company) => [
+        `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
+        '',
+        'Berikut terlampir Berita Acara HOLD Aktif Kembali.',
+        f.region ? `Wilayah: ${f.region}` : null,
+        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        '',
+        company && company.name ? company.name : '',
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ].filter(Boolean).join('\n')
+    }
+    return this._sendBaTemplate({ request, response, auth }, cfg)
+  }
+
+  async sendBaTerminated({ request, response, auth }) {
+    const cfg = {
+      template: 'ba-terminated',
+      required: ['mdsName', 'region', 'letterNo'],
+      prefixParts: (f) => ['ba-terminated', f.mdsName, f.region, f.letterNo],
+      subject: (f) => `Berita Acara Terminasi - ${f.mdsName || f.letterNo || ''}`,
+      body: (f, company) => [
+        `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
+        '',
+        'Berikut terlampir Berita Acara Terminasi MDS.',
+        f.region ? `Wilayah: ${f.region}` : null,
+        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        '',
+        company && company.name ? company.name : '',
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ].filter(Boolean).join('\n')
+    }
+    return this._sendBaTemplate({ request, response, auth }, cfg)
+  }
 }
 
 function ensureLogDir() {
@@ -390,6 +655,13 @@ function normalizeRow(row) {
 
 function sanitize(str) {
   return (str || 'unknown').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim()
+}
+
+function safeName(str) {
+  return (str || '').toString()
+    .replace(/\//g, '-')
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .replace(/\s+/g, '_')
 }
 
 function truthy(val) {

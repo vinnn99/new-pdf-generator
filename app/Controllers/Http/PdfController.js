@@ -29,6 +29,11 @@ class PdfController {
         thr: ['employeeName', 'position', 'period', 'payoutDate', 'baseSalary'],
         payslip: ['employeeName', 'position', 'period'],
         'ba-penempatan': ['letterNo', 'mdsName', 'nik', 'placementDate', 'outlet'],
+        'ba-request-id': ['letterNo', 'mdsName', 'nik', 'joinDate'],
+        'ba-hold': ['letterNo', 'region', 'holdDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
+        'ba-rolling': ['letterNo', 'region', 'rollingDate', 'mdsName', 'mdsCode', 'status', 'outletFrom', 'outletTo'],
+        'ba-hold-activate': ['letterNo', 'region', 'reactivateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
+        'ba-terminated': ['letterNo', 'region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
       }
 
       const errors = []
