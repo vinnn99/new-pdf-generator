@@ -139,8 +139,9 @@ module.exports = function baPenempatanTemplate(payloadData = {}) {
 
       {
         text: [
-          'Pemberitahuan Penempatan MDS untuk Outlet Wilayah : ',
-          { text: upper(region) || '-', bold: true }
+          'Pemberitahuan Penempatan MDS untuk Outlet Wilayah ',
+          { text: upper(region) || '-', bold: true },
+          ' : '
         ],
         style: 'intro',
         margin: [0, 0, 0, 12],
