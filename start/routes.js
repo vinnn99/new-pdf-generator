@@ -36,6 +36,13 @@ Route.group(() => {
   Route.post('/send-ba-rolling-emails', 'BulkEmailController.sendBaRolling').middleware(['auth:jwt'])
   Route.post('/send-ba-hold-activate-emails', 'BulkEmailController.sendBaHoldActivate').middleware(['auth:jwt'])
   Route.post('/send-ba-terminated-emails', 'BulkEmailController.sendBaTerminated').middleware(['auth:jwt'])
+  // Single email (generate + kirim) per template
+  Route.post('/send/ba-penempatan', 'SingleEmailController.sendBaPenempatan').middleware(['auth:jwt'])
+  Route.post('/send/ba-request-id', 'SingleEmailController.sendBaRequestId').middleware(['auth:jwt'])
+  Route.post('/send/ba-hold', 'SingleEmailController.sendBaHold').middleware(['auth:jwt'])
+  Route.post('/send/ba-rolling', 'SingleEmailController.sendBaRolling').middleware(['auth:jwt'])
+  Route.post('/send/ba-hold-activate', 'SingleEmailController.sendBaHoldActivate').middleware(['auth:jwt'])
+  Route.post('/send/ba-terminated', 'SingleEmailController.sendBaTerminated').middleware(['auth:jwt'])
   Route.get('/company/api-key', 'CompanyController.apiKey').middleware(['auth:jwt'])
   Route.post('/bulk/payslip', 'BulkPdfController.payslipFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/insentif', 'BulkPdfController.insentifFromExcel').middleware(['auth:jwt'])

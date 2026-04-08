@@ -24,6 +24,11 @@ class GeneratePdfJob {
   }
 
   async handle(data) {
+    let filename
+    let filePath
+    let downloadUrl
+    let companyFolder
+    let emailFolder
     try {
       console.log('Starting PDF generation job...')
       console.log('Data:', JSON.stringify(data, null, 2))
@@ -71,8 +76,8 @@ class GeneratePdfJob {
 
       // Sanitize folder names — hapus karakter tidak valid untuk nama folder
       const sanitize = (str) => (str || 'unknown').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim()
-      const companyFolder = sanitize(companyName)
-      const emailFolder   = sanitize(email)
+      companyFolder = sanitize(companyName)
+      emailFolder   = sanitize(email)
 
       // Buat folder public/download/{companyName}/{email}/ — recursive, tidak error kalau sudah ada
       const downloadDir = path.join(process.cwd(), 'public', 'download', companyFolder, emailFolder)
@@ -92,7 +97,6 @@ class GeneratePdfJob {
           })()
 
       // Penamaan file per template
-      let filename
       if (template === 'payslip') {
         const nip = payloadData && payloadData.employeeId ? String(payloadData.employeeId) : 'NIP'
         const nama = payloadData && payloadData.employeeName ? String(payloadData.employeeName) : 'NAME'
@@ -147,13 +151,13 @@ class GeneratePdfJob {
       } else {
         filename  = `${template}_${uniqueId}.pdf`
       }
-      const filePath  = path.join(downloadDir, filename)
+      filePath  = path.join(downloadDir, filename)
       fs.writeFileSync(filePath, pdfBuffer)
       console.log(`PDF saved to: ${filePath}`)
 
       // Bangun download URL
       const baseUrl    = process.env.APP_URL || `http://localhost:${process.env.PORT || 3334}`
-      const downloadUrl = `${baseUrl}/download/${encodeURIComponent(companyFolder)}/${encodeURIComponent(emailFolder)}/${encodeURIComponent(filename)}`
+      downloadUrl = `${baseUrl}/download/${encodeURIComponent(companyFolder)}/${encodeURIComponent(emailFolder)}/${encodeURIComponent(filename)}`
 
       // Kirim webhook dengan download URL (bukan base64)
       const webhookPayload = {
@@ -225,6 +229,15 @@ class GeneratePdfJob {
           }
           throw err
         }
+      }
+
+      // Kembalikan metadata dasar agar bisa dipakai pemanggil sinkron (opsional)
+      return {
+        filename,
+        filePath,
+        downloadUrl,
+        companyFolder,
+        emailFolder
       }
 
     } catch (error) {

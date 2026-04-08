@@ -213,6 +213,35 @@ Response 202:
 ```json
 { "status": "queued", "message": "PDF generation is being processed" }
 ```
+
+### Kirim Email Single + Generate PDF (JWT)
+`POST /api/v1/send/{template}`  
+Headers: `Authorization: Bearer <JWT>`, `Content-Type: application/json`  
+Template yang tersedia: `ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-terminated`.
+
+Payload umum:
+```json
+{
+  "to": "penerima@example.com",
+  "cc": ["opsional1@example.com"],
+  "bcc": ["opsional2@example.com"],
+  "subject": "Opsional, akan diisi default jika kosong",
+  "body": "Opsional, akan diisi default jika kosong",
+  "data": { "... mengikuti field wajib template ..." }
+}
+```
+Field wajib di `data` sama seperti tabel “Field wajib per template” di bawah.  
+Response 202:
+```json
+{
+  "status": "queued",
+  "message": "PDF digenerate dan email akan dikirim",
+  "download_url": "...",
+  "filename": "..."
+}
+```
+Catatan: PDF dibuat dulu, lalu pengiriman email dijalankan melalui queue `SendEmailJob` menggunakan SMTP perusahaan (fallback `.env`).
+
 Webhook payload (on success):
 ```json
 {
