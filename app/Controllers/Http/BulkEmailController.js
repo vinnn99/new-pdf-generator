@@ -154,7 +154,11 @@ class BulkEmailController {
             smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
             to, cc, bcc, subject: slipTitle, text: body,
             attachments: limitedAttachments,
-            employeeId, employeeName
+            employeeId, employeeName,
+            userId: user.id,
+            companyId: company.company_id,
+            template: 'payslip-email',
+            context: 'bulk-slip'
           }, { attempts: 3, timeout: 120000 })
           const attachNames = limitedAttachments.map(a => a.filename)
           results.push({ row: i + 1, status: 'queued', to, attachments: attachNames })
@@ -328,7 +332,11 @@ class BulkEmailController {
             smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
             to, cc, bcc, subject, text: body,
             attachments: [firstAttachment],
-            employeeName: mdsName
+            employeeName: mdsName,
+            userId: user.id,
+            companyId: company.company_id,
+            template: 'ba-penempatan',
+            context: 'bulk-ba'
           }, { attempts: 3, timeout: 120000 })
           results.push({ row: i + 1, status: 'queued', to, attachment: firstAttachment.filename })
           appendLog({ row: i + 1, to, status: 'queued', attachment: firstAttachment.filename, mdsName, outlet, letterNo })
@@ -495,7 +503,11 @@ class BulkEmailController {
             smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
             to, cc, bcc, subject, text: body,
             attachments: [firstAttachment],
-            employeeName: fields.mdsName
+            employeeName: fields.mdsName,
+            userId: user.id,
+            companyId: company.company_id,
+            template: cfg.template,
+            context: 'bulk-ba'
           }, { attempts: 3, timeout: 120000 })
           results.push({ row: i + 1, status: 'queued', to, attachment: firstAttachment.filename })
           queuedCount++

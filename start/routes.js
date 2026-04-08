@@ -53,6 +53,8 @@ Route.group(() => {
   Route.post('/bulk/ba-rolling', 'BulkPdfController.baRollingFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/ba-hold-activate', 'BulkPdfController.baHoldActivateFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/ba-terminated', 'BulkPdfController.baTerminatedFromExcel').middleware(['auth:jwt'])
+  // Dashboard summary
+  Route.get('/dashboard/summary', 'DashboardController.summary').middleware(['auth:jwt'])
 }).prefix('/api/v1')
 
 // Download PDF yang sudah tersimpan di public/download/

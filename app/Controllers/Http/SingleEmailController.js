@@ -105,7 +105,11 @@ class SingleEmailController {
         text: textBody,
         attachments: [
           { filename: pdfMeta.filename, path: pdfMeta.filePath }
-        ]
+        ],
+        userId: user.id,
+        companyId: company.company_id,
+        template: cfg.template,
+        context: 'single-send'
       }, { attempts: 3, timeout: 120000 })
 
       return response.status(202).json({

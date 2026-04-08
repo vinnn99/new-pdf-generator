@@ -442,7 +442,53 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
 
 ---
 
-## 9) Template Ringkas (payload)
+## 9) Pencatatan Email Terkirim
+- Setiap pengiriman email (bulk maupun single send) otomatis dicatat ke tabel `email_logs` dengan kolom: `user_id`, `company_id`, `template`, `context`, `to_email`, `cc`, `bcc`, `subject`, `body`, `attachments` (JSON array nama file), `status`, `error`, `created_at`, `updated_at`.
+- Status: `sent` atau `failed` (jika nodemailer error).
+- Nilai `context`:
+  - `bulk-slip` untuk `/send-slip-emails`
+  - `bulk-ba` untuk semua BA bulk send
+  - `single-send` untuk `/send/{template}`
+- Jalankan migrasi sebelum memakai fitur ini: `node ace migration:run`
+- Akses riwayat: query langsung tabel `email_logs` (contoh: `select * from email_logs order by id desc limit 20;`).
+
+---
+
+## 10) Dashboard Summary
+`GET /api/v1/dashboard/summary`  
+Headers: `Authorization: Bearer <JWT>`  
+Query opsional: `scope=user` untuk membatasi data pada user login; default `scope` adalah perusahaan (company).  
+Ringkasan:
+```json
+{
+  "status": "ok",
+  "company": { "id": 1, "name": "Contoh Corp" },
+  "scope": "company",
+  "pdf": {
+    "total": 120,
+    "byTemplate": [{ "template": "ba-penempatan", "total": 45 }],
+    "recent": [
+      { "id": 10, "template": "ba-terminated", "filename": "...pdf", "download_url": "...", "email": "user@ex.com", "created_at": "2026-04-08T03:30:00.000Z" }
+    ]
+  },
+  "email": {
+    "totalSent": 300,
+    "totalFailed": 5,
+    "byTemplate": [
+      { "template": "ba-penempatan", "context": "bulk-ba", "total": 40 },
+      { "template": "ba-terminated", "context": "single-send", "total": 5 }
+    ],
+    "recent": [
+      { "id": 21, "template": "ba-rolling", "context": "bulk-ba", "to_email": "a@b.com", "subject": "Berita Acara Rolling", "attachments": ["...pdf"], "status": "sent", "error": null, "created_at": "2026-04-08T03:35:00.000Z" }
+    ]
+  }
+}
+```
+Catatan: data otomatis difilter `company_id` sesuai user login. `attachments` pada `recent` sudah di-parse menjadi array.
+
+---
+
+## 11) Template Ringkas (payload)
 - **musik**: surat perjanjian lisensi musik (lihat contoh di README).
 - **invoice**: invoice dengan tabel item, PPN default 11%.
 - **payslip**: slip gaji; earnings/deductions array atau kolom terpisah di Excel.
