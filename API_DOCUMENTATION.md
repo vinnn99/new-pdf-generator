@@ -58,6 +58,23 @@ Headers: `Authorization: Bearer <JWT>`
 Rules: both required, min 6; `oldPassword` must match current password.  
 Response 200: `{ "status": "password_changed" }`
 
+### Get Company API Key (JWT)
+`GET /api/v1/company/api-key`  
+Headers: `Authorization: Bearer <JWT>`  
+Mengembalikan API key perusahaan yang terhubung dengan user login.  
+Response 200:
+```json
+{
+  "status": "ok",
+  "company": {
+    "id": 1,
+    "name": "Contoh Corp",
+    "apiKey": "abcd1234"
+  }
+}
+```
+Jika user belum terhubung ke perusahaan atau perusahaan tidak ditemukan, balikan 404 dengan pesan kesalahan.
+
 ---
 
 ## 2) Generate PDF (single)

@@ -254,7 +254,8 @@ function toYmd(y, m, d) {
  * Mengembalikan string ISO pendek (YYYY-MM-DD) atau '' jika tidak valid.
  */
 function parseExcelDate(val) {
-  if (val === undefined || val === null || val === '') return ''
+  if (val === undefined || val === null) return undefined
+  if (val === '') return undefined
 
   // Excel date code (number of days since 1900-01-00)
   if (typeof val === 'number') {
@@ -271,7 +272,7 @@ function parseExcelDate(val) {
 
   // String formats: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, MM/DD/YYYY (fallback)
   const str = String(val).trim()
-  if (!str) return ''
+  if (!str) return undefined
 
   let m
   // 2026-04-07 or 2026/04/07
@@ -649,9 +650,11 @@ function buildBaTerminatedPayload(lower, opts) {
 
 function pickFromLower(lower, keys) {
   for (const k of keys) {
-    if (lower[k] !== undefined && lower[k] !== null && lower[k] !== '') return lower[k]
+    if (lower[k] === undefined || lower[k] === null) continue
+    if (typeof lower[k] === 'string' && lower[k].trim() === '') continue
+    return lower[k]
   }
-  return ''
+  return undefined
 }
 
 function parseList(val) {

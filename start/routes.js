@@ -36,6 +36,7 @@ Route.group(() => {
   Route.post('/send-ba-rolling-emails', 'BulkEmailController.sendBaRolling').middleware(['auth:jwt'])
   Route.post('/send-ba-hold-activate-emails', 'BulkEmailController.sendBaHoldActivate').middleware(['auth:jwt'])
   Route.post('/send-ba-terminated-emails', 'BulkEmailController.sendBaTerminated').middleware(['auth:jwt'])
+  Route.get('/company/api-key', 'CompanyController.apiKey').middleware(['auth:jwt'])
   Route.post('/bulk/payslip', 'BulkPdfController.payslipFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/insentif', 'BulkPdfController.insentifFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/thr', 'BulkPdfController.thrFromExcel').middleware(['auth:jwt'])
