@@ -24,6 +24,11 @@ class GeneratePdfJob {
   }
 
   async handle(data) {
+    let filename
+    let filePath
+    let downloadUrl
+    let companyFolder
+    let emailFolder
     try {
       console.log('Starting PDF generation job...')
       console.log('Data:', JSON.stringify(data, null, 2))
@@ -71,8 +76,8 @@ class GeneratePdfJob {
 
       // Sanitize folder names — hapus karakter tidak valid untuk nama folder
       const sanitize = (str) => (str || 'unknown').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim()
-      const companyFolder = sanitize(companyName)
-      const emailFolder   = sanitize(email)
+      companyFolder = sanitize(companyName)
+      emailFolder   = sanitize(email)
 
       // Buat folder public/download/{companyName}/{email}/ — recursive, tidak error kalau sudah ada
       const downloadDir = path.join(process.cwd(), 'public', 'download', companyFolder, emailFolder)
@@ -92,7 +97,6 @@ class GeneratePdfJob {
           })()
 
       // Penamaan file per template
-      let filename
       if (template === 'payslip') {
         const nip = payloadData && payloadData.employeeId ? String(payloadData.employeeId) : 'NIP'
         const nama = payloadData && payloadData.employeeName ? String(payloadData.employeeName) : 'NAME'
@@ -114,16 +118,46 @@ class GeneratePdfJob {
         const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
         const safeLetter = safe(letterNo.replace(/\//g, '-'))
         filename = `ba-penempatan.${safe(mdsName)}.${safe(outlet)}.${safeLetter}.${uniqueId}.pdf`
+      } else if (template === 'ba-request-id') {
+        const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
+        const area     = payloadData && payloadData.area ? String(payloadData.area) : 'AREA'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
+        filename = `ba-request-id.${safe(mdsName)}.${safe(area)}.${safeLetter}.${uniqueId}.pdf`
+      } else if (template === 'ba-hold') {
+        const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
+        const region  = payloadData && payloadData.region ? String(payloadData.region) : 'REGION'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
+        filename = `ba-hold.${safe(mdsName)}.${safe(region)}.${safeLetter}.${uniqueId}.pdf`
+      } else if (template === 'ba-rolling') {
+        const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
+        const region  = payloadData && payloadData.region ? String(payloadData.region) : 'REGION'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
+        filename = `ba-rolling.${safe(mdsName)}.${safe(region)}.${safeLetter}.${uniqueId}.pdf`
+      } else if (template === 'ba-hold-activate') {
+        const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
+        const region  = payloadData && payloadData.region ? String(payloadData.region) : 'REGION'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
+        filename = `ba-hold-activate.${safe(mdsName)}.${safe(region)}.${safeLetter}.${uniqueId}.pdf`
+      } else if (template === 'ba-terminated') {
+        const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
+        const region  = payloadData && payloadData.region ? String(payloadData.region) : 'REGION'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
+        filename = `ba-terminated.${safe(mdsName)}.${safe(region)}.${safeLetter}.${uniqueId}.pdf`
       } else {
         filename  = `${template}_${uniqueId}.pdf`
       }
-      const filePath  = path.join(downloadDir, filename)
+      filePath  = path.join(downloadDir, filename)
       fs.writeFileSync(filePath, pdfBuffer)
       console.log(`PDF saved to: ${filePath}`)
 
       // Bangun download URL
       const baseUrl    = process.env.APP_URL || `http://localhost:${process.env.PORT || 3334}`
-      const downloadUrl = `${baseUrl}/download/${encodeURIComponent(companyFolder)}/${encodeURIComponent(emailFolder)}/${encodeURIComponent(filename)}`
+      downloadUrl = `${baseUrl}/download/${encodeURIComponent(companyFolder)}/${encodeURIComponent(emailFolder)}/${encodeURIComponent(filename)}`
 
       // Kirim webhook dengan download URL (bukan base64)
       const webhookPayload = {
@@ -195,6 +229,15 @@ class GeneratePdfJob {
           }
           throw err
         }
+      }
+
+      // Kembalikan metadata dasar agar bisa dipakai pemanggil sinkron (opsional)
+      return {
+        filename,
+        filePath,
+        downloadUrl,
+        companyFolder,
+        emailFolder
       }
 
     } catch (error) {

@@ -24,6 +24,26 @@ class BulkPdfController {
     return this._handleExcel(ctx, 'ba-penempatan')
   }
 
+  async baRequestIdFromExcel(ctx) {
+    return this._handleExcel(ctx, 'ba-request-id')
+  }
+
+  async baHoldFromExcel(ctx) {
+    return this._handleExcel(ctx, 'ba-hold')
+  }
+
+  async baRollingFromExcel(ctx) {
+    return this._handleExcel(ctx, 'ba-rolling')
+  }
+
+  async baHoldActivateFromExcel(ctx) {
+    return this._handleExcel(ctx, 'ba-hold-activate')
+  }
+
+  async baTerminatedFromExcel(ctx) {
+    return this._handleExcel(ctx, 'ba-terminated')
+  }
+
   /**
    * mode: payslip | insentif | thr
    */
@@ -247,7 +267,8 @@ function toYmd(y, m, d) {
  * Mengembalikan string ISO pendek (YYYY-MM-DD) atau '' jika tidak valid.
  */
 function parseExcelDate(val) {
-  if (val === undefined || val === null || val === '') return ''
+  if (val === undefined || val === null) return undefined
+  if (val === '') return undefined
 
   // Excel date code (number of days since 1900-01-00)
   if (typeof val === 'number') {
@@ -264,7 +285,7 @@ function parseExcelDate(val) {
 
   // String formats: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, MM/DD/YYYY (fallback)
   const str = String(val).trim()
-  if (!str) return ''
+  if (!str) return undefined
 
   let m
   // 2026-04-07 or 2026/04/07
@@ -285,6 +306,11 @@ function buildPayloadForMode(lower, mode, opts) {
   if (mode === 'insentif') return buildInsentifPayload(lower, opts)
   if (mode === 'thr') return buildThrPayload(lower, opts)
   if (mode === 'ba-penempatan') return buildBaPenempatanPayload(lower, opts)
+  if (mode === 'ba-request-id') return buildBaRequestIdPayload(lower, opts)
+  if (mode === 'ba-hold') return buildBaHoldPayload(lower, opts)
+  if (mode === 'ba-rolling') return buildBaRollingPayload(lower, opts)
+  if (mode === 'ba-hold-activate') return buildBaHoldActivatePayload(lower, opts)
+  if (mode === 'ba-terminated') return buildBaTerminatedPayload(lower, opts)
   return buildPayslipPayload(lower, opts)
 }
 
@@ -445,12 +471,7 @@ function buildBaPenempatanPayload(lower, opts) {
   const payload = basePayload(lower, opts)
   payload.template = 'ba-penempatan'
 
-  const pick = (keys) => {
-    for (const k of keys) {
-      if (lower[k] !== undefined && lower[k] !== '') return lower[k]
-    }
-    return ''
-  }
+  const pick = (keys) => pickFromLower(lower, keys)
 
   payload.data = {
     ...payload.data,
@@ -480,6 +501,181 @@ function buildBaPenempatanPayload(lower, opts) {
   }
 
   return payload
+}
+
+function buildBaRequestIdPayload(lower, opts) {
+  const payload = basePayload(lower, opts)
+  payload.template = 'ba-request-id'
+
+  const pick = (keys) => pickFromLower(lower, keys)
+
+  payload.data = {
+    ...payload.data,
+    companyName: lower.companyname || opts.defaultCompany,
+    letterNo: pick(['letterno', 'letter no', 'no surat', 'letter_number', 'letter number']),
+    area: pick(['area', 'wilayah', 'region']),
+    mdsName: pick(['mdsname', 'mds name', 'nama mds']),
+    nik: pick(['nik']),
+    birthDate: parseExcelDate(pick(['birthdate', 'birth date', 'tanggal lahir', 'tgl lahir'])),
+    joinDate: parseExcelDate(pick(['joindate', 'join date', 'tanggal masuk', 'tgl masuk'])),
+    status: pick(['status']),
+    stores: pick(['stores', 'store', 'toko', 'outlet']),
+    reason: pick(['reason', 'alasan']),
+    location: pick(['location', 'lokasi']),
+    letterDate: parseExcelDate(pick(['letterdate', 'letter date', 'tanggal surat'])),
+    signerLeftName: pick(['signerleftname', 'signer left name', 'penandatangan kiri']),
+    signerLeftTitle: pick(['signerlefttitle', 'signer left title', 'jabatan kiri']),
+    signerRightName: pick(['signerrightname', 'signer right name', 'penandatangan kanan']),
+    signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
+  }
+
+  const required = ['letterNo', 'mdsName', 'nik', 'joinDate']
+  const missing = required.filter((k) => !payload.data[k])
+  if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
+
+  return payload
+}
+
+function buildBaHoldPayload(lower, opts) {
+  const payload = basePayload(lower, opts)
+  payload.template = 'ba-hold'
+  const pick = (keys) => pickFromLower(lower, keys)
+
+  payload.data = {
+    ...payload.data,
+    companyName: lower.companyname || opts.defaultCompany,
+    letterNo: pick(['letterno', 'letter no', 'no surat', 'letter_number', 'letter number']),
+    region: pick(['region', 'wilayah']),
+    holdDate: parseExcelDate(pick(['holddate', 'hold date', 'tanggal hold', 'tgl hold'])),
+    mdsName: pick(['mdsname', 'mds name', 'nama mds']),
+    mdsCode: pick(['mdscode', 'mds code', 'code mds', 'kode mds']),
+    status: pick(['status']),
+    outlet: pick(['outlet', 'outlet penempatan', 'toko']),
+    reason: pick(['reason', 'alasan']),
+    location: pick(['location', 'lokasi']),
+    letterDate: parseExcelDate(pick(['letterdate', 'letter date', 'tanggal surat'])),
+    signerLeftName: pick(['signerleftname', 'signer left name', 'penandatangan kiri']),
+    signerLeftTitle: pick(['signerlefttitle', 'signer left title', 'jabatan kiri']),
+    signerRightName: pick(['signerrightname', 'signer right name', 'penandatangan kanan']),
+    signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
+  }
+
+  const required = ['letterNo', 'region', 'holdDate', 'mdsName', 'mdsCode', 'status', 'outlet']
+  const missing = required.filter((k) => !payload.data[k])
+  if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
+
+  return payload
+}
+
+function buildBaRollingPayload(lower, opts) {
+  const payload = basePayload(lower, opts)
+  payload.template = 'ba-rolling'
+  const pick = (keys) => pickFromLower(lower, keys)
+
+  payload.data = {
+    ...payload.data,
+    companyName: lower.companyname || opts.defaultCompany,
+    letterNo: pick(['letterno', 'letter no', 'no surat', 'letter_number', 'letter number']),
+    region: pick(['region', 'wilayah']),
+    rollingDate: parseExcelDate(pick(['rollingdate', 'rolling date', 'tanggal rolling', 'tgl rolling'])),
+    mdsName: pick(['mdsname', 'mds name', 'nama mds']),
+    mdsCode: pick(['mdscode', 'mds code', 'code mds', 'kode mds']),
+    status: pick(['status']),
+    outletFrom: pick(['outletfrom', 'outlet from', 'outlet sebelumnya', 'toko sebelumnya']),
+    outletTo: pick(['outletto', 'outlet to', 'outlet penempatan', 'toko penempatan']),
+    reason: pick(['reason', 'alasan']),
+    location: pick(['location', 'lokasi']),
+    letterDate: parseExcelDate(pick(['letterdate', 'letter date', 'tanggal surat'])),
+    signerLeftName: pick(['signerleftname', 'signer left name', 'penandatangan kiri']),
+    signerLeftTitle: pick(['signerlefttitle', 'signer left title', 'jabatan kiri']),
+    signerRightName: pick(['signerrightname', 'signer right name', 'penandatangan kanan']),
+    signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
+  }
+
+  const required = ['letterNo', 'region', 'rollingDate', 'mdsName', 'mdsCode', 'status', 'outletFrom', 'outletTo']
+  const missing = required.filter((k) => !payload.data[k])
+  if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
+
+  return payload
+}
+
+function buildBaHoldActivatePayload(lower, opts) {
+  const payload = basePayload(lower, opts)
+  payload.template = 'ba-hold-activate'
+  const pick = (keys) => pickFromLower(lower, keys)
+
+  payload.data = {
+    ...payload.data,
+    companyName: lower.companyname || opts.defaultCompany,
+    letterNo: pick(['letterno', 'letter no', 'no surat', 'letter_number', 'letter number']),
+    region: pick(['region', 'wilayah']),
+    reactivateDate: parseExcelDate(pick(['reactivatedate', 'reactivate date', 'tanggal aktif', 'tgl aktif', 'aktif kembali'])),
+    mdsName: pick(['mdsname', 'mds name', 'nama mds']),
+    mdsCode: pick(['mdscode', 'mds code', 'code mds', 'kode mds']),
+    status: pick(['status']),
+    outlet: pick(['outlet', 'outlet penempatan', 'toko']),
+    holdReason: pick(['holdreason', 'hold reason', 'alasan hold']),
+    location: pick(['location', 'lokasi']),
+    letterDate: parseExcelDate(pick(['letterdate', 'letter date', 'tanggal surat'])),
+    signerLeftName: pick(['signerleftname', 'signer left name', 'penandatangan kiri']),
+    signerLeftTitle: pick(['signerlefttitle', 'signer left title', 'jabatan kiri']),
+    signerRightName: pick(['signerrightname', 'signer right name', 'penandatangan kanan']),
+    signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
+  }
+
+  const required = ['letterNo', 'region', 'reactivateDate', 'mdsName', 'mdsCode', 'status', 'outlet']
+  const missing = required.filter((k) => !payload.data[k])
+  if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
+
+  return payload
+}
+
+function buildBaTerminatedPayload(lower, opts) {
+  const payload = basePayload(lower, opts)
+  payload.template = 'ba-terminated'
+  const pick = (keys) => pickFromLower(lower, keys)
+
+  payload.data = {
+    ...payload.data,
+    companyName: lower.companyname || opts.defaultCompany,
+    letterNo: pick(['letterno', 'letter no', 'no surat', 'letter_number', 'letter number']),
+    region: pick(['region', 'wilayah']),
+    terminateDate: parseExcelDate(pick(['terminatedate', 'terminate date', 'termination date', 'tanggal terminasi', 'tgl terminasi'])),
+    mdsName: pick(['mdsname', 'mds name', 'nama mds']),
+    mdsCode: pick(['mdscode', 'mds code', 'code mds', 'kode mds']),
+    status: pick(['status']),
+    outlet: pick(['outlet', 'outlet penempatan', 'toko']),
+    reasons: parseList(pick(['reasons', 'reason', 'alasan terminasi', 'alasan'])),
+    location: pick(['location', 'lokasi']),
+    letterDate: parseExcelDate(pick(['letterdate', 'letter date', 'tanggal surat'])),
+    signerLeftName: pick(['signerleftname', 'signer left name', 'penandatangan kiri']),
+    signerLeftTitle: pick(['signerlefttitle', 'signer left title', 'jabatan kiri']),
+    signerRightName: pick(['signerrightname', 'signer right name', 'penandatangan kanan']),
+    signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
+  }
+
+  const required = ['letterNo', 'region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet']
+  const missing = required.filter((k) => !payload.data[k])
+  if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
+
+  return payload
+}
+
+function pickFromLower(lower, keys) {
+  for (const k of keys) {
+    if (lower[k] === undefined || lower[k] === null) continue
+    if (typeof lower[k] === 'string' && lower[k].trim() === '') continue
+    return lower[k]
+  }
+  return undefined
+}
+
+function parseList(val) {
+  if (!val && val !== 0) return []
+  if (Array.isArray(val)) return val.filter(Boolean).map((v) => String(v).trim()).filter(Boolean)
+  const str = String(val).trim()
+  if (!str) return []
+  return str.split(/\r?\n|;|,|•|-/).map((s) => s.trim()).filter(Boolean)
 }
 
 module.exports = BulkPdfController

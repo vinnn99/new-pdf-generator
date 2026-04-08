@@ -69,7 +69,8 @@ Setiap request harus melewati middleware `companyAuth`:
   - `user`: akses sesuai haknya.
   - `admin`: wajib punya `company_id`, akses hanya ke perusahaannya (user/company/PDF).
   - `superadmin`: tidak perlu `company_id`, bisa kelola semua user dan company, serta melihat semua PDF.
-  - Superadmin yang ingin generate/bulk PDF harus menyertakan `company_id` (companyId) di body; admin otomatis pakai `company_id` miliknya.
+  - Superadmin yang ingin generate PDF lewat `/api/v1/generate-pdf` harus menyertakan `company_id` (`companyId`) di body.
+  - Untuk endpoint bulk (`/api/v1/bulk/*`), user login wajib punya `company_id` pada akun.
 
 ### Register User
 
@@ -86,7 +87,7 @@ Body:
   "username": "demo",
   "email": "user@example.com",
   "password": "rahasia123",
-  "role": "user"   // opsional, default user; boleh admin
+  "role": "user"   // opsional, default user; boleh admin/superadmin
 }
 ```
 
@@ -210,89 +211,89 @@ Catatan:
 - Superadmin bisa membuat user/admin/superadmin; untuk user/admin wajib isi `company_id`.
 - Validasi sama seperti register.
 
-### List User (Admin only)
+### List User (Admin/Superadmin)
 
 ```
 GET http://localhost:3334/api/v1/admin/users?page=1&perPage=10
-Authorization: Bearer <jwt_token_admin>
+Authorization: Bearer <jwt_token_admin_or_superadmin>
 ```
 
 Di-paginate (`perPage` maks 100) dan diurutkan `created_at` terbaru.  
-Admin dengan `company_id` hanya melihat user dalam perusahaannya; jika `company_id` null, akan melihat semua user.
+Admin hanya melihat user dalam perusahaannya dan wajib punya `company_id` (jika tidak, respons 403). Superadmin melihat semua user.
 
-### Ubah User (Admin only)
+### Ubah User (Admin/Superadmin)
 
 ```
 PUT http://localhost:3334/api/v1/admin/users/:id
-Authorization: Bearer <jwt_token_admin>
+Authorization: Bearer <jwt_token_admin_or_superadmin>
 Content-Type: application/json
 ```
 
-Body (opsional): `username`, `email`, `role` (`user|admin`), `is_active` (boolean).  
-Hanya untuk user dalam perusahaan yang sama. Respons: `{ "status": "updated", "user": {...} }`
+Body (opsional): `username`, `email`, `role` (`user|admin|superadmin`), `is_active` (boolean), `company_id` (hanya superadmin).  
+Admin hanya bisa ubah user dalam perusahaan yang sama, tidak boleh set role `superadmin`, dan tidak boleh ubah `company_id`. Superadmin bebas.
 
-### Nonaktifkan User (Admin only)
+### Nonaktifkan User (Admin/Superadmin)
 
 ```
 POST http://localhost:3334/api/v1/admin/users/:id/deactivate
-Authorization: Bearer <jwt_token_admin>
+Authorization: Bearer <jwt_token_admin_or_superadmin>
 ```
 
-Set `is_active=false` pada user dalam perusahaan admin.
+Set `is_active=false`. Admin dibatasi user di perusahaan sendiri; superadmin semua user.
 
-### Reset Password User (Admin only)
+### Reset Password User (Admin/Superadmin)
 
 ```
 POST http://localhost:3334/api/v1/admin/users/:id/password
-Authorization: Bearer <jwt_token_admin>
+Authorization: Bearer <jwt_token_admin_or_superadmin>
 Content-Type: application/json
 ```
 
 Body: `{ "password": "minimal6karakter" }`  
-Password di-hash otomatis melalui hook model User.
+Password di-hash otomatis melalui hook model User. Admin dibatasi user di perusahaan sendiri; superadmin semua user.
 
-### List Company (Admin only)
+### List Company (Admin/Superadmin)
 
 ```
 GET http://localhost:3334/api/v1/admin/companies?page=1&perPage=10
-Authorization: Bearer <jwt_token_admin>
+Authorization: Bearer <jwt_token_admin_or_superadmin>
 ```
 
 Pagination (`perPage` maks 100) dan diurutkan `created_at` terbaru.  
-Admin yang punya `company_id` hanya melihat company-nya sendiri; admin tanpa `company_id` melihat semua company.
+Admin dengan `company_id` hanya melihat company-nya sendiri; superadmin melihat semua company. Jika admin tanpa `company_id` lolos autentikasi, query tidak difilter (melihat semua company).
 
-### Buat Company (Admin only)
+### Buat Company (Admin/Superadmin)
 
 ```
 POST http://localhost:3334/api/v1/admin/companies
-Authorization: Bearer <jwt_token_admin>
+Authorization: Bearer <jwt_token_admin_or_superadmin>
 Content-Type: application/json
 ```
 
 Body wajib: `name`, `api_key` (unik). Opsional: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_secure` (bool), `mail_from`, `is_active` (default true).
-Catatan: hanya admin tanpa `company_id` yang boleh membuat company baru.
+Catatan: superadmin boleh membuat company. Admin hanya boleh membuat company jika `company_id` kosong; jika sudah terhubung company akan ditolak 403.
 
-### Edit Company (Admin only)
+### Edit Company (Admin/Superadmin)
 
 ```
 PUT http://localhost:3334/api/v1/admin/companies/:id
-Authorization: Bearer <jwt_token_admin>
+Authorization: Bearer <jwt_token_admin_or_superadmin>
 Content-Type: application/json
 ```
 
 Body opsional: `name`, `api_key`, SMTP fields, `is_active` (boolean).
-Admin dengan `company_id` hanya boleh mengedit company miliknya.
+Admin dengan `company_id` hanya boleh mengedit company miliknya; superadmin bebas.
 
-### Aktivasi/Nonaktifkan Company (Admin only)
+### Aktivasi/Nonaktifkan Company (Admin/Superadmin)
 
 ```
 POST http://localhost:3334/api/v1/admin/companies/:id/activate
 POST http://localhost:3334/api/v1/admin/companies/:id/deactivate
-Authorization: Bearer <jwt_token_admin>
+Authorization: Bearer <jwt_token_admin_or_superadmin>
 ```
 
 Jika company nonaktif, semua user perusahaan tersebut tidak bisa login maupun melewati `companyAuth`.
-Admin dengan `company_id` hanya boleh mengubah status company miliknya.
+Admin dengan `company_id` hanya boleh mengubah status company miliknya; superadmin bebas.
 
 ### Endpoint
 
@@ -463,6 +464,168 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 
 > **Field wajib `ba-penempatan`:** `letterNo`, `mdsName`, `placementDate`, `outlet` (validasi di API). Nama file output: `ba-penempatan.[namaMDS].[outlet].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
 
+### `ba-request-id` — Berita Acara Request ID MDS
+
+```json
+{
+  "template": "ba-request-id",
+  "email": "user@email.com",
+  "data": {
+    "letterNo": "102/OMI-TM/BAK/IV/2026",
+    "area": "JTU",
+    "mdsName": "MUHAMAD MUZAENI",
+    "nik": "3328091505990007",
+    "birthDate": "1999-05-15",
+    "joinDate": "2026-04-09",
+    "status": "MOBILE",
+    "stores": [
+      "GAB TK EKONOMI@*OBP",
+      "GAB TK EKONOMI@*OBP - SLEROK",
+      "GAB TK EKONOMI@*OBP - TEKSIN"
+    ],
+    "reason": "REQUEST ID MDS",
+    "location": "Jakarta",
+    "letterDate": "2026-04-07",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
+  },
+  "callback": {
+    "url": "https://webhook.site/xxx"
+  }
+}
+```
+
+> **Field wajib `ba-request-id`:** `letterNo`, `mdsName`, `nik`, `joinDate`. Nama file output: `ba-request-id.[namaMDS].[area].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+
+### `ba-hold` — Berita Acara MDS HOLD
+
+```json
+{
+  "template": "ba-hold",
+  "email": "user@email.com",
+  "data": {
+    "letterNo": "097/OMI-TM/BAK/IV/2026",
+    "region": "JTU",
+    "holdDate": "2026-04-01",
+    "mdsName": "INTAN DESMA SYAWALIA",
+    "mdsCode": "MDSUJTU207",
+    "status": "STAY",
+    "outlet": "Tk Harry & Sons@ *Obp",
+    "reason": "IJIN JAGA SUAMI KARENA SUAMINYA KECELAKAN",
+    "letterDate": "2026-04-06",
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
+  },
+  "callback": {
+    "url": "https://webhook.site/xxx"
+  }
+}
+```
+
+> **Field wajib `ba-hold`:** `letterNo`, `region`, `holdDate`, `mdsName`, `mdsCode`, `status`, `outlet`. Nama file output: `ba-hold.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+
+### `ba-rolling` — Berita Acara Rolling MDS
+
+```json
+{
+  "template": "ba-rolling",
+  "email": "user@email.com",
+  "data": {
+    "letterNo": "099/OMI-TM/BAK/IV/2026",
+    "region": "JTU",
+    "rollingDate": "2026-04-07",
+    "mdsName": "NUZULUL NINA QURANI",
+    "mdsCode": "MDSUJTU255",
+    "status": "STAY",
+    "outletFrom": "DJ TEDDY GAB",
+    "outletTo": "MAK SUTINAH*OBP",
+    "reason": "KARENA TIDAK KUAT DENGAN PERLAKUAN OWNER DENGAN KATA - KATA KEBUN BINATANG ( TEKANAN BATIN )",
+    "letterDate": "2026-04-06",
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
+  },
+  "callback": {
+    "url": "https://webhook.site/xxx"
+  }
+}
+```
+
+> **Field wajib `ba-rolling`:** `letterNo`, `region`, `rollingDate`, `mdsName`, `mdsCode`, `status`, `outletFrom`, `outletTo`. Nama file output: `ba-rolling.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+
+### `ba-hold-activate` — Berita Acara MDS HOLD Diaktifkan Kembali
+
+```json
+{
+  "template": "ba-hold-activate",
+  "email": "user@email.com",
+  "data": {
+    "letterNo": "098/OMI-TM/BAK/IV/2026",
+    "region": "JTU",
+    "reactivateDate": "2026-04-06",
+    "mdsName": "INTAN DESMA SYAWALIA",
+    "mdsCode": "MDSUJTU207",
+    "status": "STAY",
+    "outlet": "Tk Harry & Sons@ *Obp",
+    "holdReason": "IJIN JAGA SUAMI KARENA SUAMINYA KECELAKAN",
+    "letterDate": "2026-04-06",
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
+  },
+  "callback": {
+    "url": "https://webhook.site/xxx"
+  }
+}
+```
+
+> **Field wajib `ba-hold-activate`:** `letterNo`, `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`. Nama file output: `ba-hold-activate.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+
+
+### `ba-terminated` ? Berita Acara Terminasi MDS
+
+```json
+{
+  "template": "ba-terminated",
+  "email": "user@email.com",
+  "data": {
+    "letterNo": "084/OMI-TM/BAK/III/2026",
+    "region": "LPB",
+    "terminateDate": "2026-04-01",
+    "mdsName": "REVINKA NOOR ALQAMARIAH",
+    "mdsCode": "MDSULPB182",
+    "status": "STAY",
+    "outlet": "TOKO POM SIMBAL *OBP - ALT DERRY YUNG",
+    "reasons": [
+      "MDS TIDAK MENGIKUTI PERATURAN YANG SUDAH DITENTUKAN MENGENAI LIBUR LEBARAN",
+      "TIDAK MENJALANKAN KETENTUAN & INSTRUKSI DARI TL",
+      "PIHAK TOKO REQUEST MENGGANTI MDS"
+    ],
+    "letterDate": "2026-03-31",
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
+  },
+  "callback": {
+    "url": "https://webhook.site/xxx"
+  }
+}
+```
+
+> **Field wajib `ba-terminated`:** `letterNo`, `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`. Nama file output: `ba-terminated.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+
+
 ---
 
 ### List Generated PDF (butuh login JWT)
@@ -474,7 +637,9 @@ Header: Authorization: Bearer <jwt_token>
 
 - Harus login (`/api/v1/login`) untuk mendapatkan JWT.
 - User biasa: hanya melihat PDF miliknya.
-- Admin: melihat semua PDF dalam perusahaannya (jika `company_id` kosong, melihat semua).
+- Admin: melihat semua PDF dalam perusahaannya.
+- Admin tanpa `company_id`: tidak melihat data apa pun.
+- Superadmin: melihat semua PDF.
 - Diurutkan `created_at` terbaru.
 - `perPage` dibatasi maks 100; default 10.
 
@@ -537,13 +702,14 @@ Response contoh:
 3. **Daftarkan validasi** di `app/Controllers/Http/PdfController.js`
 
    ```js
-   const templateRequiredFields = {
-     musik:         ['nama', 'judul', ...],
-     invoice:       ['clientName', 'items'],
-     'ba-penempatan': ['letterNo', 'mdsName', 'placementDate', 'outlet'],
-     namaTemplate:  ['field1', 'field2'],  // ← tambahkan di sini
-   }
-   ```
+  const templateRequiredFields = {
+    musik:         ['nama', 'judul', ...],
+    invoice:       ['clientName', 'items'],
+    'ba-penempatan': ['letterNo', 'mdsName', 'placementDate', 'outlet'],
+    'ba-request-id': ['letterNo', 'mdsName', 'nik', 'joinDate'],
+    namaTemplate:  ['field1', 'field2'],  // ← tambahkan di sini
+  }
+  ```
 
 ---
 
@@ -551,35 +717,51 @@ Response contoh:
 
 ```
 app/
-  Controllers/Http/PdfController.js   ← validasi & dispatch job + endpoint download
-  Controllers/Http/AuthController.js  ← endpoint register user
-  Jobs/GeneratePdfJob.js              ← proses generate PDF, simpan ke disk, kirim webhook
-  Templates/                          ← logika template (isi PDF)
+  Controllers/Http/PdfController.js   ? validasi & dispatch job + endpoint download
+  Controllers/Http/AuthController.js  ? endpoint register user
+  Jobs/GeneratePdfJob.js              ? proses generate PDF, simpan ke disk, kirim webhook
+  Templates/                          ? logika template (isi PDF)
     musik.js
     invoice.js
+    payslip.js
+    thr.js
+    ba-penempatan.js
+    ba-request-id.js
+    ba-hold.js
+    ba-rolling.js
+    ba-hold-activate.js
+    ba-terminated.js
   Services/
-    JobService.js                     ← helper dispatch queue
-    WebhookSender.js                  ← kirim hasil ke callback URL (dengan retry)
-  Fonts/                              ← custom font (.ttf)
+    JobService.js                     ? helper dispatch queue
+    WebhookSender.js                  ? kirim hasil ke callback URL (dengan retry)
+  Fonts/                              ? custom font (.ttf)
 
-resources/pdf-templates/              ← re-export template (dipakai job)
+resources/pdf-templates/              ? re-export template (dipakai job)
   musik.js
   invoice.js
+  payslip.js
+  thr.js
+  ba-penempatan.js
+  ba-request-id.js
+  ba-hold.js
+  ba-rolling.js
+  ba-hold-activate.js
+  ba-terminated.js
 
 public/
-  download/                           ← folder penyimpanan PDF yang sudah digenerate
+  download/                           ? folder penyimpanan PDF yang sudah digenerate
     {companyName}/
       {email}/
         {template}_{uniqueId}.pdf
 
 start/
-  routes.js                           ← definisi route API & download endpoint
-  kernel.js                           ← registrasi middleware `companyAuth`
-  queueWorker.js                      ← auto-start queue worker saat server jalan
+  routes.js                           ? definisi route API & download endpoint
+  kernel.js                           ? registrasi middleware `companyAuth`
+  queueWorker.js                      ? auto-start queue worker saat server jalan
 
 database/migrations/
-  ...company.js                       ← tabel perusahaan (company_id, name, api_key)
-  ...add_company_to_users.js          ← kolom company_id di users
+  ...company.js                       ? tabel perusahaan (company_id, name, api_key)
+  ...add_company_to_users.js          ? kolom company_id di users
 ```
 
 ---
@@ -634,6 +816,26 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
   - Kolom opsional: `region/wilayah`, `nik`, `birthDate/tanggal lahir`, `status`, `category/kategori`, `reason/alasan`, `location/lokasi`, `letterDate/tanggal surat`, `signerLeftName/Title`, `signerRightName/Title`, `callback_url`, `callback_header`, `data_json`.  
   - Contoh header Excel yang disarankan:  
     `letterNo | mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional) | callback_url | callback_header`
+- `POST /api/v1/bulk/ba-request-id`  
+  - Minimal: `letterNo`, `mdsName`, `nik`, `joinDate`.  
+  - Kolom lain: `area/wilayah/region`, `birthDate`, `status`, `stores/toko`, `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `letterNo | area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | email (opsional) | callback_url | callback_header`
+- `POST /api/v1/bulk/ba-hold`  
+  - Minimal: `letterNo`, `region`, `holdDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
+  - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `letterNo | region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
+- `POST /api/v1/bulk/ba-rolling`  
+  - Minimal: `letterNo`, `region`, `rollingDate`, `mdsName`, `mdsCode`, `status`, `outletFrom`, `outletTo`.  
+  - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `letterNo | region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | email (opsional)`
+- `POST /api/v1/bulk/ba-hold-activate`  
+  - Minimal: `letterNo`, `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
+  - Tambahan: `holdReason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `letterNo | region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | email (opsional)`
+- `POST /api/v1/bulk/ba-terminated`  
+  - Minimal: `letterNo`, `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
+  - Tambahan: `reasons` (bisa multi baris/koma), `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `letterNo | region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | email (opsional)`
 
 Kolom opsional umum (semua mode): `employeeId`, `department/departement/departemen`, `joinDate`, `ptkp`, `targetHK`, `attendance`, `note`, `data_json` (JSON string untuk override/tambah field data), `callback_url`, `callback_header`.
 
@@ -676,6 +878,15 @@ Perilaku:
 - File yang dikirim hanya template `ba-penempatan` dengan pola nama `ba-penempatan.[mdsName].[outlet].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`, spasi jadi `_`, karakter ilegal jadi `_`).
 - Satu lampiran per email (pertama yang cocok).
 - Log tercatat di `logs/bulk-email.log`.
+
+## Bulk Kirim Email BA Lain
+Endpoint (auth: JWT, form-data `file` xls/xlsx; kolom minimal `sentTo`, plus field wajib per template; `subject`/`body`/`cc`/`bcc` opsional). Lampiran dicari di `public/download/{companyName}/{email_login}/`; hanya satu lampiran pertama yang cocok dikirim.
+
+- `POST /api/v1/send-ba-request-id-emails` — wajib: `mdsName`, `area/region/wilayah`, `letterNo`; pola `ba-request-id.[mdsName].[area].[letterNo].[unique].pdf`
+- `POST /api/v1/send-ba-hold-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-hold.[mdsName].[region].[letterNo].[unique].pdf`
+- `POST /api/v1/send-ba-rolling-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-rolling.[mdsName].[region].[letterNo].[unique].pdf`
+- `POST /api/v1/send-ba-hold-activate-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-hold-activate.[mdsName].[region].[letterNo].[unique].pdf`
+- `POST /api/v1/send-ba-terminated-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-terminated.[mdsName].[region].[letterNo].[unique].pdf`
 
 ---
 
