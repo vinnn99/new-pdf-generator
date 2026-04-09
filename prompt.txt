@@ -1,0 +1,18 @@
+buatkan issue.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+
+isi planning nya sebagai berikut:
+
+** Contact
+- buatkan tabel contact yang terhubung ke user
+- user hanya bisa melihat kontaknya sendiri
+- admin company bisa melihat contact semua user yang ada di company nya sendiri
+- super admin bisa melihat semua contact
+- buatkan endpoint dan CRUD nya
+
+** Update Pengiriman Email
+- Setiap pengiriman email baik bulk atau single harus terdaftar dalam contact
+- apabila ada email yang dikirim diluar contact, maka harus otomatis dimasukan contact baru
+
+buatkan skrenario test per API selengkap mungkin
+
+jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah

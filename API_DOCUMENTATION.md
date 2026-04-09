@@ -381,6 +381,29 @@ Contoh payload `ba-hold-activate`:
   }
 }
 ```
+Contoh payload `ba-takeout`:
+```json
+{
+  "template": "ba-takeout",
+  "email": "user@example.com",
+  "data": {
+    "letterNo": "048/OMI-TM/BAK/III/2026",
+    "region": "JTS",
+    "takeoutDate": "2026-02-12",
+    "mdsName": "BEASTRICE ARUM SEKARWANGI",
+    "mdsCode": "MDSUJTS262",
+    "status": "STAY",
+    "outlet": "KIOS MERAH*OBP",
+    "reason": "TOKO TAKEOUT KARENA KIOS MERAH ADA TUNGGAKAN PEMBAYARAN KE WILAYAH",
+    "letterDate": "2026-03-12",
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
+  }
+}
+```
 Contoh payload `ba-terminated`:
 ```json
 {
@@ -439,6 +462,7 @@ Webhook payload (on success):
 - `ba-hold`: `letterNo`, `region`, `holdDate`, `mdsName`, `mdsCode`, `status`, `outlet`
 - `ba-rolling`: `letterNo`, `region`, `rollingDate`, `mdsName`, `mdsCode`, `status`, `outletFrom`, `outletTo`
 - `ba-hold-activate`: `letterNo`, `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`
+- `ba-takeout`: `letterNo`, `region`, `takeoutDate`, `mdsName`, `mdsCode`, `status`, `outlet`
 - `ba-terminated`: `letterNo`, `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`
 
 **Penamaan file:**
@@ -448,6 +472,7 @@ Webhook payload (on success):
 - `ba-hold`: `ba-hold.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-rolling`: `ba-rolling.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-hold-activate`: `ba-hold-activate.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
+- `ba-takeout`: `ba-takeout.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-terminated`: `ba-terminated.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - Lainnya: `<template>_<unik>.pdf`
 
@@ -492,6 +517,7 @@ Content-Type: `multipart/form-data` dengan field `file` (xls/xlsx, max 10 MB). O
 - `POST /api/v1/bulk/insentif`
 - `POST /api/v1/bulk/thr`
 - `POST /api/v1/bulk/ba-penempatan`
+- `POST /api/v1/bulk/ba-takeout`
 
 Catatan: Template yang di-bulk harus termasuk dalam `allowed_templates` company; jika tidak, request ditolak 403 sebelum baris diproses.
 
@@ -547,6 +573,7 @@ Response 200:
 - **BA HOLD**: `letterNo | region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
 - **BA Rolling**: `letterNo | region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | email (opsional)`
 - **BA HOLD Activate**: `letterNo | region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | email (opsional)`
+- **BA Takeout**: `letterNo | region | takeoutDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
 - **BA Terminated**: `letterNo | region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | email (opsional)`
 
 Kolom umum: `callback_url`, `callback_header` (JSON), `data_json` (override/extra field), `email` (jika penerima berbeda dari akun login).
@@ -604,7 +631,7 @@ Response 200:
 
 ---
 
-## 7) Bulk Kirim Email BA (Request ID, HOLD, Rolling, HOLD Activate, Terminated)
+## 7) Bulk Kirim Email BA (Request ID, HOLD, Rolling, HOLD Activate, Takeout, Terminated)
 Auth: `Authorization: Bearer <JWT>`  
 Form-data:
 - `file` (xls/xlsx, max 5 MB) dengan kolom minimal: `sentTo`, lalu field wajib per template di bawah. Kolom `subject`, `body`, `cc`, `bcc` opsional.  
@@ -625,6 +652,10 @@ Lampiran dicari di `public/download/{companyName}/{email_user_company}/`; hanya 
 - `POST /api/v1/send-ba-hold-activate-emails`  
   - Wajib: `mdsName`, `region/wilayah`, `letterNo`  
   - Pola: `ba-hold-activate.[mdsName].[region].[letterNo].[unik].pdf`
+
+- `POST /api/v1/send-ba-takeout-emails`  
+  - Wajib: `mdsName`, `region/wilayah`, `letterNo`  
+  - Pola: `ba-takeout.[mdsName].[region].[letterNo].[unik].pdf`
 
 - `POST /api/v1/send-ba-terminated-emails`  
   - Wajib: `mdsName`, `region/wilayah`, `letterNo`  
@@ -803,6 +834,12 @@ Field update: `email`, `name`, `phone`, `notes`.
 - **insentif**: slip insentif; earnings khusus INSENTIF + custom.
 - **thr**: slip THR; earnings “THR” + custom.
 - **ba-penempatan**: berita acara penempatan MDS; header/footer otomatis, wilayah/outlet variabel.
+- **ba-request-id**: berita acara request ID MDS.
+- **ba-hold**: berita acara MDS hold.
+- **ba-rolling**: berita acara rolling MDS.
+- **ba-hold-activate**: berita acara MDS hold diaktifkan kembali.
+- **ba-takeout**: berita acara pemberitahuan toko takeout MDS.
+- **ba-terminated**: berita acara terminasi MDS.
 
 ---
 

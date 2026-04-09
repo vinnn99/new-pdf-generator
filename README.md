@@ -688,6 +688,36 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 
 > **Field wajib `ba-hold-activate`:** `letterNo`, `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`. Nama file output: `ba-hold-activate.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
 
+### `ba-takeout` — Berita Acara Toko Takeout MDS
+
+```json
+{
+  "template": "ba-takeout",
+  "email": "user@email.com",
+  "data": {
+    "letterNo": "048/OMI-TM/BAK/III/2026",
+    "region": "JTS",
+    "takeoutDate": "2026-02-12",
+    "mdsName": "BEASTRICE ARUM SEKARWANGI",
+    "mdsCode": "MDSUJTS262",
+    "status": "STAY",
+    "outlet": "KIOS MERAH*OBP",
+    "reason": "TOKO TAKEOUT KARENA KIOS MERAH ADA TUNGGAKAN PEMBAYARAN KE WILAYAH",
+    "letterDate": "2026-03-12",
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
+  },
+  "callback": {
+    "url": "https://webhook.site/xxx"
+  }
+}
+```
+
+> **Field wajib `ba-takeout`:** `letterNo`, `region`, `takeoutDate`, `mdsName`, `mdsCode`, `status`, `outlet`. Nama file output: `ba-takeout.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+
 
 ### `ba-terminated` ? Berita Acara Terminasi MDS
 
@@ -805,6 +835,7 @@ Response contoh:
     invoice:       ['clientName', 'items'],
     'ba-penempatan': ['letterNo', 'mdsName', 'placementDate', 'outlet'],
     'ba-request-id': ['letterNo', 'mdsName', 'nik', 'joinDate'],
+    'ba-takeout': ['letterNo', 'region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
     namaTemplate:  ['field1', 'field2'],  // ← tambahkan di sini
   }
   ```
@@ -828,6 +859,7 @@ app/
     ba-hold.js
     ba-rolling.js
     ba-hold-activate.js
+    ba-takeout.js
     ba-terminated.js
   Services/
     JobService.js                     ? helper dispatch queue
@@ -844,6 +876,7 @@ resources/pdf-templates/              ? re-export template (dipakai job)
   ba-hold.js
   ba-rolling.js
   ba-hold-activate.js
+  ba-takeout.js
   ba-terminated.js
 
 public/
@@ -930,6 +963,10 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
   - Minimal: `letterNo`, `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
   - Tambahan: `holdReason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
   - Header contoh: `letterNo | region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | email (opsional)`
+- `POST /api/v1/bulk/ba-takeout`  
+  - Minimal: `letterNo`, `region`, `takeoutDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
+  - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `letterNo | region | takeoutDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
 - `POST /api/v1/bulk/ba-terminated`  
   - Minimal: `letterNo`, `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
   - Tambahan: `reasons` (bisa multi baris/koma), `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
@@ -984,6 +1021,7 @@ Endpoint (auth: JWT, form-data `file` xls/xlsx; kolom minimal `sentTo`, plus fie
 - `POST /api/v1/send-ba-hold-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-hold.[mdsName].[region].[letterNo].[unique].pdf`
 - `POST /api/v1/send-ba-rolling-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-rolling.[mdsName].[region].[letterNo].[unique].pdf`
 - `POST /api/v1/send-ba-hold-activate-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-hold-activate.[mdsName].[region].[letterNo].[unique].pdf`
+- `POST /api/v1/send-ba-takeout-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-takeout.[mdsName].[region].[letterNo].[unique].pdf`
 - `POST /api/v1/send-ba-terminated-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-terminated.[mdsName].[region].[letterNo].[unique].pdf`
 
 ---

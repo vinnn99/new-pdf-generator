@@ -21,6 +21,9 @@ class SingleEmailController {
   async sendBaHoldActivate(ctx) {
     return this._send(ctx, cfgBa('ba-hold-activate'))
   }
+  async sendBaTakeout(ctx) {
+    return this._send(ctx, cfgBa('ba-takeout'))
+  }
   async sendBaTerminated(ctx) {
     return this._send(ctx, cfgBa('ba-terminated'))
   }
@@ -176,6 +179,7 @@ function cfgBa(template) {
         template === 'ba-hold' ? 'Berita Acara Hold' :
         template === 'ba-rolling' ? 'Berita Acara Rolling' :
         template === 'ba-hold-activate' ? 'Berita Acara HOLD Aktif Kembali' :
+        template === 'ba-takeout' ? 'Berita Acara Toko Takeout' :
         'Berita Acara Terminasi'
       const who = f.mdsName || f.letterNo || ''
       return who ? `${base} - ${who}` : base
@@ -188,6 +192,8 @@ function cfgBa(template) {
           ? 'Berikut terlampir Berita Acara Terminasi MDS.'
           : template === 'ba-hold-activate'
           ? 'Berikut terlampir Berita Acara HOLD Aktif Kembali.'
+          : template === 'ba-takeout'
+          ? 'Berikut terlampir Berita Acara Toko Takeout MDS.'
           : `Berikut terlampir Berita Acara ${title(template)}.`,
         f.region ? `Wilayah: ${f.region}` : null,
         f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
@@ -207,6 +213,7 @@ function requiredFields(template) {
     'ba-hold': ['letterNo', 'region', 'holdDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
     'ba-rolling': ['letterNo', 'region', 'rollingDate', 'mdsName', 'mdsCode', 'status', 'outletFrom', 'outletTo'],
     'ba-hold-activate': ['letterNo', 'region', 'reactivateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
+    'ba-takeout': ['letterNo', 'region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
     'ba-terminated': ['letterNo', 'region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet']
   }
   return map[template] || []
@@ -219,6 +226,7 @@ function title(template) {
     'ba-hold': 'Hold',
     'ba-rolling': 'Rolling',
     'ba-hold-activate': 'Hold Aktivasi',
+    'ba-takeout': 'Takeout',
     'ba-terminated': 'Terminasi'
   }
   return map[template] || template

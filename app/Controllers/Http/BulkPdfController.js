@@ -40,6 +40,10 @@ class BulkPdfController {
     return this._handleExcel(ctx, 'ba-hold-activate')
   }
 
+  async baTakeoutFromExcel(ctx) {
+    return this._handleExcel(ctx, 'ba-takeout')
+  }
+
   async baTerminatedFromExcel(ctx) {
     return this._handleExcel(ctx, 'ba-terminated')
   }
@@ -310,6 +314,7 @@ function buildPayloadForMode(lower, mode, opts) {
   if (mode === 'ba-hold') return buildBaHoldPayload(lower, opts)
   if (mode === 'ba-rolling') return buildBaRollingPayload(lower, opts)
   if (mode === 'ba-hold-activate') return buildBaHoldActivatePayload(lower, opts)
+  if (mode === 'ba-takeout') return buildBaTakeoutPayload(lower, opts)
   if (mode === 'ba-terminated') return buildBaTerminatedPayload(lower, opts)
   return buildPayslipPayload(lower, opts)
 }
@@ -624,6 +629,37 @@ function buildBaHoldActivatePayload(lower, opts) {
   }
 
   const required = ['letterNo', 'region', 'reactivateDate', 'mdsName', 'mdsCode', 'status', 'outlet']
+  const missing = required.filter((k) => !payload.data[k])
+  if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
+
+  return payload
+}
+
+function buildBaTakeoutPayload(lower, opts) {
+  const payload = basePayload(lower, opts)
+  payload.template = 'ba-takeout'
+  const pick = (keys) => pickFromLower(lower, keys)
+
+  payload.data = {
+    ...payload.data,
+    companyName: lower.companyname || opts.defaultCompany,
+    letterNo: pick(['letterno', 'letter no', 'no surat', 'letter_number', 'letter number']),
+    region: pick(['region', 'wilayah']),
+    takeoutDate: parseExcelDate(pick(['takeoutdate', 'takeout date', 'tanggal takeout', 'tgl takeout', 'tanggal toko takeout'])),
+    mdsName: pick(['mdsname', 'mds name', 'nama mds']),
+    mdsCode: pick(['mdscode', 'mds code', 'code mds', 'kode mds']),
+    status: pick(['status']),
+    outlet: pick(['outlet', 'outlet penempatan', 'toko']),
+    reason: pick(['reason', 'alasan', 'alasan takeout']),
+    location: pick(['location', 'lokasi']),
+    letterDate: parseExcelDate(pick(['letterdate', 'letter date', 'tanggal surat'])),
+    signerLeftName: pick(['signerleftname', 'signer left name', 'penandatangan kiri']),
+    signerLeftTitle: pick(['signerlefttitle', 'signer left title', 'jabatan kiri']),
+    signerRightName: pick(['signerrightname', 'signer right name', 'penandatangan kanan']),
+    signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
+  }
+
+  const required = ['letterNo', 'region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet']
   const missing = required.filter((k) => !payload.data[k])
   if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
 

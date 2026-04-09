@@ -147,6 +147,12 @@ class GeneratePdfJob {
         const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
         const safeLetter = safe(letterNo.replace(/\//g, '-'))
         filename = `ba-hold-activate.${safe(mdsName)}.${safe(region)}.${safeLetter}.${uniqueId}.pdf`
+      } else if (template === 'ba-takeout') {
+        const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
+        const region  = payloadData && payloadData.region ? String(payloadData.region) : 'REGION'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
+        filename = `ba-takeout.${safe(mdsName)}.${safe(region)}.${safeLetter}.${uniqueId}.pdf`
       } else if (template === 'ba-terminated') {
         const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
         const region  = payloadData && payloadData.region ? String(payloadData.region) : 'REGION'

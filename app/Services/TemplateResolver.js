@@ -18,6 +18,7 @@ const LEGACY_REQUIRED_FIELDS = {
   'ba-hold': ['letterNo', 'region', 'holdDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
   'ba-rolling': ['letterNo', 'region', 'rollingDate', 'mdsName', 'mdsCode', 'status', 'outletFrom', 'outletTo'],
   'ba-hold-activate': ['letterNo', 'region', 'reactivateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
+  'ba-takeout': ['letterNo', 'region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
   'ba-terminated': ['letterNo', 'region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
 }
 

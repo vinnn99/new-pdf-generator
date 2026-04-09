@@ -618,6 +618,26 @@ class BulkEmailController {
     return this._sendBaTemplate({ request, response, auth }, cfg)
   }
 
+  async sendBaTakeout({ request, response, auth }) {
+    const cfg = {
+      template: 'ba-takeout',
+      required: ['mdsName', 'region', 'letterNo'],
+      prefixParts: (f) => ['ba-takeout', f.mdsName, f.region, f.letterNo],
+      subject: (f) => `Berita Acara Takeout - ${f.mdsName || f.letterNo || ''}`,
+      body: (f, company) => [
+        `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
+        '',
+        'Berikut terlampir Berita Acara Toko Takeout MDS.',
+        f.region ? `Wilayah: ${f.region}` : null,
+        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        '',
+        company && company.name ? company.name : '',
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ].filter(Boolean).join('\n')
+    }
+    return this._sendBaTemplate({ request, response, auth }, cfg)
+  }
+
   async sendBaTerminated({ request, response, auth }) {
     const cfg = {
       template: 'ba-terminated',

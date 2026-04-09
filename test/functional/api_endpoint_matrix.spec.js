@@ -28,6 +28,7 @@ const BULK_ENDPOINTS = [
   '/api/v1/bulk/ba-hold',
   '/api/v1/bulk/ba-rolling',
   '/api/v1/bulk/ba-hold-activate',
+  '/api/v1/bulk/ba-takeout',
   '/api/v1/bulk/ba-terminated'
 ]
 
