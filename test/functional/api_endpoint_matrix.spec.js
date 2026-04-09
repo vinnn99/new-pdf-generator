@@ -3,6 +3,7 @@
 const fs = require('fs')
 const path = require('path')
 const http = require('http')
+const nodemailer = require('nodemailer')
 const { spawn } = require('child_process')
 
 const suite = use('Test/Suite')('API Endpoint Matrix (No Email Send)')
@@ -12,6 +13,8 @@ const { test, trait, before, after } = suite
 const Database = use('Database')
 const User = use('App/Models/User')
 const Helpers = use('Helpers')
+const ContactService = use('App/Services/ContactService')
+const SendEmailJob = use('App/Jobs/SendEmailJob')
 
 trait('Test/ApiClient')
 
@@ -33,8 +36,21 @@ const seed = {
   companyBId: null,
   companyAApiKey: 'api_key_company_a',
   companyBApiKey: 'api_key_company_b',
+  userMainId: null,
+  adminMainId: null,
+  superMainId: null,
+  outsiderUserId: null,
   managedUserId: null,
   dynamicTemplateCompanyId: null,
+  contactOwnId: null,
+  contactManagedId: null,
+  contactOutsiderId: null,
+  contactUpdateId: null,
+  contactDeleteByRole: {
+    user: null,
+    admin: null,
+    superadmin: null
+  },
   credentials: {
     user: { email: 'user.main@test.local', password: 'secret123' },
     admin: { email: 'admin.main@test.local', password: 'secret123' },
@@ -299,6 +315,117 @@ const endpointCases = [
   },
   {
     method: 'get',
+    url: () => '/api/v1/contacts?page=1&perPage=10&q=contact',
+    label: '/api/v1/contacts',
+    auth: 'jwt',
+    expected: { user: 200, admin: 200, superadmin: 200 },
+    assertBody: ({ response, role }) => {
+      const rows = (response.body && response.body.data) || []
+      if (!Array.isArray(rows)) throw new Error('Response contacts.data harus berupa array')
+
+      if (role === 'user' && rows.some((row) => Number(row.user_id) !== Number(seed.userMainId))) {
+        throw new Error('Role user tidak boleh melihat contact user lain')
+      }
+
+      if (role === 'admin' && rows.some((row) => Number(row.company_id) !== Number(seed.companyAId))) {
+        throw new Error('Role admin tidak boleh melihat contact di luar company sendiri')
+      }
+    }
+  },
+  {
+    method: 'get',
+    url: () => `/api/v1/contacts?page=1&perPage=10&company_id=${seed.companyAId}`,
+    label: '/api/v1/contacts?company_id=',
+    auth: 'jwt',
+    expected: { user: 403, admin: 403, superadmin: 200 }
+  },
+  {
+    method: 'get',
+    url: () => `/api/v1/contacts/${seed.contactOwnId}`,
+    label: '/api/v1/contacts/:id own',
+    auth: 'jwt',
+    expected: { user: 200, admin: 200, superadmin: 200 }
+  },
+  {
+    method: 'get',
+    url: () => `/api/v1/contacts/${seed.contactOutsiderId}`,
+    label: '/api/v1/contacts/:id outsider',
+    auth: 'jwt',
+    expected: { user: 403, admin: 403, superadmin: 200 }
+  },
+  {
+    method: 'post',
+    url: () => '/api/v1/contacts',
+    label: '/api/v1/contacts create',
+    auth: 'jwt',
+    body: ({ role }) => {
+      const id = uniqueId(`contact_create_${role}`)
+      return {
+        email: `Contact_${id}@test.local`,
+        name: `Contact ${id}`,
+        phone: `08${Date.now()}`
+      }
+    },
+    expected: { user: 201, admin: 201, superadmin: 201 },
+    assertBody: ({ response, expectedStatus }) => {
+      if (expectedStatus !== 201) return
+      const data = response.body && response.body.data
+      if (!data || !data.email) throw new Error('Response create contact tidak memiliki data.email')
+      if (data.email !== String(data.email).toLowerCase()) {
+        throw new Error('Email contact harus tersimpan dalam lowercase')
+      }
+    }
+  },
+  {
+    method: 'post',
+    url: () => '/api/v1/contacts',
+    label: '/api/v1/contacts create cross scope',
+    auth: 'jwt',
+    body: ({ role }) => {
+      const id = uniqueId(`contact_scope_${role}`)
+      return {
+        email: `scope_${id}@test.local`,
+        user_id: seed.outsiderUserId
+      }
+    },
+    expected: { user: 403, admin: 403, superadmin: 201 }
+  },
+  {
+    method: 'put',
+    url: () => `/api/v1/contacts/${seed.contactUpdateId}`,
+    label: '/api/v1/contacts/:id update own-company',
+    auth: 'jwt',
+    body: ({ role }) => ({
+      name: `Updated ${uniqueId(`contact_upd_${role}`)}`,
+      email: `UPD_${uniqueId(role)}@TEST.LOCAL`
+    }),
+    expected: { user: 200, admin: 200, superadmin: 200 },
+    assertBody: ({ response, expectedStatus }) => {
+      if (expectedStatus !== 200) return
+      const data = response.body && response.body.data
+      if (!data || !data.email) throw new Error('Response update contact tidak memiliki data.email')
+      if (data.email !== String(data.email).toLowerCase()) {
+        throw new Error('Email update contact harus tersimpan dalam lowercase')
+      }
+    }
+  },
+  {
+    method: 'put',
+    url: () => `/api/v1/contacts/${seed.contactOutsiderId}`,
+    label: '/api/v1/contacts/:id update outsider',
+    auth: 'jwt',
+    body: () => ({ notes: 'forbidden update check' }),
+    expected: { user: 403, admin: 403, superadmin: 200 }
+  },
+  {
+    method: 'delete',
+    url: ({ role }) => `/api/v1/contacts/${seed.contactDeleteByRole[role]}`,
+    label: '/api/v1/contacts/:id delete',
+    auth: 'jwt',
+    expected: { user: 200, admin: 200, superadmin: 200 }
+  },
+  {
+    method: 'get',
     url: () => '/api/v1/email-logs?page=1&perPage=10&q=test',
     auth: 'jwt',
     expected: { user: 200, admin: 200, superadmin: 200 }
@@ -336,7 +463,8 @@ for (const endpoint of endpointCases) {
   for (const role of ROLES) {
     const endpointLabel = endpoint.label || '[dynamic endpoint]'
     test(`${endpoint.method.toUpperCase()} ${endpointLabel} as ${role}`, async ({ client }) => {
-      let request = client[endpoint.method](endpoint.url())
+      const targetUrl = endpoint.url({ role })
+      let request = client[endpoint.method](targetUrl)
 
       if (endpoint.auth === 'jwt') {
         const token = await loginAndGetToken(client, seed.credentials[role])
@@ -366,6 +494,109 @@ for (const endpoint of endpointCases) {
     })
   }
 }
+
+test('ContactService.upsertFromSend normalisasi + increment send_count', async ({ assert }) => {
+  const stamp = uniqueId('upsert')
+  const toEmail = `Mix.${stamp}@Test.Local`
+  const ccEmail = `cc.${stamp}@test.local`
+  const bccEmail = `bcc.${stamp}@test.local`
+
+  const first = await ContactService.upsertFromSend({
+    userId: seed.userMainId,
+    companyId: seed.companyAId,
+    to: `  ${toEmail}  `,
+    cc: [ccEmail, 'invalid-email'],
+    bcc: `${bccEmail};${toEmail}`,
+    source: 'auto-bulk',
+    sentAt: new Date()
+  })
+
+  assert.equal(first.upserted, 3)
+  assert.equal(first.skipped, 1)
+
+  await ContactService.upsertFromSend({
+    userId: seed.userMainId,
+    companyId: seed.companyAId,
+    to: toEmail,
+    cc: [],
+    bcc: [],
+    source: 'auto-bulk',
+    sentAt: new Date()
+  })
+
+  const stored = await Database.table('contacts')
+    .where('user_id', seed.userMainId)
+    .where('email', toEmail.toLowerCase())
+    .first()
+
+  assert.ok(stored)
+  assert.equal(Number(stored.send_count), 2)
+  assert.equal(stored.source, 'auto-bulk')
+})
+
+test('SendEmailJob tetap upsert contact saat kirim email gagal', async ({ assert }) => {
+  const stamp = uniqueId('sendjob')
+  const toEmail = `sendjob.${stamp}@test.local`
+  const ccEmail = `sendjob.cc.${stamp}@test.local`
+  const originalCreateTransport = nodemailer.createTransport
+
+  nodemailer.createTransport = () => ({
+    sendMail: async () => {
+      throw new Error('SMTP mock failure')
+    }
+  })
+
+  try {
+    await new SendEmailJob().handle({
+      smtpHost: 'localhost',
+      smtpPort: 25,
+      smtpSecure: false,
+      smtpUser: 'noreply@test.local',
+      smtpPass: 'dummy',
+      mailFrom: 'noreply@test.local',
+      to: toEmail,
+      cc: [ccEmail],
+      bcc: [],
+      subject: 'Mock Subject',
+      text: 'Mock Body',
+      attachments: [],
+      userId: seed.userMainId,
+      companyId: seed.companyAId,
+      template: 'ba-penempatan',
+      context: 'single-send'
+    })
+    throw new Error('SendEmailJob seharusnya throw saat SMTP gagal')
+  } catch (err) {
+    if (!String(err.message || '').includes('SMTP mock failure')) {
+      throw err
+    }
+  } finally {
+    nodemailer.createTransport = originalCreateTransport
+  }
+
+  const toContact = await Database.table('contacts')
+    .where('user_id', seed.userMainId)
+    .where('email', toEmail)
+    .first()
+
+  const ccContact = await Database.table('contacts')
+    .where('user_id', seed.userMainId)
+    .where('email', ccEmail)
+    .first()
+
+  assert.ok(toContact)
+  assert.ok(ccContact)
+  assert.equal(toContact.source, 'auto-single')
+  assert.equal(Number(toContact.send_count), 1)
+
+  const emailLog = await Database.table('email_logs')
+    .where('to_email', toEmail)
+    .orderBy('id', 'desc')
+    .first()
+
+  assert.ok(emailLog)
+  assert.equal(emailLog.status, 'failed')
+})
 
 async function loginAndGetToken(client, credentials) {
   const response = await client
@@ -401,7 +632,7 @@ function uniqueSlug(prefix) {
 async function resetSchema() {
   await Database.raw('PRAGMA foreign_keys = OFF')
 
-  const tables = ['dynamic_templates', 'email_logs', 'generated_pdfs', 'jobs', 'tokens', 'users', 'companies']
+  const tables = ['contacts', 'dynamic_templates', 'email_logs', 'generated_pdfs', 'jobs', 'tokens', 'users', 'companies']
   for (const table of tables) {
     const exists = await Database.schema.hasTable(table)
     if (exists) await Database.schema.dropTable(table)
@@ -485,6 +716,25 @@ async function resetSchema() {
     table.timestamps()
   })
 
+  await Database.schema.createTable('contacts', (table) => {
+    table.increments()
+    table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE')
+    table.integer('company_id').unsigned().nullable().references('company_id').inTable('companies').onDelete('SET NULL')
+    table.string('email', 254).notNullable()
+    table.string('name', 191).nullable()
+    table.string('phone', 50).nullable()
+    table.text('notes').nullable()
+    table.string('source', 50).notNullable().defaultTo('manual')
+    table.datetime('last_sent_at').nullable()
+    table.integer('send_count').notNullable().defaultTo(0)
+    table.timestamps()
+    table.unique(['user_id', 'email'])
+    table.index(['company_id'])
+    table.index(['user_id'])
+    table.index(['email'])
+    table.index(['last_sent_at'])
+  })
+
   await Database.schema.createTable('dynamic_templates', (table) => {
     table.increments()
     table.string('template_key', 100).notNullable().index()
@@ -526,7 +776,7 @@ async function seedData() {
   })
   seed.companyBId = Array.isArray(cB) ? cB[0] : cB
 
-  await User.create({
+  const userMain = await User.create({
     username: 'user_main',
     email: seed.credentials.user.email,
     password: seed.credentials.user.password,
@@ -534,6 +784,7 @@ async function seedData() {
     company_id: seed.companyAId,
     is_active: true
   })
+  seed.userMainId = userMain.id
 
   const adminMain = await User.create({
     username: 'admin_main',
@@ -543,8 +794,9 @@ async function seedData() {
     company_id: seed.companyAId,
     is_active: true
   })
+  seed.adminMainId = adminMain.id
 
-  await User.create({
+  const superMain = await User.create({
     username: 'super_main',
     email: seed.credentials.superadmin.email,
     password: seed.credentials.superadmin.password,
@@ -552,6 +804,7 @@ async function seedData() {
     company_id: null,
     is_active: true
   })
+  seed.superMainId = superMain.id
 
   await User.create({
     username: 'user_change',
@@ -598,6 +851,117 @@ async function seedData() {
     company_id: seed.companyBId,
     is_active: true
   })
+  seed.outsiderUserId = outsider.id
+
+  const contactsInserted = await Database.table('contacts').insert([
+    {
+      user_id: seed.userMainId,
+      company_id: seed.companyAId,
+      email: 'owned-contact@test.local',
+      name: 'Owned Contact',
+      phone: '081111111111',
+      notes: 'Contact owned by user_main',
+      source: 'manual',
+      last_sent_at: null,
+      send_count: 0,
+      created_at: now,
+      updated_at: now
+    },
+    {
+      user_id: managedUser.id,
+      company_id: seed.companyAId,
+      email: 'managed-contact@test.local',
+      name: 'Managed Contact',
+      phone: '082222222222',
+      notes: 'Contact in company A',
+      source: 'manual',
+      last_sent_at: null,
+      send_count: 0,
+      created_at: now,
+      updated_at: now
+    },
+    {
+      user_id: outsider.id,
+      company_id: seed.companyBId,
+      email: 'outsider-contact@test.local',
+      name: 'Outsider Contact',
+      phone: '083333333333',
+      notes: 'Contact in company B',
+      source: 'manual',
+      last_sent_at: null,
+      send_count: 0,
+      created_at: now,
+      updated_at: now
+    },
+    {
+      user_id: seed.userMainId,
+      company_id: seed.companyAId,
+      email: 'update-contact@test.local',
+      name: 'Update Contact',
+      phone: '084444444444',
+      notes: 'Contact for update scenario',
+      source: 'manual',
+      last_sent_at: null,
+      send_count: 0,
+      created_at: now,
+      updated_at: now
+    },
+    {
+      user_id: seed.userMainId,
+      company_id: seed.companyAId,
+      email: 'delete-user@test.local',
+      name: 'Delete User Contact',
+      source: 'manual',
+      last_sent_at: null,
+      send_count: 0,
+      created_at: now,
+      updated_at: now
+    },
+    {
+      user_id: seed.adminMainId,
+      company_id: seed.companyAId,
+      email: 'delete-admin@test.local',
+      name: 'Delete Admin Contact',
+      source: 'manual',
+      last_sent_at: null,
+      send_count: 0,
+      created_at: now,
+      updated_at: now
+    },
+    {
+      user_id: seed.superMainId,
+      company_id: null,
+      email: 'delete-super@test.local',
+      name: 'Delete Super Contact',
+      source: 'manual',
+      last_sent_at: null,
+      send_count: 0,
+      created_at: now,
+      updated_at: now
+    }
+  ])
+
+  const contactIds = Array.isArray(contactsInserted) ? contactsInserted : []
+  if (contactIds.length >= 7) {
+    seed.contactOwnId = contactIds[0]
+    seed.contactManagedId = contactIds[1]
+    seed.contactOutsiderId = contactIds[2]
+    seed.contactUpdateId = contactIds[3]
+    seed.contactDeleteByRole.user = contactIds[4]
+    seed.contactDeleteByRole.admin = contactIds[5]
+    seed.contactDeleteByRole.superadmin = contactIds[6]
+  } else {
+    const seededContacts = await Database.table('contacts').select('id', 'email').orderBy('id', 'asc')
+    for (const c of seededContacts) {
+      if (c.email === 'owned-contact@test.local') seed.contactOwnId = c.id
+      if (c.email === 'managed-contact@test.local') seed.contactManagedId = c.id
+      if (c.email === 'outsider-contact@test.local') seed.contactOutsiderId = c.id
+      if (c.email === 'update-contact@test.local') seed.contactUpdateId = c.id
+      if (c.email === 'delete-user@test.local') seed.contactDeleteByRole.user = c.id
+      if (c.email === 'delete-admin@test.local') seed.contactDeleteByRole.admin = c.id
+      if (c.email === 'delete-super@test.local') seed.contactDeleteByRole.superadmin = c.id
+    }
+  }
 
   await Database.table('generated_pdfs').insert([
     {

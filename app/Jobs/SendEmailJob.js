@@ -5,6 +5,7 @@ const fs = require('fs')
 const path = require('path')
 const Helpers = use('Helpers')
 const Database = use('Database')
+const ContactService = use('App/Services/ContactService')
 
 const LOG_DIR = path.join(Helpers.appRoot(), 'logs')
 const LOG_FILE = path.join(LOG_DIR, 'bulk-email.log')
@@ -23,6 +24,8 @@ class SendEmailJob {
     } = data
 
     ensureLogDir()
+    const sentAt = new Date()
+    let sendError = null
 
     try {
       const transporter = nodemailer.createTransport({
@@ -60,6 +63,7 @@ class SendEmailJob {
         error: null
       })
     } catch (err) {
+      sendError = err
       appendLog({ status: 'failed', to, error: err.message, employeeId, employeeName })
       await logEmail({
         status: 'failed',
@@ -75,7 +79,20 @@ class SendEmailJob {
         context,
         error: err.message
       })
-      throw err
+    } finally {
+      await upsertContactsFromSend({
+        userId,
+        companyId,
+        to,
+        cc,
+        bcc,
+        context,
+        sentAt
+      })
+    }
+
+    if (sendError) {
+      throw sendError
     }
   }
 }
@@ -131,6 +148,22 @@ async function logEmail(entry) {
     })
   } catch (e) {
     console.error('Failed to log email:', e.message)
+  }
+}
+
+async function upsertContactsFromSend(entry) {
+  try {
+    await ContactService.upsertFromSend({
+      userId: entry.userId,
+      companyId: entry.companyId,
+      to: entry.to,
+      cc: entry.cc,
+      bcc: entry.bcc,
+      source: ContactService.sourceFromContext(entry.context),
+      sentAt: entry.sentAt || new Date()
+    })
+  } catch (e) {
+    console.error('Failed to upsert contacts:', e.message)
   }
 }
 

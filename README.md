@@ -278,6 +278,31 @@ Contoh respons:
 }
 ```
 
+### Contact Management (JWT)
+
+Semua endpoint contact memakai `Authorization: Bearer <jwt_token>`.
+
+Role scope:
+- `user`: hanya contact miliknya sendiri.
+- `admin`: semua contact user di company yang sama.
+- `superadmin`: semua contact lintas company.
+
+Endpoint:
+- `POST /api/v1/contacts`
+  - Body minimum: `{ "email": "target@example.com" }`
+  - Opsional: `name`, `phone`, `notes`, `user_id`
+- `GET /api/v1/contacts?page=1&perPage=10&q=target`
+  - Query filter opsional: `user_id` (admin/super sesuai scope), `company_id` (khusus superadmin)
+- `GET /api/v1/contacts/:id`
+- `PUT /api/v1/contacts/:id`
+  - Field update: `email`, `name`, `phone`, `notes`
+- `DELETE /api/v1/contacts/:id`
+
+Catatan:
+- Email selalu dinormalisasi ke lowercase + trim.
+- Unik per user berdasarkan `(user_id, email)`.
+- Pengiriman email (bulk/single), termasuk gagal kirim, otomatis upsert ke tabel `contacts` untuk semua penerima `to/cc/bcc` dan menaikkan `send_count`.
+
 ### List Company (Admin/Superadmin)
 
 ```

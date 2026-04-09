@@ -646,6 +646,9 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
 
 ## 9) Pencatatan Email Terkirim
 - Setiap pengiriman email (bulk maupun single send) otomatis dicatat ke tabel `email_logs` dengan kolom: `user_id`, `company_id`, `template`, `context`, `to_email`, `cc`, `bcc`, `subject`, `body`, `attachments` (JSON array nama file), `status`, `error`, `created_at`, `updated_at`.
+- Setiap pengiriman email (bulk/single), termasuk yang gagal, otomatis melakukan upsert ke tabel `contacts` berdasarkan `(user_id, email)` untuk penerima `to`, `cc`, dan `bcc`:
+  - jika belum ada: dibuat contact baru (`source` otomatis `auto-bulk`/`auto-single`, `send_count=1`, `last_sent_at` terisi).
+  - jika sudah ada: `send_count` bertambah, `last_sent_at` diperbarui, tanpa duplikasi.
 - Status: `sent` atau `failed` (jika nodemailer error).
 - Nilai `context`:
   - `bulk-slip` untuk `/send-slip-emails`
@@ -703,6 +706,93 @@ Ringkasan:
 }
 ```
 Catatan: default data difilter `company_id` user login. Jika `scope=all`, data lintas company akan dikembalikan. `attachments` pada `recent` sudah di-parse menjadi array.
+
+---
+
+## Contact Management (JWT)
+Role scope:
+- `user`: hanya contact miliknya (`contacts.user_id = auth.id`).
+- `admin`: semua contact di company sendiri (`contacts.company_id = auth.company_id`).
+- `superadmin`: semua contact lintas company.
+- Admin tanpa `company_id` akan ditolak (`403`).
+
+Normalisasi:
+- Field `email` selalu di-trim dan disimpan lowercase.
+- Unik per owner: `(user_id, email)`.
+
+### `POST /api/v1/contacts`
+Body minimum:
+```json
+{ "email": "target@example.com" }
+```
+Body opsional: `name`, `phone`, `notes`, `user_id`.
+- `user`: tidak boleh set `user_id` user lain.
+- `admin`: boleh set `user_id` selama user target masih company yang sama.
+- `superadmin`: boleh set `user_id` ke user mana pun.
+
+Response 201:
+```json
+{
+  "status": "created",
+  "data": {
+    "id": 1,
+    "user_id": 2,
+    "company_id": 1,
+    "email": "target@example.com",
+    "name": "Target",
+    "phone": "0812",
+    "notes": null,
+    "source": "manual",
+    "last_sent_at": null,
+    "send_count": 0
+  }
+}
+```
+
+### `GET /api/v1/contacts`
+Query opsional:
+- `page`, `perPage` (default 10, max 100)
+- `q` (quick search ke `email`, `name`, `phone`)
+- `user_id` (admin/super sesuai scope)
+- `company_id` (khusus superadmin)
+
+Response 200:
+```json
+{
+  "status": "ok",
+  "total": 1,
+  "perPage": 10,
+  "page": 1,
+  "lastPage": 1,
+  "data": [
+    {
+      "id": 1,
+      "user_id": 2,
+      "company_id": 1,
+      "email": "target@example.com",
+      "name": "Target",
+      "phone": "0812",
+      "notes": null,
+      "source": "manual",
+      "last_sent_at": null,
+      "send_count": 0
+    }
+  ]
+}
+```
+
+### `GET /api/v1/contacts/:id`
+- Detail satu contact (wajib lolos scope role).
+- Out-of-scope -> `403`.
+
+### `PUT /api/v1/contacts/:id`
+Field update: `email`, `name`, `phone`, `notes`.
+- `email` divalidasi + dinormalisasi lowercase.
+- Konflik unik `(user_id,email)` -> `409`.
+
+### `DELETE /api/v1/contacts/:id`
+- Hard delete.
+- Hanya role yang in-scope yang boleh menghapus.
 
 ---
 
