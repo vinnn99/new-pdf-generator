@@ -5,6 +5,7 @@ const { validate } = use('Validator')
 const uuid = () => Math.random().toString(36).slice(2, 12)
 const fs = require('fs')
 const path = require('path')
+const TemplateResolver = require('../../Services/TemplateResolver')
 
 class AdminCompanyController {
   _listTemplates() {
@@ -24,7 +25,8 @@ class AdminCompanyController {
     if (role !== 'superadmin') {
       return response.status(403).json({ status: 'forbidden', message: 'Hanya superadmin yang dapat melihat daftar template' })
     }
-    return response.json({ status: 'ok', templates: this._listTemplates() })
+    const templates = await TemplateResolver.listTemplateKeys({ includeInactive: false })
+    return response.json({ status: 'ok', templates })
   }
 
   async setTemplates({ params, request, response, auth }) {
@@ -107,6 +109,11 @@ class AdminCompanyController {
     }
 
     const now = new Date()
+    const defaultAllowedTemplates = await TemplateResolver.listTemplateKeys({
+      includeInactive: false,
+      companyId: null
+    })
+
     const company = {
       name: payload.name,
       api_key: payload.api_key || uuid(),
@@ -117,7 +124,7 @@ class AdminCompanyController {
       smtp_secure: payload.smtp_secure || false,
       mail_from: payload.mail_from || null,
       is_active: payload.is_active === false ? false : true,
-      allowed_templates: JSON.stringify(this._listTemplates()),
+      allowed_templates: JSON.stringify(defaultAllowedTemplates),
       created_at: now,
       updated_at: now
     }

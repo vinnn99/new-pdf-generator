@@ -193,7 +193,7 @@ Catatan: ketika nonaktif, semua user perusahaan tersebut tidak dapat login / mel
 ### Daftar Template (Superadmin)
 `GET /api/v1/admin/templates`  
 Headers: `Authorization: Bearer <JWT superadmin>`  
-Mengembalikan semua template yang tersedia di `resources/pdf-templates/`.
+Mengembalikan gabungan template file JS di `resources/pdf-templates/` dan template dinamis aktif dari DB.
 
 ### Atur Template Per Company (Superadmin)
 `POST /api/v1/admin/companies/:id/templates`  
@@ -212,6 +212,41 @@ Contoh respons:
   "company": { "company_id": 1, "name": "Contoh Corp", "allowed_templates": "[\"payslip\",\"ba-penempatan\"]" }
 }
 ```
+
+### Kelola Template Dinamis (Admin/Superadmin)
+- `GET /api/v1/admin/dynamic-templates?page=1&perPage=10`
+  - Headers: `Authorization: Bearer <JWT admin/superadmin>`
+  - Query opsional:
+    - `includeInactive=true`
+    - `company_id=<id>` (khusus superadmin)
+    - `company_id=null` (khusus superadmin, hanya template global)
+- `POST /api/v1/admin/dynamic-templates`
+  - Headers: `Authorization: Bearer <JWT admin/superadmin>`
+  - Body:
+```json
+{
+  "template_key": "dyn-kontrak-kerja",
+  "name": "Kontrak Kerja Dinamis",
+  "required_fields": ["employeeName", "position"],
+  "content": {
+    "pageSize": "A4",
+    "content": [
+      { "text": "Kontrak Kerja", "style": "header" },
+      { "text": "Nama: {{employeeName}}" },
+      { "text": "Posisi: {{position}}" }
+    ]
+  },
+  "is_active": true
+}
+```
+- `PUT /api/v1/admin/dynamic-templates/:id`
+- `POST /api/v1/admin/dynamic-templates/:id/activate`
+- `POST /api/v1/admin/dynamic-templates/:id/deactivate`
+
+Catatan:
+- Admin hanya dapat membuat/mengubah template dinamis untuk company miliknya.
+- Superadmin dapat membuat template global (`company_id` null) atau scope company tertentu.
+- Runtime bersifat hybrid: template DB diprioritaskan, lalu fallback ke template file JS legacy.
 
 ---
 
@@ -595,7 +630,19 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
   - `bulk-ba` untuk semua BA bulk send
   - `single-send` untuk `/send/{template}`
 - Jalankan migrasi sebelum memakai fitur ini: `node ace migration:run`
-- Akses riwayat: query langsung tabel `email_logs` (contoh: `select * from email_logs order by id desc limit 20;`).
+- Akses riwayat via endpoint:
+  - `GET /api/v1/email-logs`
+  - Headers: `Authorization: Bearer <JWT>`
+  - Query opsional:
+    - `page`, `perPage` (default 10, max 100)
+    - `q` (pencarian cepat di `to_email`, `subject`, `template`, `context`, `status`, `error`, `username`, `email user`)
+    - `user_id` (filter berdasarkan user)
+    - `status`, `template`, `context`
+    - `company_id` (khusus superadmin)
+  - Akses data:
+    - `superadmin`: semua company
+    - `admin`: hanya company sendiri
+    - `user`: hanya log milik user login
 
 ---
 
@@ -603,7 +650,10 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
 `GET /api/v1/dashboard/summary`  
 Headers: `Authorization: Bearer <JWT>`  
 Query opsional: `scope=user|all`; default `scope` adalah perusahaan (company).  
-Syarat: user login wajib punya `company_id`; jika tidak, respons 401.
+Syarat:
+- User biasa/admin wajib punya `company_id`; jika tidak, respons 401.
+- `scope=all` hanya boleh dipakai `superadmin` (selain itu respons 403).
+- Untuk `superadmin` tanpa `company_id`, default `scope=company` otomatis diperlakukan sebagai `scope=all`.
 Ringkasan:
 ```json
 {

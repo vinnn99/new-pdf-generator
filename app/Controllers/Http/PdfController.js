@@ -1,6 +1,7 @@
 'use strict'
 
 const JobService = require('../../Services/JobService')
+const TemplateResolver = require('../../Services/TemplateResolver')
 const path = require('path')
 const fs = require('fs')
 
@@ -18,35 +19,28 @@ class PdfController {
       // Manual validation
       const requiredFields = ['data', 'template', 'email']
 
-      // Required fields per template
-      const templateRequiredFields = {
-        musik: [
-          'nama', 'judul', 'nik', 'address', 'pt',
-          'pencipta', 'asNama', 'bankName', 'npwp',
-          'imail', 'phone', 'norek'
-        ],
-        invoice: ['clientName', 'items'],
-        thr: ['employeeName', 'position', 'period', 'payoutDate', 'baseSalary'],
-        payslip: ['employeeName', 'position', 'period'],
-        'ba-penempatan': ['letterNo', 'mdsName', 'nik', 'placementDate', 'outlet'],
-        'ba-request-id': ['letterNo', 'mdsName', 'nik', 'joinDate'],
-        'ba-hold': ['letterNo', 'region', 'holdDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
-        'ba-rolling': ['letterNo', 'region', 'rollingDate', 'mdsName', 'mdsCode', 'status', 'outletFrom', 'outletTo'],
-        'ba-hold-activate': ['letterNo', 'region', 'reactivateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
-        'ba-terminated': ['letterNo', 'region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
-      }
-
       const errors = []
 
       for (const f of requiredFields) {
         if (!payload[f]) errors.push(`Field ${f} is required`)
       }
 
-      if (payload.data && typeof payload.data === 'object' && payload.template) {
-        const required = templateRequiredFields[payload.template] || []
-        for (const f of required) {
-          if (!payload.data[f]) errors.push(`Field data.${f} is required`)
+      let resolvedTemplate = null
+      if (payload.template) {
+        resolvedTemplate = await TemplateResolver.resolve(payload.template, {
+          companyId: company ? company.company_id : null
+        })
+        if (!resolvedTemplate) {
+          errors.push(`Template '${payload.template}' tidak ditemukan`)
         }
+      }
+
+      if (payload.data && typeof payload.data === 'object' && resolvedTemplate) {
+        const requiredErrors = TemplateResolver.validateRequiredFields(
+          payload.data,
+          resolvedTemplate.requiredFields
+        )
+        errors.push(...requiredErrors)
       }
 
       if (payload.callback && !payload.callback.url) {

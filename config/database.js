@@ -58,5 +58,21 @@ module.exports = {
       password: Env.get('DB_PASSWORD', ''),
       database: Env.get('DB_DATABASE', 'adonis')
     }
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | Sqlite
+  |--------------------------------------------------------------------------
+  |
+  | In-memory/file based database useful for local tests.
+  |
+  */
+  sqlite: {
+    client: 'sqlite3',
+    connection: {
+      filename: Env.get('DB_DATABASE', Helpers.tmpPath('test.sqlite'))
+    },
+    useNullAsDefault: true
   }
 }

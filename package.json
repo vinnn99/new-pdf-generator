@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node ace test"
+    "test": "cross-env NODE_ENV=testing node ace test --timeout=120000"
   },
   "keywords": [
     "adonisjs",
@@ -28,11 +28,16 @@
     "@adonisjs/shield": "^1.0.8",
     "@adonisjs/validator": "^5.1.0",
     "mysql": "^2.18.1",
+    "nodemailer": "^6.9.8",
     "pdfmake": "^0.2.10",
-    "xlsx": "^0.18.5",
-    "nodemailer": "^6.9.8"
+    "xlsx": "^0.18.5"
   },
   "autoload": {
     "App": "./app"
+  },
+  "devDependencies": {
+    "@adonisjs/vow": "^1.0.17",
+    "cross-env": "^7.0.3",
+    "sqlite3": "^5.1.7"
   }
 }

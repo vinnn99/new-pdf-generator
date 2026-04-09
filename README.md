@@ -295,6 +295,53 @@ Authorization: Bearer <jwt_token_admin_or_superadmin>
 Jika company nonaktif, semua user perusahaan tersebut tidak bisa login maupun melewati `companyAuth`.
 Admin dengan `company_id` hanya boleh mengubah status company miliknya; superadmin bebas.
 
+### Kelola Template Dinamis (Admin/Superadmin)
+
+```
+GET http://localhost:3334/api/v1/admin/dynamic-templates?page=1&perPage=10
+Authorization: Bearer <jwt_token_admin_or_superadmin>
+```
+
+Query opsional:
+- `includeInactive=true`
+- `company_id=<id>` (khusus superadmin)
+- `company_id=null` (khusus superadmin, hanya template global)
+
+```
+POST http://localhost:3334/api/v1/admin/dynamic-templates
+Authorization: Bearer <jwt_token_admin_or_superadmin>
+Content-Type: application/json
+```
+
+Body contoh:
+
+```json
+{
+  "template_key": "dyn-kontrak-kerja",
+  "name": "Kontrak Kerja Dinamis",
+  "required_fields": ["employeeName", "position"],
+  "content": {
+    "pageSize": "A4",
+    "content": [
+      { "text": "Kontrak Kerja", "style": "header" },
+      { "text": "Nama: {{employeeName}}" },
+      { "text": "Posisi: {{position}}" }
+    ]
+  },
+  "is_active": true
+}
+```
+
+Endpoint tambahan:
+- `PUT /api/v1/admin/dynamic-templates/:id`
+- `POST /api/v1/admin/dynamic-templates/:id/activate`
+- `POST /api/v1/admin/dynamic-templates/:id/deactivate`
+
+Catatan:
+- Admin membuat template dinamis untuk company-nya sendiri.
+- Superadmin bisa membuat template global (`company_id` null) atau untuk company tertentu.
+- Runtime bersifat hybrid: template dinamis (DB) diprioritaskan, template file JS lama tetap fallback.
+
 ### Endpoint
 
 ```

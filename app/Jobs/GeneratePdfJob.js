@@ -5,6 +5,7 @@ const Database = use('Database')
 const path = require('path')
 const fs = require('fs')
 const WebhookSender = require('../Services/WebhookSender')
+const TemplateResolver = require('../Services/TemplateResolver')
 
 // Server-side font paths for pdfmake v0.2
 const fontsDir = path.join(__dirname, '../Fonts')
@@ -41,23 +42,27 @@ class GeneratePdfJob {
         throw new Error('Invalid template name')
       }
 
-      // Load template dynamically
-      const templatePath = `../../resources/pdf-templates/${template}`
-      let templateFunction
-
-      try {
-        templateFunction = require(templatePath)
-      } catch (error) {
-        throw new Error(`Template '${template}' not found: ${error.message}`)
-      }
-
-      if (typeof templateFunction !== 'function') {
-        throw new Error(`Template '${template}' must export a function`)
+      // Resolve template: DB dynamic first, then fallback ke file JS legacy
+      const resolvedTemplate = await TemplateResolver.resolve(template, { companyId })
+      if (!resolvedTemplate) {
+        throw new Error(`Template '${template}' tidak ditemukan`)
       }
 
       // Generate PDF document definition
       console.log('Generating PDF document definition...')
-      const docDefinition = templateFunction(payloadData)
+      let docDefinition
+      if (resolvedTemplate.source === 'dynamic') {
+        docDefinition = TemplateResolver.renderDynamicDocDefinition(
+          resolvedTemplate.templateRecord,
+          payloadData
+        )
+      } else {
+        const templateFunction = resolvedTemplate.templateFunction
+        if (typeof templateFunction !== 'function') {
+          throw new Error(`Template '${template}' must export a function`)
+        }
+        docDefinition = templateFunction(payloadData)
+      }
 
       // Create PDF
       console.log('Creating PDF...')
