@@ -78,6 +78,28 @@ Contoh error 401 (old password salah):
 { "status": "error", "message": "Password lama salah" }
 ```
 
+### Ambil API Key Company (JWT)
+`GET /api/v1/company/api-key`  
+Headers: `Authorization: Bearer <JWT>`  
+
+Catatan:
+- User/admin harus terhubung ke company (`company_id`).
+- Superadmin tanpa `company_id` akan menerima 404.
+- `allowed_templates` dikembalikan sebagai array (sudah diparse dari kolom DB).
+
+Response 200:
+```json
+{
+  "status": "ok",
+  "company": {
+    "id": 1,
+    "name": "Contoh Corp",
+    "apiKey": "abc123",
+    "allowed_templates": ["payslip", "ba-penempatan"]
+  }
+}
+```
+
 ### Buat User (Admin/Superadmin)
 `POST /api/v1/admin/users`  
 Headers: `Authorization: Bearer <JWT admin/superadmin>`

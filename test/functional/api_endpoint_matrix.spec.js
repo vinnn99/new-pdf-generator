@@ -284,8 +284,18 @@ const endpointCases = [
   {
     method: 'get',
     url: () => '/api/v1/company/api-key',
+    label: '/api/v1/company/api-key',
     auth: 'jwt',
-    expected: { user: 200, admin: 200, superadmin: 404 }
+    expected: { user: 200, admin: 200, superadmin: 404 },
+    assertBody: ({ response, expectedStatus }) => {
+      if (expectedStatus !== 200) return
+
+      const company = response.body && response.body.company
+      if (!company) throw new Error('Response company/api-key tidak memiliki objek company')
+      if (!Array.isArray(company.allowed_templates)) {
+        throw new Error('Field company.allowed_templates harus berupa array')
+      }
+    }
   },
   {
     method: 'get',
@@ -346,6 +356,13 @@ for (const endpoint of endpointCases) {
 
       const response = await request.end()
       response.assertStatus(endpoint.expected[role])
+      if (endpoint.assertBody) {
+        endpoint.assertBody({
+          response,
+          role,
+          expectedStatus: endpoint.expected[role]
+        })
+      }
     })
   }
 }

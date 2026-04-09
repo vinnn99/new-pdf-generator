@@ -32,9 +32,21 @@ class CompanyController {
       company: {
         id: company.company_id,
         name: company.name,
-        apiKey: company.api_key
+        apiKey: company.api_key,
+        allowed_templates: safeJsonArray(company.allowed_templates)
       }
     })
+  }
+}
+
+function safeJsonArray(value) {
+  if (!value) return []
+  if (Array.isArray(value)) return value
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch (e) {
+    return []
   }
 }
 

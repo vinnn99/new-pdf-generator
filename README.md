@@ -252,6 +252,32 @@ Content-Type: application/json
 Body: `{ "password": "minimal6karakter" }`  
 Password di-hash otomatis melalui hook model User. Admin dibatasi user di perusahaan sendiri; superadmin semua user.
 
+### Ambil API Key Company (JWT)
+
+```
+GET http://localhost:3334/api/v1/company/api-key
+Authorization: Bearer <jwt_token>
+```
+
+Catatan:
+- User/admin harus memiliki `company_id`.
+- Superadmin tanpa `company_id` akan menerima respons 404.
+- `allowed_templates` pada respons sudah berupa array.
+
+Contoh respons:
+
+```json
+{
+  "status": "ok",
+  "company": {
+    "id": 1,
+    "name": "Contoh Corp",
+    "apiKey": "abc123",
+    "allowed_templates": ["payslip", "ba-penempatan"]
+  }
+}
+```
+
 ### List Company (Admin/Superadmin)
 
 ```
