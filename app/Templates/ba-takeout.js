@@ -175,7 +175,7 @@ module.exports = function baTakeoutTemplate(payloadData = {}) {
 
       {
         text: 'Hormat Kami,',
-        alignment: 'center',
+        alignment: 'right',
         style: 'paragraph',
         margin: [0, 0, 0, 8]
       },
