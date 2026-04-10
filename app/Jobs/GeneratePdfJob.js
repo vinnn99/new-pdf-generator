@@ -35,7 +35,7 @@ class GeneratePdfJob {
       console.log('Data:', JSON.stringify(data, null, 2))
 
       // Extract payload — companyName & email are top-level fields
-      const { data: payloadData, template, callback, companyName, email, userId, companyId } = data
+      const { data: payloadData, template, callback, companyName, email, userId, companyId, filenameTemplate } = data
 
       // Validate template name
       if (!template || typeof template !== 'string') {
@@ -88,35 +88,26 @@ class GeneratePdfJob {
       const downloadDir = path.join(process.cwd(), 'public', 'download', companyFolder, emailFolder)
       fs.mkdirSync(downloadDir, { recursive: true })
 
-      // Simpan PDF dengan nama unik: {template}_{timestamp}_{random}.pdf
+      // Simpan PDF dengan kode unik.
       const uniqueId  = Date.now().toString(36) + Math.random().toString(36).slice(2, 7).toUpperCase()
 
       // Helper untuk penamaan file
       const safe = (str) => (str || '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, '_')
       const periodFromPayload = payloadData && (payloadData.period || payloadData.periode)
+      const currentPeriod = (() => {
+        const now = new Date()
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      })()
       const normalizedPeriod = periodFromPayload
-        ? safe(String(periodFromPayload).trim().replace(/\//g, '-'))
-        : (() => {
-            const now = new Date()
-            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-          })()
+        ? sanitizeSlipSegment(String(periodFromPayload).trim().replace(/\//g, '-'), currentPeriod)
+        : currentPeriod
+      const normalizedFilenameTemplate = sanitizeSlipSegment(normalizeFilenameTemplate(filenameTemplate || template), 'payslip').toLowerCase()
 
       // Penamaan file per template
-      if (template === 'payslip') {
+      if (isSlipFilenameTemplate(template)) {
         const nip = payloadData && payloadData.employeeId ? String(payloadData.employeeId) : 'NIP'
         const nama = payloadData && payloadData.employeeName ? String(payloadData.employeeName) : 'NAME'
-        const slipTitleRaw = payloadData && payloadData.slipTitle ? String(payloadData.slipTitle) : 'PAYSLIP'
-        filename = `${normalizedPeriod}-${safe(slipTitleRaw)}-${safe(nip)}-${safe(nama)}-${uniqueId}.pdf`
-      } else if (template === 'insentif') {
-        const nip = payloadData && payloadData.employeeId ? String(payloadData.employeeId) : 'NIP'
-        const nama = payloadData && payloadData.employeeName ? String(payloadData.employeeName) : 'NAME'
-        const slipTitleRaw = payloadData && payloadData.slipTitle ? String(payloadData.slipTitle) : 'INSENTIF'
-        filename = `${normalizedPeriod}-${safe(slipTitleRaw)}-${safe(nip)}-${safe(nama)}-${uniqueId}.pdf`
-      } else if (template === 'thr') {
-        const nip = payloadData && payloadData.employeeId ? String(payloadData.employeeId) : 'NIP'
-        const nama = payloadData && payloadData.employeeName ? String(payloadData.employeeName) : 'NAME'
-        const slipTitleRaw = payloadData && payloadData.slipTitle ? String(payloadData.slipTitle) : 'THR'
-        filename = `${normalizedPeriod}-${safe(slipTitleRaw)}-${safe(nip)}-${safe(nama)}-${uniqueId}.pdf`
+        filename = `${normalizedPeriod}.${normalizedFilenameTemplate}.${sanitizeSlipSegment(nip, 'NIP')}.${sanitizeSlipSegment(nama, 'NAME')}.${uniqueId}.pdf`
       } else if (template === 'ba-penempatan') {
         const mdsName = payloadData && payloadData.mdsName ? String(payloadData.mdsName) : 'MDS'
         const outlet  = payloadData && payloadData.outlet ? String(payloadData.outlet) : 'OUTLET'
@@ -256,6 +247,30 @@ class GeneratePdfJob {
       throw error
     }
   }
+}
+
+function normalizeFilenameTemplate(value) {
+  const raw = (value || '').toString().trim().toLowerCase()
+  return raw || 'payslip'
+}
+
+function isSlipFilenameTemplate(template) {
+  const keyA = normalizeFilenameTemplate(template)
+  return ['payslip', 'insentif', 'thr'].includes(keyA)
+}
+
+function sanitizeSlipSegment(value, fallback) {
+  const cleaned = (value === undefined || value === null ? '' : String(value))
+    .trim()
+    .replace(/\//g, '-')
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .replace(/\./g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+
+  if (cleaned) return cleaned
+  return fallback || 'UNKNOWN'
 }
 
 module.exports = GeneratePdfJob

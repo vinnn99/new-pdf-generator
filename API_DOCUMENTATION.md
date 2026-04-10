@@ -466,7 +466,7 @@ Webhook payload (on success):
 - `ba-terminated`: `letterNo`, `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`
 
 **Penamaan file:**
-- `payslip`: `YYYY-MM-<slipTitle>-<NIP>-<Nama>-<unik>.pdf`
+- `payslip`/`insentif`/`thr`: `<periode>.<template>.<employeeId>.<nama>.<unik>.pdf`
 - `ba-penempatan`: `ba-penempatan.<mdsName>.<outlet>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-request-id`: `ba-request-id.<mdsName>.<area>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-hold`: `ba-hold.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
@@ -584,10 +584,12 @@ Kolom umum: `callback_url`, `callback_header` (JSON), `data_json` (override/extr
 `POST /api/v1/send-slip-emails`  
 Auth: `Authorization: Bearer <JWT>`  
 Form-data:
-- `file` (xls/xlsx, max 5 MB) dengan kolom: `sentTo` (wajib) | `employeeId` (wajib) | `employeeName` | `slipTitle` | `body` | `cc` | `bcc`
-- `periode` (opsional, filter lampiran dengan prefix nama file, contoh `2026-03`)
+- `file` (xls/xlsx, max 5 MB) dengan kolom: `sentTo` (wajib) | `employeeId` (wajib) | `employeeName` | `slipTitle` | `template` (opsional: `payslip`/`insentif`/`thr`) | `body` | `cc` | `bcc`
+- `periode` (opsional, filter segmen periode pada nama file, contoh `2026-03`)
 
-Lampiran dicari hanya di `public/download/{companyName}/{email_login}/` (folder disanitasi sesuai email user login) dan dipilih berdasar `employeeId` (+nama jika ada). Maks 3 lampiran per email.
+Lampiran dicari hanya di `public/download/{companyName}/{email_login}/` (folder disanitasi sesuai email user login) dengan format:
+`[periode].[template].[employeeId].[nama].[kodeUnique].pdf`.
+Jika ditemukan lebih dari satu kandidat untuk baris yang sama, sistem memilih file paling baru (berdasarkan waktu file).
 SMTP: jika semua field SMTP di tabel `companies` terisi (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, opsional `smtp_secure`, `mail_from`) maka dipakai; jika tidak lengkap, fallback ke `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `MAIL_FROM`).
 
 Response 200:
@@ -599,7 +601,7 @@ Response 200:
   "failed": 1,
   "skipped": 1,
   "results": [
-    { "row": 1, "status": "queued", "to": "a@b.com", "attachments": ["2026-03-PAYSLIP-123.pdf"] },
+    { "row": 1, "status": "queued", "to": "a@b.com", "attachments": ["2026-03.payslip.123.BUDI.X7A12.pdf"] },
     { "row": 2, "status": "failed", "message": "employeeId kosong" }
   ]
 }

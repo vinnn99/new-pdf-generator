@@ -16,12 +16,14 @@ class BulkEmailController {
    * POST /api/v1/send-slip-emails
    * Multipart form-data:
    *   - file: .xlsx file with columns (case-insensitive):
-   *       sentTo (wajib) | employeeId | employeeName | slipTitle | body | cc | bcc
-   *   - periode (opsional): contoh "2026-03"; hanya file lampiran yang nama filenya berawalan nilai ini yang akan dipakai.
+   *       sentTo (wajib) | employeeId | employeeName | slipTitle | template (opsional) | body | cc | bcc
+   *   - periode (opsional): contoh "2026-03"; filter berdasarkan segmen periode di nama file.
    *   Attachments dicari di:
    *     public/download/{companyName}/{email_login_user}/
    *   (hanya folder email user yang sedang login yang dipakai)
-   *   File dipilih jika nama file mengandung employeeId (case-insensitive).
+   *   Format nama file yang dipakai:
+   *     [periode].[template].[employeeId].[nama].[kodeUnique].pdf
+   *   Jika kandidat > 1 (mis. beda kodeUnique), sistem memilih file terbaru.
    */
   async sendSlips({ request, response, auth }) {
     try {
@@ -63,7 +65,12 @@ class BulkEmailController {
       const sheetName = workbook.SheetNames[0]
       const sheet = workbook.Sheets[sheetName]
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-      const periodPrefix = (request.input('periode') || request.input('period') || '').toString().trim().toLowerCase()
+      const periodPrefix = normalizePeriodPrefix(request.input('periode') || request.input('period'))
+      const templateFromRequest = normalizeSlipTemplate(
+        request.input('template') ||
+        request.input('slipTemplate') ||
+        request.input('slip_template')
+      )
 
       ensureLogDir()
 
@@ -86,6 +93,7 @@ class BulkEmailController {
         const employeeName = norm.employeename || ''
         const companyName = norm.companyname || ''
         const slipTitle = norm.sliptitle || 'Slip Gaji'
+        const slipTemplate = resolveSlipTemplate(norm, templateFromRequest, slipTitle)
         const body =
           norm.body ||
           [
@@ -112,39 +120,29 @@ class BulkEmailController {
           continue
         }
 
-        const normalizeName = (str) => (str || '').toString()
-          .replace(/\s+/g, '_')
-          .replace(/[^a-z0-9_-]/gi, '')
-          .toLowerCase()
+        const candidates = findSlipAttachmentCandidates({
+          bases,
+          periodPrefix,
+          slipTemplate,
+          employeeId,
+          employeeName
+        })
+        const selectedAttachment = pickNewestAttachment(candidates)
+        const selectedAttachments = selectedAttachment
+          ? [{ filename: selectedAttachment.filename, path: selectedAttachment.path }]
+          : []
 
-        const attachments = []
-        for (const base of bases) {
-          const dir = base.dir
-          if (!fs.existsSync(dir)) continue
-          const files = fs.readdirSync(dir)
-          const targetId = employeeId.toLowerCase()
-          const targetName = normalizeName(employeeName)
-          const matches = files.filter((f) => {
-            const lower = f.toLowerCase()
-            const periodOk = !periodPrefix || lower.startsWith(periodPrefix)
-            const hasId = lower.includes(targetId)
-            const hasName = targetName ? lower.includes(targetName) : true
-            return periodOk && hasId && hasName
-          })
-          for (const match of matches) {
-            attachments.push({
-              filename: match,
-              path: path.join(dir, match)
-            })
-          }
-        }
-
-        // Batasi 3 lampiran max
-        const limitedAttachments = attachments.slice(0, 3)
-
-        if (limitedAttachments.length === 0) {
+        if (selectedAttachments.length === 0) {
           results.push({ row: i + 1, status: 'skipped', to, message: 'Lampiran tidak ditemukan untuk employeeId/name' })
-          appendLog({ row: i + 1, to, status: 'skipped', reason: 'no_attachments', employeeId, employeeName })
+          appendLog({
+            row: i + 1,
+            to,
+            status: 'skipped',
+            reason: 'no_attachments',
+            employeeId,
+            employeeName,
+            slipTemplate
+          })
           skippedCount++
           continue
         }
@@ -153,16 +151,25 @@ class BulkEmailController {
           await JobService.dispatch('App/Jobs/SendEmailJob', {
             smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
             to, cc, bcc, subject: slipTitle, text: body,
-            attachments: limitedAttachments,
+            attachments: selectedAttachments,
             employeeId, employeeName,
             userId: user.id,
             companyId: company.company_id,
             template: 'payslip-email',
             context: 'bulk-slip'
           }, { attempts: 3, timeout: 120000 })
-          const attachNames = limitedAttachments.map(a => a.filename)
+          const attachNames = selectedAttachments.map(a => a.filename)
           results.push({ row: i + 1, status: 'queued', to, attachments: attachNames })
-          appendLog({ row: i + 1, to, status: 'queued', attachments: attachNames, employeeId, employeeName })
+          appendLog({
+            row: i + 1,
+            to,
+            status: 'queued',
+            attachments: attachNames,
+            employeeId,
+            employeeName,
+            slipTemplate,
+            candidates: candidates.length
+          })
           queuedCount++
         } catch (err) {
           results.push({ row: i + 1, status: 'failed', to, message: err.message })
@@ -657,6 +664,168 @@ class BulkEmailController {
     }
     return this._sendBaTemplate({ request, response, auth }, cfg)
   }
+}
+
+function findSlipAttachmentCandidates({ bases, periodPrefix, slipTemplate, employeeId, employeeName }) {
+  const targetId = normalizeSlipSegment(employeeId).toLowerCase()
+  if (!targetId) return []
+
+  const targetName = normalizeSlipSegment(employeeName).toLowerCase()
+  const candidates = []
+
+  for (const base of bases) {
+    const dir = base.dir
+    if (!fs.existsSync(dir)) continue
+
+    const files = fs.readdirSync(dir)
+    for (const filename of files) {
+      const parsed = parseSlipAttachmentFilename(filename)
+      if (!parsed) continue
+
+      const periodOk = !periodPrefix || parsed.period.startsWith(periodPrefix)
+      const templateOk = !slipTemplate || parsed.template === slipTemplate
+      const idOk = parsed.employeeId === targetId
+      const nameOk = !targetName || parsed.employeeName === targetName
+      if (!periodOk || !templateOk || !idOk || !nameOk) continue
+
+      candidates.push(buildAttachmentCandidate(filename, path.join(dir, filename), 'new-format'))
+    }
+  }
+
+  if (candidates.length > 0) return candidates
+  return findLegacySlipAttachmentCandidates({ bases, periodPrefix, employeeId, employeeName })
+}
+
+function findLegacySlipAttachmentCandidates({ bases, periodPrefix, employeeId, employeeName }) {
+  const targetId = (employeeId || '').toString().trim().toLowerCase()
+  const targetName = normalizeLegacyName(employeeName)
+  const candidates = []
+
+  if (!targetId) return candidates
+
+  for (const base of bases) {
+    const dir = base.dir
+    if (!fs.existsSync(dir)) continue
+
+    const files = fs.readdirSync(dir)
+    for (const filename of files) {
+      const lower = filename.toLowerCase()
+      if (!lower.endsWith('.pdf')) continue
+      const periodOk = !periodPrefix || lower.startsWith(periodPrefix)
+      const hasId = lower.includes(targetId)
+      const hasName = !targetName || lower.includes(targetName)
+      if (!periodOk || !hasId || !hasName) continue
+
+      candidates.push(buildAttachmentCandidate(filename, path.join(dir, filename), 'legacy'))
+    }
+  }
+
+  return candidates
+}
+
+function buildAttachmentCandidate(filename, filePath, source) {
+  let mtimeMs = 0
+  try {
+    mtimeMs = fs.statSync(filePath).mtimeMs || 0
+  } catch (e) {
+    mtimeMs = 0
+  }
+
+  return {
+    filename,
+    path: filePath,
+    source,
+    mtimeMs
+  }
+}
+
+function pickNewestAttachment(candidates) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return null
+
+  const sorted = candidates.slice().sort((a, b) => {
+    if ((b.mtimeMs || 0) !== (a.mtimeMs || 0)) {
+      return (b.mtimeMs || 0) - (a.mtimeMs || 0)
+    }
+
+    const byName = String(b.filename || '').localeCompare(String(a.filename || ''), 'en', { sensitivity: 'base' })
+    if (byName !== 0) return byName
+
+    return String(b.path || '').localeCompare(String(a.path || ''), 'en', { sensitivity: 'base' })
+  })
+
+  return sorted[0]
+}
+
+function parseSlipAttachmentFilename(filename) {
+  if (!filename || typeof filename !== 'string') return null
+  if (!filename.toLowerCase().endsWith('.pdf')) return null
+
+  const base = filename.slice(0, -4)
+  const parts = base.split('.')
+  if (parts.length < 5) return null
+
+  const [period, template, employeeId, employeeName, ...uniqueParts] = parts
+  if (!period || !template || !employeeId || !employeeName || uniqueParts.length === 0) return null
+
+  return {
+    period: period.toLowerCase(),
+    template: template.toLowerCase(),
+    employeeId: employeeId.toLowerCase(),
+    employeeName: employeeName.toLowerCase()
+  }
+}
+
+function normalizePeriodPrefix(val) {
+  return normalizeSlipSegment((val || '').toString().trim().replace(/\//g, '-')).toLowerCase()
+}
+
+function resolveSlipTemplate(norm, requestTemplate, slipTitle) {
+  const rowTemplate = normalizeSlipTemplate(
+    norm.template ||
+    norm.sliptemplate ||
+    norm.slip_template ||
+    norm.sliptype ||
+    norm.slip_type
+  )
+  if (rowTemplate) return rowTemplate
+
+  if (requestTemplate) return requestTemplate
+
+  const inferred = inferSlipTemplateFromTitle(slipTitle)
+  return inferred || 'payslip'
+}
+
+function inferSlipTemplateFromTitle(title) {
+  const lower = (title || '').toString().trim().toLowerCase()
+  if (!lower) return ''
+  if (lower.includes('insentif')) return 'insentif'
+  if (lower.includes('thr')) return 'thr'
+  if (lower.includes('payslip') || lower.includes('slip')) return 'payslip'
+  return ''
+}
+
+function normalizeSlipTemplate(template) {
+  const normalized = normalizeSlipSegment(template).toLowerCase()
+  if (['payslip', 'insentif', 'thr'].includes(normalized)) return normalized
+  return ''
+}
+
+function normalizeSlipSegment(str) {
+  return (str || '').toString()
+    .trim()
+    .replace(/\//g, '-')
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .replace(/\./g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+function normalizeLegacyName(str) {
+  return (str || '').toString()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_-]/gi, '')
+    .toLowerCase()
 }
 
 function ensureLogDir() {

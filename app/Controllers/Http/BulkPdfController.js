@@ -126,6 +126,10 @@ class BulkPdfController {
           if (!email) throw new Error('email kosong (tidak ada di kolom dan akun login tanpa email)')
 
           const payload = buildPayloadForMode(lower, mode, opts)
+          if (isSlipMode(mode)) {
+            // Dipakai GeneratePdfJob untuk format nama file baru slip bulk.
+            payload.filenameTemplate = mode
+          }
           payload.companyName = company.name
           payload.companyId = company.company_id
           payload.userId = user.id
@@ -704,6 +708,10 @@ function pickFromLower(lower, keys) {
     return lower[k]
   }
   return undefined
+}
+
+function isSlipMode(mode) {
+  return mode === 'payslip' || mode === 'insentif' || mode === 'thr'
 }
 
 function parseList(val) {

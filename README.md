@@ -883,7 +883,7 @@ public/
   download/                           ? folder penyimpanan PDF yang sudah digenerate
     {companyName}/
       {email}/
-        {template}_{uniqueId}.pdf
+        {periode}.{template}.{employeeId}.{nama}.{unique}.pdf
 
 start/
   routes.js                           ? definisi route API & download endpoint
@@ -992,13 +992,14 @@ curl -X POST http://localhost:3334/api/v1/bulk/payslip \
 
 Endpoint: `POST /api/v1/send-slip-emails` (auth: JWT).  
 Form-data:
-- `file` (wajib): XLS/XLSX dengan kolom (case-insensitive): `sentTo`, `employeeId`, `employeeName`, `slipTitle`, `body`, `cc`, `bcc`.
-- `periode` (opsional): contoh `2026-03`; hanya file lampiran yang nama filenya diawali nilai ini yang akan dikirim.
+- `file` (wajib): XLS/XLSX dengan kolom (case-insensitive): `sentTo`, `employeeId`, `employeeName`, `slipTitle`, `template` (opsional: `payslip`/`insentif`/`thr`), `body`, `cc`, `bcc`.
+- `periode` (opsional): contoh `2026-03`; filter segmen periode pada nama file.
 
 Perilaku:
 - Lampiran dicari hanya di `public/download/{companyName}/{email_login}/` (folder disanitasi sesuai email user yang login).
-- File dipilih jika nama file mengandung `employeeId` (case-insensitive), cocok nama (jika ada), dan (jika `periode` diisi) nama file diawali prefix periode.
-- Maks 3 lampiran per baris email.
+- Format file lampiran yang diprioritaskan: `[periode].[template].[employeeId].[nama].[kodeUnique].pdf`.
+- Jika ada lebih dari satu kandidat lampiran yang cocok (beda `kodeUnique`), sistem memilih file terbaru.
+- Satu lampiran dikirim per baris email.
 - Log tercatat di `logs/bulk-email.log`.
 - SMTP: jika semua field SMTP di tabel `companies` terisi (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, opsional `smtp_secure`, `mail_from`) maka dipakai; jika tidak lengkap, fallback ke `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `MAIL_FROM`).
 
