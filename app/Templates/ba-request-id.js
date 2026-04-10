@@ -177,10 +177,23 @@ module.exports = function baRequestIdTemplate(payloadData = {}) {
 
       {
         columns: [
+          { width: '50%', text: '' },
+          {
+            width: '50%',
+            text: 'Hormat Kami,',
+            alignment: 'center',
+            style: 'paragraph',
+          },
+        ],
+        columnGap: 40,
+        margin: [0, 0, 0, 8]
+      },
+
+      {
+        columns: [
           {
             width: '50%',
             stack: [
-              { text: 'Hormat Kami,', style: 'paragraph', margin: [0, 0, 0, 12], alignment: 'center' },
               { image: signatureLeftImage, width: 120, alignment: 'center', margin: [0, 8, 0, 12] },
               {
                 stack: [
@@ -195,7 +208,6 @@ module.exports = function baRequestIdTemplate(payloadData = {}) {
           {
             width: '50%',
             stack: [
-              { text: 'Menyetujui,', style: 'paragraph', margin: [0, 0, 0, 12], alignment: 'center' },
               { image: signatureRightImage, width: 120, alignment: 'center', margin: [0, 8, 0, 12] },
               {
                 stack: [
