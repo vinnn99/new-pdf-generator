@@ -50,6 +50,8 @@ Route.group(() => {
   Route.post('/admin/dynamic-templates/:id/deactivate', 'AdminTemplateController.deactivate').middleware(['auth:jwt'])
   Route.post('/generate-pdf', 'PdfController.generate').middleware(['companyAuth'])
   Route.get('/generated-pdfs', 'GeneratedPdfController.index').middleware(['auth:jwt'])
+  Route.get('/batches', 'BatchController.index').middleware(['auth:jwt'])
+  Route.get('/batches/:batch_id', 'BatchController.show').middleware(['auth:jwt'])
   Route.post('/send-slip-emails', 'BulkEmailController.sendSlips').middleware(['auth:jwt'])
   Route.post('/send-ba-penempatan-emails', 'BulkEmailController.sendBaPenempatan').middleware(['auth:jwt'])
   Route.post('/send-ba-request-id-emails', 'BulkEmailController.sendBaRequestId').middleware(['auth:jwt'])

@@ -35,7 +35,19 @@ class GeneratePdfJob {
       console.log('Data:', JSON.stringify(data, null, 2))
 
       // Extract payload — companyName & email are top-level fields
-      const { data: payloadData, template, callback, companyName, email, userId, companyId, filenameTemplate } = data
+      const {
+        data: payloadData,
+        template,
+        callback,
+        companyName,
+        email,
+        userId,
+        companyId,
+        filenameTemplate,
+        batchId,
+        batchItemId,
+        matchKey
+      } = data
 
       // Validate template name
       if (!template || typeof template !== 'string') {
@@ -162,11 +174,12 @@ class GeneratePdfJob {
       downloadUrl = `${baseUrl}/download/${encodeURIComponent(companyFolder)}/${encodeURIComponent(emailFolder)}/${encodeURIComponent(filename)}`
 
       // Kirim webhook dengan download URL (bukan base64)
+      const savedRelativePath = `public/download/${companyFolder}/${emailFolder}/${filename}`
       const webhookPayload = {
         success:      true,
         download_url: downloadUrl,
         filename:     filename,
-        saved_at:     `public/download/${companyFolder}/${emailFolder}/${filename}`,
+        saved_at:     savedRelativePath,
         template:     template,
         email:        email,
         companyName:  companyName,
@@ -182,7 +195,7 @@ class GeneratePdfJob {
           template,
           filename,
           download_url: downloadUrl,
-          saved_path: `public/download/${companyFolder}/${emailFolder}/${filename}`,
+          saved_path: savedRelativePath,
           email,
           company_name: companyName || 'unknown',
           data: JSON.stringify(payloadData || {}),
@@ -193,6 +206,18 @@ class GeneratePdfJob {
       } catch (err) {
         console.error('Failed to insert generated_pdfs record:', err.message)
       }
+
+      await updateBatchItemStatus({
+        batchId,
+        batchItemId,
+        template,
+        matchKey,
+        status: 'success',
+        filename,
+        savedPath: savedRelativePath,
+        generatedPdfId: generatedId || null,
+        error: null
+      })
 
       if (callback && callback.url) {
         try {
@@ -239,10 +264,20 @@ class GeneratePdfJob {
         filePath,
         downloadUrl,
         companyFolder,
-        emailFolder
+        emailFolder,
+        batchId: batchId || null,
+        batchItemId: batchItemId || null
       }
 
     } catch (error) {
+      await updateBatchItemStatus({
+        batchId: data && data.batchId,
+        batchItemId: data && data.batchItemId,
+        template: data && data.template,
+        matchKey: data && data.matchKey,
+        status: 'failed',
+        error: error.message
+      })
       console.error('GeneratePdfJob error:', error.message)
       throw error
     }
@@ -271,6 +306,44 @@ function sanitizeSlipSegment(value, fallback) {
 
   if (cleaned) return cleaned
   return fallback || 'UNKNOWN'
+}
+
+async function updateBatchItemStatus({
+  batchId,
+  batchItemId,
+  template,
+  matchKey,
+  status,
+  filename = undefined,
+  savedPath = undefined,
+  generatedPdfId = undefined,
+  error = undefined
+}) {
+  if (!batchId && !batchItemId) return
+
+  const payload = {
+    status: status || 'queued',
+    updated_at: new Date()
+  }
+  if (filename !== undefined) payload.filename = filename
+  if (savedPath !== undefined) payload.saved_path = savedPath
+  if (generatedPdfId !== undefined) payload.generated_pdf_id = generatedPdfId
+  if (error !== undefined) payload.error = error
+
+  let query = Database.table('generation_batch_items')
+  if (batchItemId) {
+    query = query.where('id', batchItemId)
+  } else {
+    query = query.where('batch_id', batchId)
+    if (template) query = query.where('template', template)
+    if (matchKey) query = query.where('match_key', matchKey)
+  }
+
+  try {
+    await query.update(payload)
+  } catch (err) {
+    console.error('Failed to update generation_batch_items:', err.message)
+  }
 }
 
 module.exports = GeneratePdfJob

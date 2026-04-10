@@ -560,7 +560,7 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 }
 ```
 
-> **Field wajib `ba-penempatan`:** `letterNo`, `mdsName`, `placementDate`, `outlet` (validasi di API). Nama file output: `ba-penempatan.[namaMDS].[outlet].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+> **Field wajib `ba-penempatan`:** `mdsName`, `placementDate`, `outlet` (validasi di API). `data.letterNo` selalu di-generate otomatis (override nilai request). Nama file output: `ba-penempatan.[namaMDS].[outlet].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
 
 ### `ba-request-id` — Berita Acara Request ID MDS
 
@@ -595,7 +595,7 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 }
 ```
 
-> **Field wajib `ba-request-id`:** `letterNo`, `mdsName`, `nik`, `joinDate`. Nama file output: `ba-request-id.[namaMDS].[area].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+> **Field wajib `ba-request-id`:** `area`, `mdsName`, `nik`, `joinDate`. `data.letterNo` selalu di-generate otomatis (override nilai request). Nama file output: `ba-request-id.[namaMDS].[area].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
 
 ### `ba-hold` — Berita Acara MDS HOLD
 
@@ -625,7 +625,7 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 }
 ```
 
-> **Field wajib `ba-hold`:** `letterNo`, `region`, `holdDate`, `mdsName`, `mdsCode`, `status`, `outlet`. Nama file output: `ba-hold.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+> **Field wajib `ba-hold`:** `region`, `holdDate`, `mdsName`, `mdsCode`, `status`, `outlet`. `data.letterNo` selalu di-generate otomatis (override nilai request). Nama file output: `ba-hold.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
 
 ### `ba-rolling` — Berita Acara Rolling MDS
 
@@ -656,7 +656,7 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 }
 ```
 
-> **Field wajib `ba-rolling`:** `letterNo`, `region`, `rollingDate`, `mdsName`, `mdsCode`, `status`, `outletFrom`, `outletTo`. Nama file output: `ba-rolling.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+> **Field wajib `ba-rolling`:** `region`, `rollingDate`, `mdsName`, `mdsCode`, `status`, `outletFrom`, `outletTo`. `data.letterNo` selalu di-generate otomatis (override nilai request). Nama file output: `ba-rolling.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
 
 ### `ba-hold-activate` — Berita Acara MDS HOLD Diaktifkan Kembali
 
@@ -686,7 +686,7 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 }
 ```
 
-> **Field wajib `ba-hold-activate`:** `letterNo`, `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`. Nama file output: `ba-hold-activate.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+> **Field wajib `ba-hold-activate`:** `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`. `data.letterNo` selalu di-generate otomatis (override nilai request). Nama file output: `ba-hold-activate.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
 
 ### `ba-takeout` — Berita Acara Toko Takeout MDS
 
@@ -716,7 +716,7 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 }
 ```
 
-> **Field wajib `ba-takeout`:** `letterNo`, `region`, `takeoutDate`, `mdsName`, `mdsCode`, `status`, `outlet`. Nama file output: `ba-takeout.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+> **Field wajib `ba-takeout`:** `region`, `takeoutDate`, `mdsName`, `mdsCode`, `status`, `outlet`. `data.letterNo` selalu di-generate otomatis (override nilai request). Nama file output: `ba-takeout.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
 
 
 ### `ba-terminated` ? Berita Acara Terminasi MDS
@@ -751,7 +751,7 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 }
 ```
 
-> **Field wajib `ba-terminated`:** `letterNo`, `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`. Nama file output: `ba-terminated.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+> **Field wajib `ba-terminated`:** `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`. `data.letterNo` selalu di-generate otomatis (override nilai request). Nama file output: `ba-terminated.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
 
 
 ---
@@ -833,9 +833,9 @@ Response contoh:
   const templateRequiredFields = {
     musik:         ['nama', 'judul', ...],
     invoice:       ['clientName', 'items'],
-    'ba-penempatan': ['letterNo', 'mdsName', 'placementDate', 'outlet'],
-    'ba-request-id': ['letterNo', 'mdsName', 'nik', 'joinDate'],
-    'ba-takeout': ['letterNo', 'region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
+    'ba-penempatan': ['mdsName', 'placementDate', 'outlet'],
+    'ba-request-id': ['area', 'mdsName', 'nik', 'joinDate'],
+    'ba-takeout': ['region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
     namaTemplate:  ['field1', 'field2'],  // ← tambahkan di sini
   }
   ```
@@ -943,34 +943,38 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
     `employeeId | employeeName | position | departement | periode | joinDate | ptkp | targetHK | attendance | THR | earnings | deductions | note | callback_url | callback_header | email (opsional)`
 
 - `POST /api/v1/bulk/ba-penempatan`  
-  - Minimal: `letterNo`, `mdsName`, `placementDate`, `outlet`. Kolom `email` opsional jika penerima berbeda dari akun login.  
+  - Minimal: `mdsName`, `placementDate`, `outlet`. Kolom `email` opsional jika penerima berbeda dari akun login.  
   - Kolom opsional: `region/wilayah`, `nik`, `birthDate/tanggal lahir`, `status`, `category/kategori`, `reason/alasan`, `location/lokasi`, `letterDate/tanggal surat`, `signerLeftName/Title`, `signerRightName/Title`, `callback_url`, `callback_header`, `data_json`.  
   - Contoh header Excel yang disarankan:  
-    `letterNo | mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional) | callback_url | callback_header`
+    `mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional) | callback_url | callback_header`
 - `POST /api/v1/bulk/ba-request-id`  
-  - Minimal: `letterNo`, `mdsName`, `nik`, `joinDate`.  
+  - Minimal: `area`, `mdsName`, `nik`, `joinDate`.  
   - Kolom lain: `area/wilayah/region`, `birthDate`, `status`, `stores/toko`, `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
-  - Header contoh: `letterNo | area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | email (opsional) | callback_url | callback_header`
+  - Header contoh: `area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | email (opsional) | callback_url | callback_header`
 - `POST /api/v1/bulk/ba-hold`  
-  - Minimal: `letterNo`, `region`, `holdDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
+  - Minimal: `region`, `holdDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
   - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
-  - Header contoh: `letterNo | region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
+  - Header contoh: `region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
 - `POST /api/v1/bulk/ba-rolling`  
-  - Minimal: `letterNo`, `region`, `rollingDate`, `mdsName`, `mdsCode`, `status`, `outletFrom`, `outletTo`.  
+  - Minimal: `region`, `rollingDate`, `mdsName`, `mdsCode`, `status`, `outletFrom`, `outletTo`.  
   - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
-  - Header contoh: `letterNo | region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | email (opsional)`
+  - Header contoh: `region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | email (opsional)`
 - `POST /api/v1/bulk/ba-hold-activate`  
-  - Minimal: `letterNo`, `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
+  - Minimal: `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
   - Tambahan: `holdReason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
-  - Header contoh: `letterNo | region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | email (opsional)`
+  - Header contoh: `region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | email (opsional)`
 - `POST /api/v1/bulk/ba-takeout`  
-  - Minimal: `letterNo`, `region`, `takeoutDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
+  - Minimal: `region`, `takeoutDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
   - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
-  - Header contoh: `letterNo | region | takeoutDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
+  - Header contoh: `region | takeoutDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
 - `POST /api/v1/bulk/ba-terminated`  
-  - Minimal: `letterNo`, `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
+  - Minimal: `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
   - Tambahan: `reasons` (bisa multi baris/koma), `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
-  - Header contoh: `letterNo | region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | email (opsional)`
+  - Header contoh: `region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | email (opsional)`
+
+Catatan khusus BA:
+- `letterNo` selalu di-generate otomatis sistem (format default: `{seq:04}/{templateCode}/{romanMonth}/{year}`, timezone server `Asia/Jakarta`).
+- Jika request bulk BA bukan `dryRun`, response akan mengembalikan `batch_id` untuk referensi kirim email bulk BA.
 
 Kolom opsional umum (semua mode): `employeeId`, `department/departement/departemen`, `joinDate`, `ptkp`, `targetHK`, `attendance`, `note`, `data_json` (JSON string untuk override/tambah field data), `callback_url`, `callback_header`.
 
@@ -984,7 +988,7 @@ curl -X POST http://localhost:3334/api/v1/bulk/payslip \
 ```
 
 ### Respons
-`200 OK` dengan ringkasan: `status`, `mode`, `total`, `queued`, `failed`, `dryRun`, `sheet`, dan `results[]` per baris (`queued`, `failed`, atau `dry-run` dengan pesan error jika ada). Job sukses masuk queue `GeneratePdfJob` dan webhook dikirim bila callback tersedia.
+`200 OK` dengan ringkasan: `status`, `mode`, `total`, `queued`, `failed`, `dryRun`, `sheet`, dan `results[]` per baris (`queued`, `failed`, atau `dry-run` dengan pesan error jika ada). Untuk mode BA non-`dryRun`, response juga mengandung `batch_id`. Job sukses masuk queue `GeneratePdfJob` dan webhook dikirim bila callback tersedia.
 
 ---
 
@@ -1007,23 +1011,32 @@ Perilaku:
 
 Endpoint: `POST /api/v1/send-ba-penempatan-emails` (auth: JWT).  
 Form-data:
-- `file` (wajib): XLS/XLSX dengan kolom (case-insensitive): `sentTo`, `mdsName`, `outlet`, `letterNo`, `subject` (opsional), `body` (opsional), `cc`, `bcc`.
+- `batch_id` (wajib): id batch dari endpoint `POST /api/v1/bulk/ba-penempatan`.
+- `file` (wajib): XLS/XLSX dengan kolom (case-insensitive): `sentTo`, `mdsName`, `outlet`, `subject` (opsional), `body` (opsional), `cc`, `bcc`.
 
 Perilaku:
-- Lampiran dicari di `public/download/{companyName}/{email_login}/`.
-- File yang dikirim hanya template `ba-penempatan` dengan pola nama `ba-penempatan.[mdsName].[outlet].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`, spasi jadi `_`, karakter ilegal jadi `_`).
-- Satu lampiran per email (pertama yang cocok).
+- Lampiran dicari dari metadata batch (`generation_batch_items`) dengan kunci `batch_id + template + match_key`.
+- Jika kandidat attachment lebih dari satu, sistem memilih file terbaru.
+- Satu lampiran per email.
 - Log tercatat di `logs/bulk-email.log`.
 
 ## Bulk Kirim Email BA Lain
-Endpoint (auth: JWT, form-data `file` xls/xlsx; kolom minimal `sentTo`, plus field wajib per template; `subject`/`body`/`cc`/`bcc` opsional). Lampiran dicari di `public/download/{companyName}/{email_login}/`; hanya satu lampiran pertama yang cocok dikirim.
+Endpoint (auth: JWT, form-data `batch_id` + `file` xls/xlsx; kolom minimal `sentTo`, plus field wajib per template; `subject`/`body`/`cc`/`bcc` opsional). Lookup lampiran memakai metadata batch (`batch_id + template + match_key`).
 
-- `POST /api/v1/send-ba-request-id-emails` — wajib: `mdsName`, `area/region/wilayah`, `letterNo`; pola `ba-request-id.[mdsName].[area].[letterNo].[unique].pdf`
-- `POST /api/v1/send-ba-hold-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-hold.[mdsName].[region].[letterNo].[unique].pdf`
-- `POST /api/v1/send-ba-rolling-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-rolling.[mdsName].[region].[letterNo].[unique].pdf`
-- `POST /api/v1/send-ba-hold-activate-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-hold-activate.[mdsName].[region].[letterNo].[unique].pdf`
-- `POST /api/v1/send-ba-takeout-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-takeout.[mdsName].[region].[letterNo].[unique].pdf`
-- `POST /api/v1/send-ba-terminated-emails` — wajib: `mdsName`, `region/wilayah`, `letterNo`; pola `ba-terminated.[mdsName].[region].[letterNo].[unique].pdf`
+- `POST /api/v1/send-ba-request-id-emails` — wajib: `mdsName`, `area/region/wilayah`
+- `POST /api/v1/send-ba-hold-emails` — wajib: `mdsName`, `region/wilayah`
+- `POST /api/v1/send-ba-rolling-emails` — wajib: `mdsName`, `region/wilayah`
+- `POST /api/v1/send-ba-hold-activate-emails` — wajib: `mdsName`, `region/wilayah`
+- `POST /api/v1/send-ba-takeout-emails` — wajib: `mdsName`, `region/wilayah`
+- `POST /api/v1/send-ba-terminated-emails` — wajib: `mdsName`, `region/wilayah`
+
+## History Batch BA
+- `GET /api/v1/batches?template=<ba-template>&page=1&perPage=10`
+- `GET /api/v1/batches/:batch_id?page=1&perPage=20`
+
+Scope akses:
+- `user`/`admin`: hanya batch company sendiri
+- `superadmin`: bisa lintas company
 
 ---
 

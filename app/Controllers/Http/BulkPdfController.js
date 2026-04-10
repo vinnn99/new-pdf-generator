@@ -6,6 +6,8 @@ const fs = require('fs')
 const path = require('path')
 const Database = use('Database')
 const JobService = require('../../Services/JobService')
+const BaTemplateService = use('App/Services/BaTemplateService')
+const BaLetterNoService = use('App/Services/BaLetterNoService')
 
 class BulkPdfController {
   async payslipFromExcel(ctx) {
@@ -97,13 +99,14 @@ class BulkPdfController {
         return response.json({ status: 'ok', message: 'Sheet kosong', total: 0 })
       }
 
+      const isBaMode = BaTemplateService.isBaTemplate(mode)
+      const batchId = isBaMode && !opts.dryRun ? createBatchId() : null
+
       const results = []
       let queued = 0
       let failed = 0
 
       // Cek allowed_templates untuk company user login
-      const company = await Database.table('companies').where('company_id', user.company_id).first()
-      if (!company) throw new Error('Perusahaan tidak ditemukan')
       const allowed = company.allowed_templates ? (() => {
         try { return JSON.parse(company.allowed_templates) } catch (e) { return [] }
       })() : []
@@ -114,8 +117,25 @@ class BulkPdfController {
         })
       }
 
+      if (batchId) {
+        await Database.table('generation_batches').insert({
+          batch_id: batchId,
+          company_id: company.company_id,
+          template: mode,
+          created_by: user.id,
+          total_rows: rows.length,
+          queued: 0,
+          failed: 0,
+          status: 'processing',
+          created_at: new Date(),
+          updated_at: new Date()
+        })
+      }
+
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i]
+        let batchItemId = null
+        let payload = null
         try {
           const lower = normalizeRow(row)
           // Untuk semua mode bulk (payslip, insentif, thr, ba-penempatan): abaikan kolom email di Excel, selalu gunakan email user yang login.
@@ -125,11 +145,51 @@ class BulkPdfController {
             : (extractEmail(lower) || (user.email || '')).toLowerCase()
           if (!email) throw new Error('email kosong (tidak ada di kolom dan akun login tanpa email)')
 
-          const payload = buildPayloadForMode(lower, mode, opts)
+          payload = buildPayloadForMode(lower, mode, opts)
           if (isSlipMode(mode)) {
             // Dipakai GeneratePdfJob untuk format nama file baru slip bulk.
             payload.filenameTemplate = mode
           }
+
+          if (isBaMode) {
+            payload.data = payload.data || {}
+            const matchFields = BaTemplateService.extractMatchFieldsFromRow(mode, lower)
+            const matchKey = BaTemplateService.buildMatchKey(mode, matchFields)
+            const requiredMatchFields = BaTemplateService.getRequiredMatchFields(mode)
+            if (!matchKey && requiredMatchFields.length > 0) {
+              throw new Error(`Kolom kunci pencarian lampiran kosong: ${requiredMatchFields.join(', ')}`)
+            }
+
+            if (opts.dryRun) {
+              payload.data.letterNo = '[AUTO_GENERATED_ON_EXECUTION]'
+            } else {
+              const numbering = await BaLetterNoService.nextLetterNo({
+                companyId: company.company_id,
+                template: mode,
+                createdBy: user.id
+              })
+              payload.data.letterNo = numbering.letterNo
+
+              const insertedBatchItem = await Database.table('generation_batch_items').insert({
+                batch_id: batchId,
+                company_id: company.company_id,
+                template: mode,
+                row_no: i + 1,
+                match_key: matchKey || null,
+                letter_no: numbering.letterNo,
+                status: 'queued',
+                row_data: JSON.stringify(row || {}),
+                created_at: new Date(),
+                updated_at: new Date()
+              })
+
+              batchItemId = Array.isArray(insertedBatchItem) ? insertedBatchItem[0] : insertedBatchItem
+              payload.batchId = batchId
+              payload.batchItemId = batchItemId
+              payload.matchKey = matchKey || null
+            }
+          }
+
           payload.companyName = company.name
           payload.companyId = company.company_id
           payload.userId = user.id
@@ -146,12 +206,59 @@ class BulkPdfController {
             timeout: 120000
           })
 
-          results.push({ row: i + 1, email, status: 'queued' })
+          results.push({
+            row: i + 1,
+            email,
+            status: 'queued',
+            ...(isBaMode ? { letterNo: payload && payload.data ? payload.data.letterNo : null } : {})
+          })
           queued++
         } catch (err) {
           failed++
+
+          if (batchId) {
+            const now = new Date()
+            if (batchItemId) {
+              await Database.table('generation_batch_items')
+                .where('id', batchItemId)
+                .update({
+                  status: 'failed',
+                  error: err.message,
+                  updated_at: now
+                })
+            } else {
+              const lower = normalizeRow(row)
+              const fields = BaTemplateService.extractMatchFieldsFromRow(mode, lower)
+              const matchKey = BaTemplateService.buildMatchKey(mode, fields)
+              await Database.table('generation_batch_items').insert({
+                batch_id: batchId,
+                company_id: company.company_id,
+                template: mode,
+                row_no: i + 1,
+                match_key: matchKey || null,
+                letter_no: payload && payload.data ? payload.data.letterNo || null : null,
+                status: 'failed',
+                error: err.message,
+                row_data: JSON.stringify(row || {}),
+                created_at: now,
+                updated_at: now
+              })
+            }
+          }
+
           results.push({ row: i + 1, status: 'failed', message: err.message, rowData: row })
         }
+      }
+
+      if (batchId) {
+        await Database.table('generation_batches')
+          .where('batch_id', batchId)
+          .update({
+            queued,
+            failed,
+            status: failed > 0 ? 'completed_with_errors' : 'completed',
+            updated_at: new Date()
+          })
       }
 
       return response.json({
@@ -160,6 +267,7 @@ class BulkPdfController {
         total: rows.length,
         queued,
         failed,
+        batch_id: batchId,
         dryRun: opts.dryRun,
         sheet: sheetName,
         results
@@ -503,7 +611,7 @@ function buildBaPenempatanPayload(lower, opts) {
     signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
   }
 
-  const required = ['letterNo', 'mdsName', 'placementDate', 'outlet']
+  const required = ['mdsName', 'placementDate', 'outlet']
   const missing = required.filter((k) => !payload.data[k])
   if (missing.length) {
     throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
@@ -538,7 +646,7 @@ function buildBaRequestIdPayload(lower, opts) {
     signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
   }
 
-  const required = ['letterNo', 'mdsName', 'nik', 'joinDate']
+  const required = ['area', 'mdsName', 'nik', 'joinDate']
   const missing = required.filter((k) => !payload.data[k])
   if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
 
@@ -569,7 +677,7 @@ function buildBaHoldPayload(lower, opts) {
     signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
   }
 
-  const required = ['letterNo', 'region', 'holdDate', 'mdsName', 'mdsCode', 'status', 'outlet']
+  const required = ['region', 'holdDate', 'mdsName', 'mdsCode', 'status', 'outlet']
   const missing = required.filter((k) => !payload.data[k])
   if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
 
@@ -601,7 +709,7 @@ function buildBaRollingPayload(lower, opts) {
     signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
   }
 
-  const required = ['letterNo', 'region', 'rollingDate', 'mdsName', 'mdsCode', 'status', 'outletFrom', 'outletTo']
+  const required = ['region', 'rollingDate', 'mdsName', 'mdsCode', 'status', 'outletFrom', 'outletTo']
   const missing = required.filter((k) => !payload.data[k])
   if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
 
@@ -632,7 +740,7 @@ function buildBaHoldActivatePayload(lower, opts) {
     signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
   }
 
-  const required = ['letterNo', 'region', 'reactivateDate', 'mdsName', 'mdsCode', 'status', 'outlet']
+  const required = ['region', 'reactivateDate', 'mdsName', 'mdsCode', 'status', 'outlet']
   const missing = required.filter((k) => !payload.data[k])
   if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
 
@@ -663,7 +771,7 @@ function buildBaTakeoutPayload(lower, opts) {
     signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
   }
 
-  const required = ['letterNo', 'region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet']
+  const required = ['region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet']
   const missing = required.filter((k) => !payload.data[k])
   if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
 
@@ -694,7 +802,7 @@ function buildBaTerminatedPayload(lower, opts) {
     signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
   }
 
-  const required = ['letterNo', 'region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet']
+  const required = ['region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet']
   const missing = required.filter((k) => !payload.data[k])
   if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
 
@@ -712,6 +820,10 @@ function pickFromLower(lower, keys) {
 
 function isSlipMode(mode) {
   return mode === 'payslip' || mode === 'insentif' || mode === 'thr'
+}
+
+function createBatchId() {
+  return `batch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 function parseList(val) {

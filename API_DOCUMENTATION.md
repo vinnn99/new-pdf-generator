@@ -457,13 +457,17 @@ Webhook payload (on success):
 - `invoice`: `clientName`, `items`
 - `payslip`: `employeeName`, `position`, `period`
 - `thr`: `employeeName`, `position`, `period`, `payoutDate`, `baseSalary`
-- `ba-penempatan`: `letterNo`, `mdsName`, `placementDate`, `outlet`
-- `ba-request-id`: `letterNo`, `mdsName`, `nik`, `joinDate`
-- `ba-hold`: `letterNo`, `region`, `holdDate`, `mdsName`, `mdsCode`, `status`, `outlet`
-- `ba-rolling`: `letterNo`, `region`, `rollingDate`, `mdsName`, `mdsCode`, `status`, `outletFrom`, `outletTo`
-- `ba-hold-activate`: `letterNo`, `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`
-- `ba-takeout`: `letterNo`, `region`, `takeoutDate`, `mdsName`, `mdsCode`, `status`, `outlet`
-- `ba-terminated`: `letterNo`, `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`
+- `ba-penempatan`: `mdsName`, `placementDate`, `outlet`
+- `ba-request-id`: `mdsName`, `nik`, `joinDate`
+- `ba-hold`: `region`, `holdDate`, `mdsName`, `mdsCode`, `status`, `outlet`
+- `ba-rolling`: `region`, `rollingDate`, `mdsName`, `mdsCode`, `status`, `outletFrom`, `outletTo`
+- `ba-hold-activate`: `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`
+- `ba-takeout`: `region`, `takeoutDate`, `mdsName`, `mdsCode`, `status`, `outlet`
+- `ba-terminated`: `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`
+
+Catatan BA:
+- `data.letterNo` selalu di-generate otomatis oleh sistem (override).
+- Format default: `{seq:04}/{templateCode}/{romanMonth}/{year}`.
 
 **Penamaan file:**
 - `payslip`/`insentif`/`thr`: `<periode>.<template>.<employeeId>.<nama>.<unik>.pdf`
@@ -556,10 +560,11 @@ Response 200:
   "total": 5,
   "queued": 5,
   "failed": 0,
+  "batch_id": "batch-m8p0q2w9-a1b2c3d4",
   "dryRun": false,
   "sheet": "Sheet1",
   "results": [
-    { "row": 1, "email": "user@example.com", "status": "queued" }
+    { "row": 1, "email": "user@example.com", "status": "queued", "letterNo": "0001/BAP/IV/2026" }
   ]
 }
 ```
@@ -568,13 +573,16 @@ Response 200:
 - **Payslip**: `employeeId | employeeName | position | departement | periode | joinDate | ptkp | targetHK | attendance | Gaji Pokok | Tunjangan makan | Tunjangan Transport | Tunjangan Komunikasi | Tunjangan Jabatan | BPJS Ketenagakerjaan | PPH 21 | email (opsional)`
 - **Insentif**: `employeeId | employeeName | position | departement | periode | INSENTIF SAMPLING | INSENTIF SELLOUT | INSENTIF KERAJINAN | INSENTIF TL | earnings | deductions | email (opsional)`
 - **THR**: `employeeId | employeeName | position | departement | periode | THR | earnings | deductions | note | email (opsional)`
-- **BA Penempatan**: `letterNo | mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional) | callback_url | callback_header`
-- **BA Request ID**: `letterNo | area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | email (opsional)`
-- **BA HOLD**: `letterNo | region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
-- **BA Rolling**: `letterNo | region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | email (opsional)`
-- **BA HOLD Activate**: `letterNo | region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | email (opsional)`
-- **BA Takeout**: `letterNo | region | takeoutDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
-- **BA Terminated**: `letterNo | region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | email (opsional)`
+- **BA Penempatan**: `mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional) | callback_url | callback_header`
+- **BA Request ID**: `area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | email (opsional)`
+- **BA HOLD**: `region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
+- **BA Rolling**: `region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | email (opsional)`
+- **BA HOLD Activate**: `region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | email (opsional)`
+- **BA Takeout**: `region | takeoutDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
+- **BA Terminated**: `region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | email (opsional)`
+
+Catatan:
+- Kolom `letterNo` boleh ada, tetapi akan diabaikan karena sistem selalu generate nomor otomatis.
 
 Kolom umum: `callback_url`, `callback_header` (JSON), `data_json` (override/extra field), `email` (jika penerima berbeda dari akun login).
 
@@ -613,9 +621,12 @@ Response 200:
 `POST /api/v1/send-ba-penempatan-emails`  
 Auth: `Authorization: Bearer <JWT>`  
 Form-data:
-- `file` (xls/xlsx, max 5 MB) dengan kolom: `sentTo` (wajib) | `mdsName` (wajib) | `outlet` (wajib) | `letterNo` (wajib) | `subject` (opsional) | `body` (opsional) | `cc` | `bcc`
+- `batch_id` (wajib): id batch hasil endpoint `bulk/ba-penempatan`
+- `file` (xls/xlsx, max 5 MB) dengan kolom: `sentTo` (wajib) | `mdsName` (wajib) | `outlet` (wajib) | `subject` (opsional) | `body` (opsional) | `cc` | `bcc`
 
-Lampiran dicari di `public/download/{companyName}/{email_login}/` dan dipilih berdasar pola nama `ba-penempatan.[mdsName].[outlet].[letterNo].[unique].pdf` (karakter `/` di `letterNo` diganti `-`, spasi jadi `_`). Hanya satu lampiran dikirim per baris (pertama yang cocok).
+Lampiran dicari dari metadata batch (`generation_batch_items`) berdasarkan:
+`batch_id + template + match_key`.
+Jika kandidat attachment lebih dari satu, sistem memilih file terbaru.
 
 Response 200:
 ```json
@@ -625,6 +636,7 @@ Response 200:
   "queued": 5,
   "failed": 0,
   "skipped": 0,
+  "batch_id": "batch-m8p0q2w9-a1b2c3d4",
   "results": [
     { "row": 1, "status": "queued", "to": "a@b.com", "attachment": "ba-penempatan.SANTI.GLOBAL_CAFE.075-OMI-TM-BAK-III-2026.ab12C.pdf" }
   ]
@@ -636,36 +648,41 @@ Response 200:
 ## 7) Bulk Kirim Email BA (Request ID, HOLD, Rolling, HOLD Activate, Takeout, Terminated)
 Auth: `Authorization: Bearer <JWT>`  
 Form-data:
+- `batch_id` (wajib): id batch dari endpoint generate bulk BA sesuai template
 - `file` (xls/xlsx, max 5 MB) dengan kolom minimal: `sentTo`, lalu field wajib per template di bawah. Kolom `subject`, `body`, `cc`, `bcc` opsional.  
-Lampiran dicari di `public/download/{companyName}/{email_user_company}/`; hanya satu lampiran pertama yang cocok dikirim.
+Lookup lampiran berbasis metadata batch (`batch_id + template + match_key`).
 
 - `POST /api/v1/send-ba-request-id-emails`  
-  - Wajib: `mdsName`, `area/region/wilayah`, `letterNo`  
-  - Pola lampiran: `ba-request-id.[mdsName].[area].[letterNo].[unik].pdf`
+  - Wajib: `mdsName`, `area/region/wilayah`
 
 - `POST /api/v1/send-ba-hold-emails`  
-  - Wajib: `mdsName`, `region/wilayah`, `letterNo`  
-  - Pola: `ba-hold.[mdsName].[region].[letterNo].[unik].pdf`
+  - Wajib: `mdsName`, `region/wilayah`
 
 - `POST /api/v1/send-ba-rolling-emails`  
-  - Wajib: `mdsName`, `region/wilayah`, `letterNo`  
-  - Pola: `ba-rolling.[mdsName].[region].[letterNo].[unik].pdf`
+  - Wajib: `mdsName`, `region/wilayah`
 
 - `POST /api/v1/send-ba-hold-activate-emails`  
-  - Wajib: `mdsName`, `region/wilayah`, `letterNo`  
-  - Pola: `ba-hold-activate.[mdsName].[region].[letterNo].[unik].pdf`
+  - Wajib: `mdsName`, `region/wilayah`
 
 - `POST /api/v1/send-ba-takeout-emails`  
-  - Wajib: `mdsName`, `region/wilayah`, `letterNo`  
-  - Pola: `ba-takeout.[mdsName].[region].[letterNo].[unik].pdf`
+  - Wajib: `mdsName`, `region/wilayah`
 
 - `POST /api/v1/send-ba-terminated-emails`  
-  - Wajib: `mdsName`, `region/wilayah`, `letterNo`  
-  - Pola: `ba-terminated.[mdsName].[region].[letterNo].[unik].pdf`
+  - Wajib: `mdsName`, `region/wilayah`
 
 ---
 
-## 8) Download PDF
+## 8) History Batch Generate BA
+- `GET /api/v1/batches?template=<ba-template>&page=1&perPage=10`
+- `GET /api/v1/batches/:batch_id?page=1&perPage=20`
+
+Akses:
+- `user`/`admin`: hanya batch di company sendiri
+- `superadmin`: bisa lintas company
+
+---
+
+## 9) Download PDF
 `GET /download/:company/:email/:filename`
 - `company`, `email`, `filename` harus URL-encoded.
 - Hanya file `.pdf` yang dilayani.
@@ -677,7 +694,7 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
 
 ---
 
-## 9) Pencatatan Email Terkirim
+## 10) Pencatatan Email Terkirim
 - Setiap pengiriman email (bulk maupun single send) otomatis dicatat ke tabel `email_logs` dengan kolom: `user_id`, `company_id`, `template`, `context`, `to_email`, `cc`, `bcc`, `subject`, `body`, `attachments` (JSON array nama file), `status`, `error`, `created_at`, `updated_at`.
 - Setiap pengiriman email (bulk/single), termasuk yang gagal, otomatis melakukan upsert ke tabel `contacts` berdasarkan `(user_id, email)` untuk penerima `to`, `cc`, dan `bcc`:
   - jika belum ada: dibuat contact baru (`source` otomatis `auto-bulk`/`auto-single`, `send_count=1`, `last_sent_at` terisi).
@@ -704,7 +721,7 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
 
 ---
 
-## 10) Dashboard Summary
+## 11) Dashboard Summary
 `GET /api/v1/dashboard/summary`  
 Headers: `Authorization: Bearer <JWT>`  
 Query opsional: `scope=user|all`; default `scope` adalah perusahaan (company).  
@@ -829,7 +846,7 @@ Field update: `email`, `name`, `phone`, `notes`.
 
 ---
 
-## 11) Template Ringkas (payload)
+## 12) Template Ringkas (payload)
 - **musik**: surat perjanjian lisensi musik (lihat contoh di README).
 - **invoice**: invoice dengan tabel item, PPN default 11%.
 - **payslip**: slip gaji; earnings/deductions array atau kolom terpisah di Excel.
@@ -845,7 +862,7 @@ Field update: `email`, `name`, `phone`, `notes`.
 
 ---
 
-## 12) Status & Error
+## 13) Status & Error
 - 202 queued (generate-pdf).
 - 422 validation_failed (field wajib kosong).
 - 401 unauthorized (JWT tidak ada / API key salah / email tidak terdaftar).
@@ -853,7 +870,7 @@ Field update: `email`, `name`, `phone`, `notes`.
 
 ---
 
-## 13) Catatan untuk Frontend (React)
+## 14) Catatan untuk Frontend (React)
 - Endpoint single generate memakai `x-api-key`; bulk & list memakai Bearer JWT.
 - Untuk upload Excel gunakan `FormData` dengan field `file`.
 - Saat dryRun, backend tidak enqueue job tapi mengembalikan payload per baris; gunakan ini untuk preview di UI.

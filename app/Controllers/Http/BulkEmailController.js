@@ -7,6 +7,7 @@ const fs = require('fs')
 const path = require('path')
 const JobService = require('../../Services/JobService')
 const Database = use('Database')
+const BaTemplateService = use('App/Services/BaTemplateService')
 
 const LOG_DIR = path.join(Helpers.appRoot(), 'logs')
 const LOG_FILE = path.join(LOG_DIR, 'bulk-email.log')
@@ -204,186 +205,39 @@ class BulkEmailController {
 
   /**
    * POST /api/v1/send-ba-penempatan-emails
-   * Multipart form-data:
-   *   - file: .xlsx dengan kolom (case-insensitive):
-   *       sentTo (wajib) | mdsName (wajib) | outlet (wajib) | letterNo (wajib) | subject | body | cc | bcc
-   *   Lampiran dicari di:
-   *     public/download/{companyName}/{email_user_company}/
-   *   dengan pola nama file:
-   *     ba-penempatan.[mdsName].[outlet].[letterNo].[unique].pdf
-   *   (karakter "/" di letterNo otomatis diganti "-"; spasi jadi "_"; karakter ilegal jadi "_")
+   * Form-data:
+   *   - batch_id (wajib): id batch hasil generate bulk BA sebelumnya
+   *   - file (.xlsx) dengan kolom:
+   *       sentTo (wajib) | mdsName (wajib) | outlet (wajib) | subject | body | cc | bcc
+   *   Lookup lampiran berdasarkan metadata batch:
+   *     batch_id + template + match_key
    */
   async sendBaPenempatan({ request, response, auth }) {
-    try {
-      const user = await auth.getUser()
-      if (!user || !user.company_id) {
-        return response.status(401).json({ status: 'error', message: 'User belum terhubung ke perusahaan' })
-      }
-      const company = await Database.table('companies').where('company_id', user.company_id).first()
-      if (!company) {
-        return response.status(401).json({ status: 'error', message: 'Perusahaan user tidak ditemukan' })
-      }
-      const companyUsers = await Database.table('users')
-        .where('company_id', company.company_id)
-        .select('email')
-
-      const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, mailFrom } = pickSmtpConfig(company)
-      if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
-        return response.status(500).json({
-          status: 'error',
-          message: 'Konfigurasi SMTP belum lengkap di perusahaan atau .env'
-        })
-      }
-
-      const upload = request.file('file', {
-        extnames: ['xls', 'xlsx'],
-        size: '5mb'
-      })
-
-      if (!upload) {
-        return response.status(422).json({ status: 'error', message: 'File .xlsx wajib diunggah (field name: file)' })
-      }
-
-      const tmpPath = path.join(Helpers.tmpPath(), `${Date.now()}-${upload.clientName}`)
-      await upload.move(path.dirname(tmpPath), { name: path.basename(tmpPath) })
-
-      const workbook = XLSX.readFile(tmpPath)
-      const sheetName = workbook.SheetNames[0]
-      const sheet = workbook.Sheets[sheetName]
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-
-      ensureLogDir()
-
-      const baseRoot = path.join(Helpers.publicPath(), 'download', sanitize(company.name))
-      const bases = companyUsers
-        .map((u) => (u.email || '').trim())
-        .filter(Boolean)
-        .map((email) => ({ dir: path.join(baseRoot, sanitize(email)) }))
-
-      const results = []
-      let queuedCount = 0
-      let failedCount = 0
-      let skippedCount = 0
-
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i]
-        const norm = normalizeRow(row)
-        const to = norm.sentto || norm.email
-        const mdsName = norm.mdsname || norm.nama || ''
-        const outlet = norm.outlet || ''
-        const letterNo = norm.letterno || norm.letter_no || ''
-        const subject = norm.subject || `Berita Acara Penempatan - ${mdsName || outlet || letterNo}`
-        const body =
-          norm.body ||
-          [
-            `Yth. ${mdsName || 'Bapak/Ibu'},`,
-            '',
-            'Berikut terlampir Berita Acara Penempatan MDS.',
-            outlet ? `Outlet: ${outlet}` : null,
-            letterNo ? `Nomor Surat: ${letterNo}` : null,
-            '',
-            company.name ? `${company.name}` : '',
-            'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
-          ].filter(Boolean).join('\n')
-        const cc = norm.cc ? norm.cc.split(';').map(s => s.trim()).filter(Boolean) : []
-        const bcc = norm.bcc ? norm.bcc.split(';').map(s => s.trim()).filter(Boolean) : []
-
-        if (!to) {
-          results.push({ row: i + 1, status: 'skipped', message: 'sentTo/email kosong' })
-          appendLog({ row: i + 1, status: 'skipped', reason: 'no_recipient', mdsName, outlet, letterNo })
-          skippedCount++
-          continue
-        }
-        if (!mdsName || !outlet || !letterNo) {
-          results.push({ row: i + 1, status: 'failed', to, message: 'mdsName/outlet/letterNo wajib' })
-          failedCount++
-          continue
-        }
-
-        const safeName = (str) => (str || '').toString()
-          .replace(/\//g, '-')
-          .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
-          .replace(/\s+/g, '_')
-
-        const expectedPrefix = `ba-penempatan.${safeName(mdsName)}.${safeName(outlet)}.${safeName(letterNo)}.`
-        const expectedPrefixLower = expectedPrefix.toLowerCase()
-
-        const attachments = []
-        for (const base of bases) {
-          const dir = base.dir
-          if (!fs.existsSync(dir)) continue
-          const files = fs.readdirSync(dir)
-          const match = files.find((f) => {
-            const lower = f.toLowerCase()
-            return lower.startsWith(expectedPrefixLower) && lower.endsWith('.pdf')
-          })
-          if (match) {
-            attachments.push({
-              filename: match,
-              path: path.join(dir, match)
-            })
-          }
-        }
-
-        if (attachments.length === 0) {
-          results.push({ row: i + 1, status: 'skipped', to, message: 'Lampiran ba-penempatan tidak ditemukan' })
-          appendLog({ row: i + 1, to, status: 'skipped', reason: 'no_attachments', mdsName, outlet, letterNo })
-          skippedCount++
-          continue
-        }
-
-        const firstAttachment = attachments[0] // hanya satu lampiran per email
-
-        try {
-          await JobService.dispatch('App/Jobs/SendEmailJob', {
-            smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
-            to, cc, bcc, subject, text: body,
-            attachments: [firstAttachment],
-            employeeName: mdsName,
-            userId: user.id,
-            companyId: company.company_id,
-            template: 'ba-penempatan',
-            context: 'bulk-ba'
-          }, { attempts: 3, timeout: 120000 })
-          results.push({ row: i + 1, status: 'queued', to, attachment: firstAttachment.filename })
-          appendLog({ row: i + 1, to, status: 'queued', attachment: firstAttachment.filename, mdsName, outlet, letterNo })
-          queuedCount++
-        } catch (err) {
-          results.push({ row: i + 1, status: 'failed', to, message: err.message })
-          appendLog({ row: i + 1, to, status: 'failed', error: err.message, mdsName, outlet, letterNo })
-          failedCount++
-        }
-      }
-
-      try { fs.unlinkSync(tmpPath) } catch (e) { /* ignore */ }
-
-      return response.json({
-        status: 'ok',
-        total: results.length,
-        queued: queuedCount,
-        failed: failedCount,
-        skipped: skippedCount,
-        results
-      })
-    } catch (error) {
-      console.error('BulkEmail ba-penempatan error:', error.message)
-      appendLog({ status: 'fatal', error: error.message })
-      return response.status(500).json({
-        status: 'error',
-        message: 'Gagal memproses permintaan',
-        error: error.message
-      })
+    const cfg = {
+      template: 'ba-penempatan',
+      required: ['mdsName', 'outlet'],
+      subject: (f, _company, item) => `Berita Acara Penempatan - ${f.mdsName || f.outlet || (item && item.letter_no) || ''}`,
+      body: (f, company, item) => [
+        `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
+        '',
+        'Berikut terlampir Berita Acara Penempatan MDS.',
+        f.outlet ? `Outlet: ${f.outlet}` : null,
+        item && item.letter_no ? `Nomor Surat: ${item.letter_no}` : null,
+        '',
+        company && company.name ? company.name : '',
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ].filter(Boolean).join('\n')
     }
+    return this._sendBaTemplate({ request, response, auth }, cfg)
   }
 
   /**
-   * Generic sender for BA templates with filename prefix matching.
+   * Generic sender for BA templates with lookup via generation batch metadata.
    * cfg: {
    *   template: 'ba-request-id',
-   *   required: ['mdsName', 'area', 'letterNo'],
-   *   prefixParts: (fields) => ['ba-request-id', fields.mdsName, fields.area, fields.letterNo],
-   *   subject: (fields) => string,
-   *   body: (fields, company) => string
+   *   required: ['mdsName', 'area'],
+   *   subject: (fields, company, batchItem) => string,
+   *   body: (fields, company, batchItem) => string
    * }
    */
   async _sendBaTemplate({ request, response, auth }, cfg) {
@@ -396,15 +250,33 @@ class BulkEmailController {
       if (!company) {
         return response.status(401).json({ status: 'error', message: 'Perusahaan user tidak ditemukan' })
       }
-      const companyUsers = await Database.table('users')
-        .where('company_id', company.company_id)
-        .select('email')
 
       const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, mailFrom } = pickSmtpConfig(company)
       if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
         return response.status(500).json({
           status: 'error',
           message: 'Konfigurasi SMTP belum lengkap di perusahaan atau .env'
+        })
+      }
+
+      const batchId = String(request.input('batch_id') || request.input('batchId') || '').trim()
+      if (!batchId) {
+        return response.status(422).json({
+          status: 'validation_failed',
+          message: 'batch_id wajib diisi'
+        })
+      }
+
+      const batch = await Database.table('generation_batches')
+        .where('batch_id', batchId)
+        .where('company_id', company.company_id)
+        .where('template', cfg.template)
+        .first()
+
+      if (!batch) {
+        return response.status(404).json({
+          status: 'error',
+          message: `Batch ${cfg.template} tidak ditemukan untuk company ini`
         })
       }
 
@@ -427,99 +299,91 @@ class BulkEmailController {
 
       ensureLogDir()
 
-      const baseRoot = path.join(Helpers.publicPath(), 'download', sanitize(company.name))
-      const bases = companyUsers
-        .map((u) => (u.email || '').trim())
-        .filter(Boolean)
-        .map((email) => ({ dir: path.join(baseRoot, sanitize(email)) }))
+      const batchItems = await Database.table('generation_batch_items')
+        .where('batch_id', batchId)
+        .where('company_id', company.company_id)
+        .where('template', cfg.template)
+        .whereNotNull('saved_path')
+        .orderBy('updated_at', 'desc')
+        .orderBy('id', 'desc')
+
+      const attachmentsByMatchKey = batchItems.reduce((acc, item) => {
+        const key = (item.match_key || '').toString()
+        if (!key) return acc
+        if (!acc[key]) acc[key] = []
+        acc[key].push(item)
+        return acc
+      }, {})
 
       const results = []
       let queuedCount = 0
       let failedCount = 0
       let skippedCount = 0
 
-      const pick = (norm, keys) => {
-        for (const k of keys) {
-          if (norm[k] !== undefined && norm[k] !== null && norm[k] !== '') return norm[k]
-        }
-        return ''
-      }
-
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i]
         const norm = normalizeRow(row)
         const to = norm.sentto || norm.email
 
-        const fields = {
-          mdsName: pick(norm, ['mdsname', 'mds name', 'nama', 'nama mds']),
-          outlet: pick(norm, ['outlet', 'outlet penempatan', 'toko']),
-          letterNo: pick(norm, ['letterno', 'letter no', 'letter_no', 'no surat', 'letter number']),
-          area: pick(norm, ['area', 'wilayah', 'region']),
-          region: pick(norm, ['region', 'wilayah']),
-          outletFrom: pick(norm, ['outletfrom', 'outlet from', 'outlet sebelumnya']),
-          outletTo: pick(norm, ['outletto', 'outlet to', 'outlet penempatan']),
-        }
+        const fields = BaTemplateService.extractMatchFieldsFromRow(cfg.template, norm)
+        const matchKey = BaTemplateService.buildMatchKey(cfg.template, fields)
 
         // Required check
         const missing = (cfg.required || []).filter((k) => !fields[k])
         if (!to) {
           results.push({ row: i + 1, status: 'skipped', message: 'sentTo/email kosong' })
+          appendLog({ row: i + 1, status: 'skipped', reason: 'no_recipient', template: cfg.template, batchId, matchKey })
           skippedCount++
           continue
         }
         if (missing.length) {
           results.push({ row: i + 1, status: 'failed', to, message: `Field wajib kosong: ${missing.join(', ')}` })
+          appendLog({ row: i + 1, to, status: 'failed', reason: 'missing_required_fields', missing, template: cfg.template, batchId, matchKey })
           failedCount++
           continue
         }
 
-        const expectedPrefix = cfg.prefixParts(fields).map(safeName).join('.')
-        const expectedPrefixLower = `${expectedPrefix}.`.toLowerCase()
-
-        const attachments = []
-        for (const base of bases) {
-          const dir = base.dir
-          if (!fs.existsSync(dir)) continue
-          const files = fs.readdirSync(dir)
-          const match = files.find((f) => {
-            const lower = f.toLowerCase()
-            return lower.startsWith(expectedPrefixLower) && lower.endsWith('.pdf')
-          })
-          if (match) {
-            attachments.push({
-              filename: match,
-              path: path.join(dir, match)
-            })
-          }
-        }
-
-        if (attachments.length === 0) {
+        const candidates = attachmentsByMatchKey[matchKey] || []
+        const batchAttachment = pickLatestBatchAttachment(candidates)
+        if (!batchAttachment) {
           results.push({ row: i + 1, status: 'skipped', to, message: `Lampiran ${cfg.template} tidak ditemukan` })
+          appendLog({ row: i + 1, to, status: 'skipped', reason: 'no_attachments', template: cfg.template, batchId, matchKey })
           skippedCount++
           continue
         }
 
-        const subject = norm.subject || cfg.subject(fields, company)
-        const body = norm.body || cfg.body(fields, company)
+        const subject = norm.subject || cfg.subject(fields, company, batchAttachment)
+        const body = norm.body || cfg.body(fields, company, batchAttachment)
         const cc = norm.cc ? norm.cc.split(';').map(s => s.trim()).filter(Boolean) : []
         const bcc = norm.bcc ? norm.bcc.split(';').map(s => s.trim()).filter(Boolean) : []
-        const firstAttachment = attachments[0]
 
         try {
           await JobService.dispatch('App/Jobs/SendEmailJob', {
             smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
             to, cc, bcc, subject, text: body,
-            attachments: [firstAttachment],
+            attachments: [{ filename: batchAttachment.filename, path: batchAttachment.path }],
             employeeName: fields.mdsName,
             userId: user.id,
             companyId: company.company_id,
             template: cfg.template,
             context: 'bulk-ba'
           }, { attempts: 3, timeout: 120000 })
-          results.push({ row: i + 1, status: 'queued', to, attachment: firstAttachment.filename })
+          results.push({ row: i + 1, status: 'queued', to, attachment: batchAttachment.filename })
+          appendLog({
+            row: i + 1,
+            to,
+            status: 'queued',
+            template: cfg.template,
+            batchId,
+            matchKey,
+            attachment: batchAttachment.filename,
+            letterNo: batchAttachment.letter_no || null,
+            candidates: candidates.length
+          })
           queuedCount++
         } catch (err) {
           results.push({ row: i + 1, status: 'failed', to, message: err.message })
+          appendLog({ row: i + 1, to, status: 'failed', error: err.message, template: cfg.template, batchId, matchKey })
           failedCount++
         }
       }
@@ -532,6 +396,7 @@ class BulkEmailController {
         queued: queuedCount,
         failed: failedCount,
         skipped: skippedCount,
+        batch_id: batchId,
         results
       })
     } catch (error) {
@@ -548,15 +413,14 @@ class BulkEmailController {
   async sendBaRequestId({ request, response, auth }) {
     const cfg = {
       template: 'ba-request-id',
-      required: ['mdsName', 'area', 'letterNo'],
-      prefixParts: (f) => ['ba-request-id', f.mdsName, f.area, f.letterNo],
-      subject: (f) => `Berita Acara Request ID - ${f.mdsName || f.letterNo || ''}`,
-      body: (f, company) => [
+      required: ['mdsName', 'area'],
+      subject: (f, _company, item) => `Berita Acara Request ID - ${f.mdsName || (item && item.letter_no) || ''}`,
+      body: (f, company, item) => [
         `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
         '',
         'Berikut terlampir Berita Acara Request ID MDS.',
         f.area ? `Area: ${f.area}` : null,
-        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        item && item.letter_no ? `Nomor Surat: ${item.letter_no}` : null,
         '',
         company && company.name ? company.name : '',
         'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
@@ -568,15 +432,14 @@ class BulkEmailController {
   async sendBaHold({ request, response, auth }) {
     const cfg = {
       template: 'ba-hold',
-      required: ['mdsName', 'region', 'letterNo'],
-      prefixParts: (f) => ['ba-hold', f.mdsName, f.region, f.letterNo],
-      subject: (f) => `Berita Acara HOLD - ${f.mdsName || f.letterNo || ''}`,
-      body: (f, company) => [
+      required: ['mdsName', 'region'],
+      subject: (f, _company, item) => `Berita Acara HOLD - ${f.mdsName || (item && item.letter_no) || ''}`,
+      body: (f, company, item) => [
         `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
         '',
         'Berikut terlampir Berita Acara HOLD MDS.',
         f.region ? `Wilayah: ${f.region}` : null,
-        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        item && item.letter_no ? `Nomor Surat: ${item.letter_no}` : null,
         '',
         company && company.name ? company.name : '',
         'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
@@ -588,15 +451,14 @@ class BulkEmailController {
   async sendBaRolling({ request, response, auth }) {
     const cfg = {
       template: 'ba-rolling',
-      required: ['mdsName', 'region', 'letterNo'],
-      prefixParts: (f) => ['ba-rolling', f.mdsName, f.region, f.letterNo],
-      subject: (f) => `Berita Acara Rolling - ${f.mdsName || f.letterNo || ''}`,
-      body: (f, company) => [
+      required: ['mdsName', 'region'],
+      subject: (f, _company, item) => `Berita Acara Rolling - ${f.mdsName || (item && item.letter_no) || ''}`,
+      body: (f, company, item) => [
         `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
         '',
         'Berikut terlampir Berita Acara Rolling MDS.',
         f.region ? `Wilayah: ${f.region}` : null,
-        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        item && item.letter_no ? `Nomor Surat: ${item.letter_no}` : null,
         '',
         company && company.name ? company.name : '',
         'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
@@ -608,15 +470,14 @@ class BulkEmailController {
   async sendBaHoldActivate({ request, response, auth }) {
     const cfg = {
       template: 'ba-hold-activate',
-      required: ['mdsName', 'region', 'letterNo'],
-      prefixParts: (f) => ['ba-hold-activate', f.mdsName, f.region, f.letterNo],
-      subject: (f) => `Berita Acara HOLD Aktif - ${f.mdsName || f.letterNo || ''}`,
-      body: (f, company) => [
+      required: ['mdsName', 'region'],
+      subject: (f, _company, item) => `Berita Acara HOLD Aktif - ${f.mdsName || (item && item.letter_no) || ''}`,
+      body: (f, company, item) => [
         `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
         '',
         'Berikut terlampir Berita Acara HOLD Aktif Kembali.',
         f.region ? `Wilayah: ${f.region}` : null,
-        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        item && item.letter_no ? `Nomor Surat: ${item.letter_no}` : null,
         '',
         company && company.name ? company.name : '',
         'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
@@ -628,15 +489,14 @@ class BulkEmailController {
   async sendBaTakeout({ request, response, auth }) {
     const cfg = {
       template: 'ba-takeout',
-      required: ['mdsName', 'region', 'letterNo'],
-      prefixParts: (f) => ['ba-takeout', f.mdsName, f.region, f.letterNo],
-      subject: (f) => `Berita Acara Takeout - ${f.mdsName || f.letterNo || ''}`,
-      body: (f, company) => [
+      required: ['mdsName', 'region'],
+      subject: (f, _company, item) => `Berita Acara Takeout - ${f.mdsName || (item && item.letter_no) || ''}`,
+      body: (f, company, item) => [
         `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
         '',
         'Berikut terlampir Berita Acara Toko Takeout MDS.',
         f.region ? `Wilayah: ${f.region}` : null,
-        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        item && item.letter_no ? `Nomor Surat: ${item.letter_no}` : null,
         '',
         company && company.name ? company.name : '',
         'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
@@ -648,15 +508,14 @@ class BulkEmailController {
   async sendBaTerminated({ request, response, auth }) {
     const cfg = {
       template: 'ba-terminated',
-      required: ['mdsName', 'region', 'letterNo'],
-      prefixParts: (f) => ['ba-terminated', f.mdsName, f.region, f.letterNo],
-      subject: (f) => `Berita Acara Terminasi - ${f.mdsName || f.letterNo || ''}`,
-      body: (f, company) => [
+      required: ['mdsName', 'region'],
+      subject: (f, _company, item) => `Berita Acara Terminasi - ${f.mdsName || (item && item.letter_no) || ''}`,
+      body: (f, company, item) => [
         `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
         '',
         'Berikut terlampir Berita Acara Terminasi MDS.',
         f.region ? `Wilayah: ${f.region}` : null,
-        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        item && item.letter_no ? `Nomor Surat: ${item.letter_no}` : null,
         '',
         company && company.name ? company.name : '',
         'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
@@ -828,6 +687,45 @@ function normalizeLegacyName(str) {
     .toLowerCase()
 }
 
+function pickLatestBatchAttachment(items) {
+  if (!Array.isArray(items) || items.length === 0) return null
+
+  const candidates = []
+  for (const item of items) {
+    const filePath = resolveSavedPath(item.saved_path)
+    if (!filePath || !fs.existsSync(filePath)) continue
+
+    let mtimeMs = 0
+    try {
+      mtimeMs = fs.statSync(filePath).mtimeMs || 0
+    } catch (e) {
+      mtimeMs = 0
+    }
+
+    candidates.push({
+      ...item,
+      path: filePath,
+      mtimeMs
+    })
+  }
+
+  if (candidates.length === 0) return null
+
+  candidates.sort((a, b) => {
+    if ((b.mtimeMs || 0) !== (a.mtimeMs || 0)) return (b.mtimeMs || 0) - (a.mtimeMs || 0)
+    if (Number(b.id || 0) !== Number(a.id || 0)) return Number(b.id || 0) - Number(a.id || 0)
+    return String(b.filename || '').localeCompare(String(a.filename || ''), 'en', { sensitivity: 'base' })
+  })
+
+  return candidates[0]
+}
+
+function resolveSavedPath(savedPath) {
+  const raw = String(savedPath || '').trim()
+  if (!raw) return ''
+  return path.join(process.cwd(), raw)
+}
+
 function ensureLogDir() {
   try {
     if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true })
@@ -856,13 +754,6 @@ function normalizeRow(row) {
 
 function sanitize(str) {
   return (str || 'unknown').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim()
-}
-
-function safeName(str) {
-  return (str || '').toString()
-    .replace(/\//g, '-')
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
-    .replace(/\s+/g, '_')
 }
 
 function truthy(val) {

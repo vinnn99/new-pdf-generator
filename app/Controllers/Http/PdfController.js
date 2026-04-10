@@ -2,6 +2,8 @@
 
 const JobService = require('../../Services/JobService')
 const TemplateResolver = require('../../Services/TemplateResolver')
+const BaTemplateService = use('App/Services/BaTemplateService')
+const BaLetterNoService = use('App/Services/BaLetterNoService')
 const path = require('path')
 const fs = require('fs')
 
@@ -23,6 +25,24 @@ class PdfController {
 
       for (const f of requiredFields) {
         if (!payload[f]) errors.push(`Field ${f} is required`)
+      }
+
+      const normalizedTemplate = BaTemplateService.normalizeTemplate(payload.template)
+      if (BaTemplateService.isBaTemplate(normalizedTemplate) && payload.data && typeof payload.data === 'object') {
+        if (!company || !company.company_id) {
+          errors.push('Company tidak valid untuk generate letterNo BA')
+        } else {
+          try {
+            const numbering = await BaLetterNoService.nextLetterNo({
+              companyId: company.company_id,
+              template: normalizedTemplate,
+              createdBy: user ? user.id : null
+            })
+            payload.data.letterNo = numbering.letterNo
+          } catch (err) {
+            errors.push(`Gagal generate letterNo: ${err.message}`)
+          }
+        }
       }
 
       let resolvedTemplate = null
