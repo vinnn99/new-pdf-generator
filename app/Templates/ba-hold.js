@@ -188,37 +188,24 @@ module.exports = function baHoldTemplate(payloadData = {}) {
       },
 
       {
-        columns: [
-          {
-            width: '50%',
-            stack: [
-              { image: signatureLeftImage, width: 120, alignment: 'center', margin: [0, 8, 0, 12] },
-              {
-                stack: [
-                  { text: signerLeftName, style: 'signName', alignment: 'center' },
-                  { text: signerLeftTitle, style: 'signTitle', alignment: 'center' },
-                ],
-                alignment: 'center'
-              },
+        table: {
+          widths: ['50%', '50%'],
+          body: [
+            [
+              { image: signatureLeftImage, width: 120, height: 60, alignment: 'center', margin: [0, 8, 0, 8] },
+              { image: signatureRightImage, width: 120, height: 60, alignment: 'center', margin: [0, 8, 0, 8] },
             ],
-            alignment: 'center',
-          },
-          {
-            width: '50%',
-            stack: [
-              { image: signatureRightImage, width: 120, alignment: 'center', margin: [0, 8, 0, 12] },
-              {
-                stack: [
-                  { text: signerRightName, style: 'signName', alignment: 'center' },
-                  { text: signerRightTitle, style: 'signTitle', alignment: 'center' },
-                ],
-                alignment: 'center'
-              },
+            [
+              { text: signerLeftName, style: 'signName', alignment: 'center' },
+              { text: signerRightName, style: 'signName', alignment: 'center' },
             ],
-            alignment: 'center',
-          },
-        ],
-        columnGap: 40,
+            [
+              { text: signerLeftTitle, style: 'signTitle', alignment: 'center' },
+              { text: signerRightTitle, style: 'signTitle', alignment: 'center' },
+            ],
+          ],
+        },
+        layout: 'noBorders',
       },
     ],
 

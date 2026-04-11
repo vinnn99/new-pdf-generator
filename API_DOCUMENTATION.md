@@ -343,7 +343,11 @@ Contoh payload `ba-hold`:
     "outlet": "Tk Harry & Sons@ *Obp",
     "reason": "IJIN JAGA SUAMI KARENA SUAMINYA KECELAKAN",
     "letterDate": "2026-04-06",
-    "location": "Jakarta"
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
   }
 }
 ```
@@ -363,7 +367,11 @@ Contoh payload `ba-rolling`:
     "outletTo": "MAK SUTINAH*OBP",
     "reason": "KARENA TIDAK KUAT DENGAN PERLAKUAN OWNER DENGAN KATA - KATA KEBUN BINATANG ( TEKANAN BATIN )",
     "letterDate": "2026-04-06",
-    "location": "Jakarta"
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
   }
 }
 ```
@@ -382,7 +390,11 @@ Contoh payload `ba-hold-activate`:
     "outlet": "Tk Harry & Sons@ *Obp",
     "holdReason": "IJIN JAGA SUAMI KARENA SUAMINYA KECELAKAN",
     "letterDate": "2026-04-06",
-    "location": "Jakarta"
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
   }
 }
 ```
@@ -428,7 +440,11 @@ Contoh payload `ba-terminated`:
       "PIHAK TOKO REQUEST MENGGANTI MDS"
     ],
     "letterDate": "2026-03-31",
-    "location": "Jakarta"
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
   }
 }
 ```
