@@ -522,9 +522,15 @@ Content-Type: `multipart/form-data` dengan field `file` (xls/xlsx, max 10 MB). O
 - `POST /api/v1/bulk/insentif`
 - `POST /api/v1/bulk/thr`
 - `POST /api/v1/bulk/ba-penempatan`
+- `POST /api/v1/bulk/ba-request-id`
+- `POST /api/v1/bulk/ba-hold`
+- `POST /api/v1/bulk/ba-rolling`
+- `POST /api/v1/bulk/ba-hold-activate`
 - `POST /api/v1/bulk/ba-takeout`
+- `POST /api/v1/bulk/ba-terminated`
 
 Catatan: Template yang di-bulk harus termasuk dalam `allowed_templates` company; jika tidak, request ditolak 403 sebelum baris diproses.
+Semua template BA mendukung field opsional `signerLeftName`, `signerLeftTitle`, `signerRightName`, `signerRightTitle`; jika dikosongkan akan memakai default tanda tangan.
 
 Contoh request `bulk/payslip` (form-data):
 - Header: `Authorization: Bearer <JWT>`
