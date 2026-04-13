@@ -923,7 +923,7 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
   - Minimal kolom: `employeeName`, `position`, `period/periode`. Kolom `email` boleh ditambahkan jika penerima berbeda dari akun login.  
   - Earnings otomatis jika ada: `Gaji Pokok`, `Tunjangan makan`, `Tunjangan Transport`, `Tunjangan Komunikasi`, `Tunjangan Jabatan`, atau kolom bebas `earnings`.  
   - Deductions: `BPJS Ketenagakerjaan`, `PPH 21`/`PPH21`, atau kolom bebas `deductions`.  
-  - Format Excel contoh tersedia: `resources/templates/payslip-bulk-template.xlsx` (atau buat via `node scripts/create-bulk-template.js`). Header kolom:  
+  - Format Excel contoh tersedia di `resources/templates/*.xlsx` (buat/refresh via `node scripts/create-bulk-template.js --all`). Header kolom:  
     `employeeID | employeeName | position | departement | ptkp | periode | joinDate | targetHK | attendance | Gaji Pokok | Tunjangan makan | Tunjangan Transport | Tunjangan Komunikasi | Tunjangan Jabatan | BPJS Ketenagakerjaan | PPH 21 | email (opsional)`
 
 - `POST /api/v1/bulk/insentif`  
@@ -944,33 +944,33 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
 
 - `POST /api/v1/bulk/ba-penempatan`  
   - Minimal: `mdsName`, `placementDate`, `outlet`. Kolom `email` opsional jika penerima berbeda dari akun login.  
-  - Kolom opsional: `region/wilayah`, `nik`, `birthDate/tanggal lahir`, `status`, `category/kategori`, `reason/alasan`, `location/lokasi`, `letterDate/tanggal surat`, `signerLeftName/Title`, `signerRightName/Title`, `callback_url`, `callback_header`, `data_json`.  
+  - Kolom opsional: `region/wilayah`, `nik`, `birthDate/tanggal lahir`, `status`, `category/kategori`, `reason/alasan`, `location/lokasi`, `letterDate/tanggal surat`, `signerLeftName/Title`, `signerRightName/Title`, `signatureLeftUrl`, `signatureRightUrl`, `callback_url`, `callback_header`, `data_json`.  
   - Contoh header Excel yang disarankan:  
-    `mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional) | callback_url | callback_header`
+    `mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
 - `POST /api/v1/bulk/ba-request-id`  
   - Minimal: `area`, `mdsName`, `nik`, `joinDate`.  
-  - Kolom lain: `area/wilayah/region`, `birthDate`, `status`, `stores/toko`, `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
-  - Header contoh: `area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | email (opsional) | callback_url | callback_header`
+  - Kolom lain: `area/wilayah/region`, `birthDate`, `status`, `stores/toko`, `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `signatureLeftUrl`, `signatureRightUrl`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
 - `POST /api/v1/bulk/ba-hold`  
   - Minimal: `region`, `holdDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
-  - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
-  - Header contoh: `region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
+  - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `signatureLeftUrl`, `signatureRightUrl`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
 - `POST /api/v1/bulk/ba-rolling`  
   - Minimal: `region`, `rollingDate`, `mdsName`, `mdsCode`, `status`, `outletFrom`, `outletTo`.  
-  - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
-  - Header contoh: `region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | email (opsional)`
+  - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `signatureLeftUrl`, `signatureRightUrl`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
 - `POST /api/v1/bulk/ba-hold-activate`  
   - Minimal: `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
-  - Tambahan: `holdReason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
-  - Header contoh: `region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | email (opsional)`
+  - Tambahan: `holdReason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `signatureLeftUrl`, `signatureRightUrl`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
 - `POST /api/v1/bulk/ba-takeout`  
   - Minimal: `region`, `takeoutDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
-  - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
-  - Header contoh: `region | takeoutDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
+  - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `signatureLeftUrl`, `signatureRightUrl`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `region | takeoutDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
 - `POST /api/v1/bulk/ba-terminated`  
   - Minimal: `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
-  - Tambahan: `reasons` (bisa multi baris/koma), `location`, `letterDate`, `signerLeft*`, `signerRight*`, `callback_url`, `callback_header`, `data_json`.  
-  - Header contoh: `region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | email (opsional)`
+  - Tambahan: `reasons` (bisa multi baris/koma), `location`, `letterDate`, `signerLeft*`, `signerRight*`, `signatureLeftUrl`, `signatureRightUrl`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
 
 Catatan khusus BA:
 - `letterNo` selalu di-generate otomatis sistem (format default: `{seq:04}/{templateCode}/{romanMonth}/{year}`, timezone server `Asia/Jakarta`).

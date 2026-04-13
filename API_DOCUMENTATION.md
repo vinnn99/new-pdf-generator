@@ -281,7 +281,6 @@ Headers: `x-api-key`, `Content-Type: application/json`
   "template": "ba-penempatan",
   "email": "user@example.com",
   "data": {
-    "letterNo": "075/OMI-TM/BAK/III/2026",
     "region": "SMS",
     "mdsName": "SANTI",
     "nik": "1505046404980001",
@@ -309,7 +308,6 @@ Contoh payload `ba-request-id`:
   "template": "ba-request-id",
   "email": "user@example.com",
   "data": {
-    "letterNo": "102/OMI-TM/BAK/IV/2026",
     "area": "JTU",
     "mdsName": "MUHAMAD MUZAENI",
     "nik": "3328091505990007",
@@ -341,7 +339,6 @@ Contoh payload `ba-hold`:
   "template": "ba-hold",
   "email": "user@example.com",
   "data": {
-    "letterNo": "097/OMI-TM/BAK/IV/2026",
     "region": "JTU",
     "holdDate": "2026-04-01",
     "mdsName": "INTAN DESMA SYAWALIA",
@@ -366,7 +363,6 @@ Contoh payload `ba-rolling`:
   "template": "ba-rolling",
   "email": "user@example.com",
   "data": {
-    "letterNo": "099/OMI-TM/BAK/IV/2026",
     "region": "JTU",
     "rollingDate": "2026-04-07",
     "mdsName": "NUZULUL NINA QURANI",
@@ -392,7 +388,6 @@ Contoh payload `ba-hold-activate`:
   "template": "ba-hold-activate",
   "email": "user@example.com",
   "data": {
-    "letterNo": "098/OMI-TM/BAK/IV/2026",
     "region": "JTU",
     "reactivateDate": "2026-04-06",
     "mdsName": "INTAN DESMA SYAWALIA",
@@ -417,7 +412,6 @@ Contoh payload `ba-takeout`:
   "template": "ba-takeout",
   "email": "user@example.com",
   "data": {
-    "letterNo": "048/OMI-TM/BAK/III/2026",
     "region": "JTS",
     "takeoutDate": "2026-02-12",
     "mdsName": "BEASTRICE ARUM SEKARWANGI",
@@ -442,7 +436,6 @@ Contoh payload `ba-terminated`:
   "template": "ba-terminated",
   "email": "user@example.com",
   "data": {
-    "letterNo": "084/OMI-TM/BAK/III/2026",
     "region": "LPB",
     "terminateDate": "2026-04-01",
     "mdsName": "REVINKA NOOR ALQAMARIAH",
