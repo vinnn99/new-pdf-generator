@@ -319,10 +319,15 @@ Contoh payload `ba-request-id`:
       "GAB TK EKONOMI@*OBP - SLEROK",
       "GAB TK EKONOMI@*OBP - TEKSIN"
     ],
-    "reason": "REQUEST ID MDS"
+    "reason": "REQUEST ID MDS",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
   }
 }
 ```
+Semua template BA (`ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`) mendukung field opsional `signerLeftName`, `signerLeftTitle`, `signerRightName`, `signerRightTitle`. Jika tidak dikirim, sistem memakai default “Adi Anto / Team Leader TEMA Agency” dan “Rizqi Arumdhita / Project Manager Tema Agency”.
 Contoh payload `ba-hold`:
 ```json
 {
@@ -338,7 +343,11 @@ Contoh payload `ba-hold`:
     "outlet": "Tk Harry & Sons@ *Obp",
     "reason": "IJIN JAGA SUAMI KARENA SUAMINYA KECELAKAN",
     "letterDate": "2026-04-06",
-    "location": "Jakarta"
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
   }
 }
 ```
@@ -358,7 +367,11 @@ Contoh payload `ba-rolling`:
     "outletTo": "MAK SUTINAH*OBP",
     "reason": "KARENA TIDAK KUAT DENGAN PERLAKUAN OWNER DENGAN KATA - KATA KEBUN BINATANG ( TEKANAN BATIN )",
     "letterDate": "2026-04-06",
-    "location": "Jakarta"
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
   }
 }
 ```
@@ -377,7 +390,11 @@ Contoh payload `ba-hold-activate`:
     "outlet": "Tk Harry & Sons@ *Obp",
     "holdReason": "IJIN JAGA SUAMI KARENA SUAMINYA KECELAKAN",
     "letterDate": "2026-04-06",
-    "location": "Jakarta"
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
   }
 }
 ```
@@ -423,7 +440,11 @@ Contoh payload `ba-terminated`:
       "PIHAK TOKO REQUEST MENGGANTI MDS"
     ],
     "letterDate": "2026-03-31",
-    "location": "Jakarta"
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
   }
 }
 ```
@@ -521,9 +542,15 @@ Content-Type: `multipart/form-data` dengan field `file` (xls/xlsx, max 10 MB). O
 - `POST /api/v1/bulk/insentif`
 - `POST /api/v1/bulk/thr`
 - `POST /api/v1/bulk/ba-penempatan`
+- `POST /api/v1/bulk/ba-request-id`
+- `POST /api/v1/bulk/ba-hold`
+- `POST /api/v1/bulk/ba-rolling`
+- `POST /api/v1/bulk/ba-hold-activate`
 - `POST /api/v1/bulk/ba-takeout`
+- `POST /api/v1/bulk/ba-terminated`
 
 Catatan: Template yang di-bulk harus termasuk dalam `allowed_templates` company; jika tidak, request ditolak 403 sebelum baris diproses.
+Semua template BA mendukung field opsional `signerLeftName`, `signerLeftTitle`, `signerRightName`, `signerRightTitle`; jika dikosongkan akan memakai default tanda tangan.
 
 Contoh request `bulk/payslip` (form-data):
 - Header: `Authorization: Bearer <JWT>`
@@ -574,15 +601,15 @@ Response 200:
 - **Insentif**: `employeeId | employeeName | position | departement | periode | INSENTIF SAMPLING | INSENTIF SELLOUT | INSENTIF KERAJINAN | INSENTIF TL | earnings | deductions | email (opsional)`
 - **THR**: `employeeId | employeeName | position | departement | periode | THR | earnings | deductions | note | email (opsional)`
 - **BA Penempatan**: `mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional) | callback_url | callback_header`
-- **BA Request ID**: `area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | email (opsional)`
-- **BA HOLD**: `region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
-- **BA Rolling**: `region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | email (opsional)`
+- **BA Request ID**: `area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional)`
+- **BA HOLD**: `region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional)`
+- **BA Rolling**: `region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional)`
 - **BA HOLD Activate**: `region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | email (opsional)`
 - **BA Takeout**: `region | takeoutDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
 - **BA Terminated**: `region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | email (opsional)`
 
 Catatan:
-- Kolom `letterNo` boleh ada, tetapi akan diabaikan karena sistem selalu generate nomor otomatis.
+- Kolom `letterNo` boleh ada di Excel (untuk kompatibilitas), tetapi akan diabaikan karena sistem selalu auto-generate nomor.
 
 Kolom umum: `callback_url`, `callback_header` (JSON), `data_json` (override/extra field), `email` (jika penerima berbeda dari akun login).
 
@@ -875,3 +902,4 @@ Field update: `email`, `name`, `phone`, `notes`.
 - Untuk upload Excel gunakan `FormData` dengan field `file`.
 - Saat dryRun, backend tidak enqueue job tapi mengembalikan payload per baris; gunakan ini untuk preview di UI.
 - Download URL diberikan di webhook / list; bisa langsung di-`window.open` atau fetch sebagai blob.
+

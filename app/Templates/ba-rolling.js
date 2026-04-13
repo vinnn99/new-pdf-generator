@@ -178,38 +178,37 @@ module.exports = function baRollingTemplate(payloadData = {}) {
 
       {
         columns: [
+          { width: '50%', text: '' },
           {
             width: '50%',
-            stack: [
-              { text: 'Hormat Kami,', style: 'paragraph', margin: [0, 0, 0, 12], alignment: 'center' },
-              { image: signatureLeftImage, width: 120, alignment: 'center', margin: [0, 8, 0, 12] },
-              {
-                stack: [
-                  { text: signerLeftName, style: 'signName', alignment: 'center' },
-                  { text: signerLeftTitle, style: 'signTitle', alignment: 'center' },
-                ],
-                alignment: 'center'
-              },
-            ],
+            text: 'Hormat Kami,',
             alignment: 'center',
-          },
-          {
-            width: '50%',
-            stack: [
-              { text: 'Menyetujui,', style: 'paragraph', margin: [0, 0, 0, 12], alignment: 'center' },
-              { image: signatureRightImage, width: 120, alignment: 'center', margin: [0, 8, 0, 12] },
-              {
-                stack: [
-                  { text: signerRightName, style: 'signName', alignment: 'center' },
-                  { text: signerRightTitle, style: 'signTitle', alignment: 'center' },
-                ],
-                alignment: 'center'
-              },
-            ],
-            alignment: 'center',
+            style: 'paragraph',
           },
         ],
         columnGap: 40,
+        margin: [0, 0, 0, 8]
+      },
+
+      {
+        table: {
+          widths: ['50%', '50%'],
+          body: [
+            [
+              { image: signatureLeftImage, width: 120, height: 60, alignment: 'center', margin: [0, 8, 0, 8] },
+              { image: signatureRightImage, width: 120, height: 60, alignment: 'center', margin: [0, 8, 0, 8] },
+            ],
+            [
+              { text: signerLeftName, style: 'signName', alignment: 'center' },
+              { text: signerRightName, style: 'signName', alignment: 'center' },
+            ],
+            [
+              { text: signerLeftTitle, style: 'signTitle', alignment: 'center' },
+              { text: signerRightTitle, style: 'signTitle', alignment: 'center' },
+            ],
+          ],
+        },
+        layout: 'noBorders',
       },
     ],
 

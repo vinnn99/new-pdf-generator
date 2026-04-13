@@ -2,10 +2,7 @@ buatkan issue.md yang berisi perencanaan untuk nanti di implementasikan oleh jon
 
 isi planning nya sebagai berikut:
 
-** Bug Fix:
-- Saat POST bulk/payslip,bulk/insentif,bulk/thr  ubah penamaan file menjadi [periode].[template].[employeeId].[nama].[kode unique]
-- Pada Saat POST send-slip-emails, sesuaikan pencarian lampiran nya ke format baru
-- apabila diketemukan file attactment lebih dari satu (karena perbedaan kode unique), ambil file yang terbaru
+** semua template ba-* di sertakan kuntom tanda tangan bagian kiri dan kanan, dengan menambahkan url file tanda tangan 
 
 
 jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah
