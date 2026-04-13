@@ -24,12 +24,24 @@ const templates = {
   'ba-terminated': tpl('ba-terminated'),
 };
 
+const dummySignatureLeft = path.join(projectRoot, 'resources', 'images', 'signature_dummy_left.png');
+const dummySignatureRight = path.join(projectRoot, 'resources', 'images', 'signature_dummy_right.png');
+
+function toDataUrl(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const mime = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
+  const base64 = fs.readFileSync(filePath).toString('base64');
+  return `data:${mime};base64,${base64}`;
+}
+
 const today = '2026-04-11';
 const signer = {
   signerLeftName: 'Tester Kiri',
   signerLeftTitle: 'QA Lead',
   signerRightName: 'Tester Kanan',
   signerRightTitle: 'QA Manager',
+  signatureLeftUrl: toDataUrl(dummySignatureLeft),
+  signatureRightUrl: toDataUrl(dummySignatureRight),
 };
 
 const payloads = {

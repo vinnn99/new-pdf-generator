@@ -4,6 +4,8 @@ const PdfPrinter = require('pdfmake')
 const Database = use('Database')
 const path = require('path')
 const fs = require('fs')
+const http = require('http')
+const https = require('https')
 const WebhookSender = require('../Services/WebhookSender')
 const TemplateResolver = require('../Services/TemplateResolver')
 
@@ -53,6 +55,9 @@ class GeneratePdfJob {
       if (!template || typeof template !== 'string') {
         throw new Error('Invalid template name')
       }
+
+      // Siapkan resource tanda tangan (opsional) bila diberikan sebagai URL
+      await enrichSignatureImages(payloadData)
 
       // Resolve template: DB dynamic first, then fallback ke file JS legacy
       const resolvedTemplate = await TemplateResolver.resolve(template, { companyId })
@@ -347,3 +352,71 @@ async function updateBatchItemStatus({
 }
 
 module.exports = GeneratePdfJob
+
+/**
+ * Enrich payloadData with base64 data URLs for signature images if URL provided.
+ * Leaves payloadData untouched on failure; PDF rendering will fallback.
+ */
+async function enrichSignatureImages(payloadData) {
+  if (!payloadData || typeof payloadData !== 'object') return
+
+  const { signatureLeftUrl, signatureRightUrl } = payloadData
+
+  if (isHttpUrl(signatureLeftUrl)) {
+    try {
+      payloadData.signatureLeftImage = await fetchImageAsDataUrl(signatureLeftUrl)
+    } catch (err) {
+      console.warn('[Signature] gagal fetch signatureLeftUrl:', err.message)
+    }
+  }
+
+  if (isHttpUrl(signatureRightUrl)) {
+    try {
+      payloadData.signatureRightImage = await fetchImageAsDataUrl(signatureRightUrl)
+    } catch (err) {
+      console.warn('[Signature] gagal fetch signatureRightUrl:', err.message)
+    }
+  }
+}
+
+function isHttpUrl(url) {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'http:' || u.protocol === 'https:'
+  } catch (_) {
+    return false
+  }
+}
+
+function fetchImageAsDataUrl(url) {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : http
+    const req = client.get(url, (res) => {
+      // handle redirect
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        const redirected = new URL(res.headers.location, url).href
+        res.resume()
+        return resolve(fetchImageAsDataUrl(redirected))
+      }
+
+      if (res.statusCode !== 200) {
+        res.resume()
+        return reject(new Error(`status ${res.statusCode}`))
+      }
+
+      const contentType = res.headers['content-type'] || 'image/png'
+      const chunks = []
+      res.on('data', (d) => chunks.push(d))
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks)
+        // optional size guard: 1.5 MB
+        if (buf.length > 1.5 * 1024 * 1024) {
+          return reject(new Error('file too large'))
+        }
+        const base64 = buf.toString('base64')
+        resolve(`data:${contentType};base64,${base64}`)
+      })
+    })
+    req.on('error', reject)
+  })
+}

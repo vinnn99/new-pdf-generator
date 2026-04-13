@@ -153,6 +153,12 @@ class BulkPdfController {
 
           if (isBaMode) {
             payload.data = payload.data || {}
+            // Tambahan: URL tanda tangan kiri/kanan (opsional)
+            const sigLeft = lower.signaturelefturl || lower['signature_left_url'] || lower['signature left url']
+            const sigRight = lower.signaturerighturl || lower['signature_right_url'] || lower['signature right url']
+            if (sigLeft) payload.data.signatureLeftUrl = sigLeft
+            if (sigRight) payload.data.signatureRightUrl = sigRight
+
             const matchFields = BaTemplateService.extractMatchFieldsFromRow(mode, lower)
             const matchKey = BaTemplateService.buildMatchKey(mode, matchFields)
             const requiredMatchFields = BaTemplateService.getRequiredMatchFields(mode)

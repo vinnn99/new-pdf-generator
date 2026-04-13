@@ -296,7 +296,9 @@ Headers: `x-api-key`, `Content-Type: application/json`
     "signerLeftName": "Adi Anto",
     "signerLeftTitle": "Team Leader TEMA Agency",
     "signerRightName": "Rizqi Arumdhita",
-    "signerRightTitle": "Project Manager Tema Agency"
+    "signerRightTitle": "Project Manager Tema Agency",
+    "signatureLeftUrl": "https://example.com/signature-left.png",
+    "signatureRightUrl": "https://example.com/signature-right.png"
   },
   "callback": { "url": "https://webhook.site/xxx" }
 }
@@ -323,11 +325,16 @@ Contoh payload `ba-request-id`:
     "signerLeftName": "Adi Anto",
     "signerLeftTitle": "Team Leader TEMA Agency",
     "signerRightName": "Rizqi Arumdhita",
-    "signerRightTitle": "Project Manager Tema Agency"
+    "signerRightTitle": "Project Manager Tema Agency",
+    "signatureLeftUrl": "https://example.com/signature-left.png",
+    "signatureRightUrl": "https://example.com/signature-right.png"
   }
 }
 ```
-Semua template BA (`ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`) mendukung field opsional `signerLeftName`, `signerLeftTitle`, `signerRightName`, `signerRightTitle`. Jika tidak dikirim, sistem memakai default “Adi Anto / Team Leader TEMA Agency” dan “Rizqi Arumdhita / Project Manager Tema Agency”.
+Semua template BA (`ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`) mendukung field opsional:
+- `signerLeftName`, `signerLeftTitle`, `signerRightName`, `signerRightTitle`
+- `signatureLeftUrl`, `signatureRightUrl` (hanya `http/https`)
+Jika signer tidak dikirim, sistem memakai default “Adi Anto / Team Leader TEMA Agency” dan “Rizqi Arumdhita / Project Manager Tema Agency”.
 Contoh payload `ba-hold`:
 ```json
 {
@@ -347,7 +354,9 @@ Contoh payload `ba-hold`:
     "signerLeftName": "Adi Anto",
     "signerLeftTitle": "Team Leader TEMA Agency",
     "signerRightName": "Rizqi Arumdhita",
-    "signerRightTitle": "Project Manager Tema Agency"
+    "signerRightTitle": "Project Manager Tema Agency",
+    "signatureLeftUrl": "https://example.com/signature-left.png",
+    "signatureRightUrl": "https://example.com/signature-right.png"
   }
 }
 ```
@@ -371,7 +380,9 @@ Contoh payload `ba-rolling`:
     "signerLeftName": "Adi Anto",
     "signerLeftTitle": "Team Leader TEMA Agency",
     "signerRightName": "Rizqi Arumdhita",
-    "signerRightTitle": "Project Manager Tema Agency"
+    "signerRightTitle": "Project Manager Tema Agency",
+    "signatureLeftUrl": "https://example.com/signature-left.png",
+    "signatureRightUrl": "https://example.com/signature-right.png"
   }
 }
 ```
@@ -394,7 +405,9 @@ Contoh payload `ba-hold-activate`:
     "signerLeftName": "Adi Anto",
     "signerLeftTitle": "Team Leader TEMA Agency",
     "signerRightName": "Rizqi Arumdhita",
-    "signerRightTitle": "Project Manager Tema Agency"
+    "signerRightTitle": "Project Manager Tema Agency",
+    "signatureLeftUrl": "https://example.com/signature-left.png",
+    "signatureRightUrl": "https://example.com/signature-right.png"
   }
 }
 ```
@@ -417,7 +430,9 @@ Contoh payload `ba-takeout`:
     "signerLeftName": "Adi Anto",
     "signerLeftTitle": "Team Leader TEMA Agency",
     "signerRightName": "Rizqi Arumdhita",
-    "signerRightTitle": "Project Manager Tema Agency"
+    "signerRightTitle": "Project Manager Tema Agency",
+    "signatureLeftUrl": "https://example.com/signature-left.png",
+    "signatureRightUrl": "https://example.com/signature-right.png"
   }
 }
 ```
@@ -444,7 +459,9 @@ Contoh payload `ba-terminated`:
     "signerLeftName": "Adi Anto",
     "signerLeftTitle": "Team Leader TEMA Agency",
     "signerRightName": "Rizqi Arumdhita",
-    "signerRightTitle": "Project Manager Tema Agency"
+    "signerRightTitle": "Project Manager Tema Agency",
+    "signatureLeftUrl": "https://example.com/signature-left.png",
+    "signatureRightUrl": "https://example.com/signature-right.png"
   }
 }
 ```
@@ -489,6 +506,7 @@ Webhook payload (on success):
 Catatan BA:
 - `data.letterNo` selalu di-generate otomatis oleh sistem (override).
 - Format default: `{seq:04}/{templateCode}/{romanMonth}/{year}`.
+- `data.signatureLeftUrl` dan `data.signatureRightUrl` bersifat opsional untuk override gambar tanda tangan.
 
 **Penamaan file:**
 - `payslip`/`insentif`/`thr`: `<periode>.<template>.<employeeId>.<nama>.<unik>.pdf`
@@ -550,7 +568,7 @@ Content-Type: `multipart/form-data` dengan field `file` (xls/xlsx, max 10 MB). O
 - `POST /api/v1/bulk/ba-terminated`
 
 Catatan: Template yang di-bulk harus termasuk dalam `allowed_templates` company; jika tidak, request ditolak 403 sebelum baris diproses.
-Semua template BA mendukung field opsional `signerLeftName`, `signerLeftTitle`, `signerRightName`, `signerRightTitle`; jika dikosongkan akan memakai default tanda tangan.
+Semua template BA mendukung field opsional `signerLeftName`, `signerLeftTitle`, `signerRightName`, `signerRightTitle`, `signatureLeftUrl`, `signatureRightUrl`; jika dikosongkan akan memakai default tanda tangan.
 
 Contoh request `bulk/payslip` (form-data):
 - Header: `Authorization: Bearer <JWT>`
@@ -600,16 +618,17 @@ Response 200:
 - **Payslip**: `employeeId | employeeName | position | departement | periode | joinDate | ptkp | targetHK | attendance | Gaji Pokok | Tunjangan makan | Tunjangan Transport | Tunjangan Komunikasi | Tunjangan Jabatan | BPJS Ketenagakerjaan | PPH 21 | email (opsional)`
 - **Insentif**: `employeeId | employeeName | position | departement | periode | INSENTIF SAMPLING | INSENTIF SELLOUT | INSENTIF KERAJINAN | INSENTIF TL | earnings | deductions | email (opsional)`
 - **THR**: `employeeId | employeeName | position | departement | periode | THR | earnings | deductions | note | email (opsional)`
-- **BA Penempatan**: `mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional) | callback_url | callback_header`
-- **BA Request ID**: `area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional)`
-- **BA HOLD**: `region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional)`
-- **BA Rolling**: `region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | email (opsional)`
-- **BA HOLD Activate**: `region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | email (opsional)`
-- **BA Takeout**: `region | takeoutDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | email (opsional)`
-- **BA Terminated**: `region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | email (opsional)`
+- **BA Penempatan**: `mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
+- **BA Request ID**: `area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional)`
+- **BA HOLD**: `region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional)`
+- **BA Rolling**: `region | rollingDate | mdsName | mdsCode | status | outletFrom | outletTo | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional)`
+- **BA HOLD Activate**: `region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional)`
+- **BA Takeout**: `region | takeoutDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional)`
+- **BA Terminated**: `region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional)`
 
 Catatan:
 - Kolom `letterNo` boleh ada di Excel (untuk kompatibilitas), tetapi akan diabaikan karena sistem selalu auto-generate nomor.
+- Semua BA mendukung kolom opsional `signatureLeftUrl` dan `signatureRightUrl` (URL `http/https` gambar tanda tangan kiri/kanan).
 
 Kolom umum: `callback_url`, `callback_header` (JSON), `data_json` (override/extra field), `email` (jika penerima berbeda dari akun login).
 

@@ -77,6 +77,8 @@ module.exports = function baPenempatanTemplate(payloadData = {}) {
   const footerImage = path.join(__dirname, '..', '..', 'resources', 'images', 'footer_omi.png')
   const signatureLeftImage = path.join(__dirname, '..', '..', 'resources', 'images', 'signature_adi.jpeg')
   const signatureRightImage = path.join(__dirname, '..', '..', 'resources', 'images', 'signature_kiki.jpeg')
+  const signatureLeftSource = payloadData.signatureLeftImage || payloadData.signatureLeftUrl || signatureLeftImage
+  const signatureRightSource = payloadData.signatureRightImage || payloadData.signatureRightUrl || signatureRightImage
   const pageWidth = 595.28  // A4 width in points (72 DPI)
   const pageHeight = 841.89 // A4 height in points
 
@@ -210,8 +212,8 @@ module.exports = function baPenempatanTemplate(payloadData = {}) {
           widths: ['50%', '50%'],
           body: [
             [
-              { image: signatureLeftImage, width: 120, height: 60, alignment: 'center', margin: [0, 8, 0, 8] },
-              { image: signatureRightImage, width: 120, height: 60, alignment: 'center', margin: [0, 8, 0, 8] },
+              signatureCell(signatureLeftSource),
+              signatureCell(signatureRightSource),
             ],
             [
               { text: signerLeftName, style: 'signName', alignment: 'center' },
@@ -238,4 +240,11 @@ module.exports = function baPenempatanTemplate(payloadData = {}) {
       signTitle: { fontSize: 10, color: '#4a4a4a' },
     },
   }
+}
+
+function signatureCell(source) {
+  if (source) {
+    return { image: source, width: 120, height: 60, alignment: 'center', margin: [0, 8, 0, 8] }
+  }
+  return { text: '', margin: [0, 24, 0, 24] }
 }
