@@ -1,87 +1,94 @@
-# Issue Plan: Monitoring Nomor BA dan Lokasi PDF
+# Issue Plan: Histori Signature URL untuk Single Generate BA
 
 ## Ringkasan Masalah
-Saat ini nomor BA (`ba-*`) sudah tergenerate saat pembuatan PDF, tetapi belum ada endpoint monitor yang rapi untuk melihat daftar nomor BA yang sudah dikeluarkan beserta lokasi file PDF-nya berdasarkan hak akses user/admin/superadmin.
+Saat ini pada alur single BA (generate PDF single dan single send email), payload bisa membawa `signatureLeftUrl` dan `signatureRightUrl`. Namun belum ada histori URL tanda tangan yang bisa dipakai ulang oleh FrontEnd, sehingga user harus upload/input ulang URL.
 
 ## Tujuan
-- User/admin/superadmin bisa memonitor nomor BA yang sudah terbit.
-- Data monitoring menampilkan info file PDF (`saved_path`, `download_url`, `filename`) agar mudah ditelusuri.
-- Menyediakan API khusus monitoring dengan filtering dan pagination.
+- Menyimpan histori `signatureLeftUrl` dan `signatureRightUrl` yang pernah dipakai di alur single.
+- FrontEnd bisa mengambil ulang daftar URL tanpa upload/input baru.
+- Histori terikat ke company sehingga user/admin hanya melihat data company-nya.
+- URL di tabel harus unik (tidak duplikat).
 
-## Keputusan Desain Data (Paling Efektif)
-Gunakan tabel `generated_pdfs` yang sudah ada, lalu tambah kolom yang dibutuhkan.
+## Scope Implementasi
+1. Simpan histori Signature URL saat:
+- `POST /api/v1/generate-pdf` (single BA)
+- endpoint single send email BA (`/api/v1/send/ba-*`)
 
-Alasan:
-- Data file PDF sudah ada di `generated_pdfs` (tidak perlu duplikasi ke tabel baru).
-- Integrasi lebih cepat karena flow generate PDF sudah menulis ke tabel ini.
-- Query monitoring jadi sederhana dan hemat perubahan.
+2. Buat tabel baru khusus histori Signature URL.
+3. Tambah endpoint untuk menampilkan daftar Signature URL per company.
+4. Terapkan validasi URL dan normalisasi agar constraint unik konsisten.
+
+## Keputusan Desain Data
+Gunakan tabel baru: `company_signature_urls`.
+
+Field yang direkomendasikan:
+- `id`
+- `company_id` (FK ke `companies.company_id`)
+- `url` (raw URL yang dipakai)
+- `url_normalized` (hasil trim/normalisasi untuk kebutuhan unique key)
+- `last_used_at`
+- `use_count`
+- `created_by` (FK user, nullable)
+- `created_at`, `updated_at`
+
+Constraint/index:
+- `UNIQUE (company_id, url_normalized)` untuk memastikan URL unik dalam scope company.
+- Index `company_id`, `last_used_at` untuk list cepat.
 
 Catatan:
-- Opsi tabel baru boleh dipertimbangkan nanti jika ada kebutuhan audit nomor BA tanpa PDF.
-- Untuk scope saat ini, menambah field di `generated_pdfs` adalah opsi paling efektif.
+- Requirement unik dipenuhi dalam konteks company (tidak duplikat dalam 1 company).
+- Jika URL yang sama dipakai lagi, lakukan upsert + increment `use_count`.
 
-## Perubahan Skema yang Direncanakan
-Tambahkan field pada `generated_pdfs`:
-- `letter_no` (string, nullable, index)
-- `batch_id` (string, nullable, index) untuk hasil bulk
-
-Field existing yang dipakai:
-- `template`, `company_id`, `user_id`, `filename`, `saved_path`, `download_url`, `created_at`
-
-## Perubahan Alur Aplikasi
-Saat generate BA (single maupun bulk):
-- Simpan `data.letterNo` ke `generated_pdfs.letter_no`.
-- Jika proses bulk, simpan `batch_id` ke `generated_pdfs.batch_id`.
-- Pastikan hanya template `ba-*` yang mengisi `letter_no`; template non-BA boleh null.
+## Alur Simpan Histori
+Saat request single BA diterima:
+- Ambil `signatureLeftUrl` dan `signatureRightUrl` dari payload (jika ada).
+- Validasi hanya `http/https`.
+- Normalisasi URL (trim, lowercase host, buang spasi berlebih).
+- Upsert ke `company_signature_urls` berdasarkan `(company_id, url_normalized)`.
+- Update `last_used_at` dan `use_count`.
 
 ## Rencana API
-1. `GET /api/v1/ba-monitoring`
+1. `GET /api/v1/signature-urls`
 - Auth: JWT
-- Akses:
-  - `user`: hanya data milik user login
-  - `admin`: semua data di company yang sama
-  - `superadmin`: semua company
+- Role behavior:
+  - `user` / `admin`: otomatis hanya company miliknya
+  - `superadmin`: bisa semua company, dengan query `company_id`
 - Query opsional:
+  - `q` (search URL)
   - `page`, `perPage`
-  - `template` (contoh `ba-request-id`)
-  - `letter_no` (exact/contains)
-  - `date_from`, `date_to`
-  - `company_id` (khusus superadmin)
-  - `batch_id`
-- Response minimal per row:
-  - `id`, `template`, `letter_no`
-  - `company_id`, `user_id`
-  - `filename`, `saved_path`, `download_url`
-  - `batch_id`, `created_at`
+  - `sort=last_used_at|created_at`
+- Response per item minimal:
+  - `id`, `url`, `use_count`, `last_used_at`, `created_at`
 
-2. `GET /api/v1/ba-monitoring/:id`
-- Auth: JWT
-- Scope akses sama seperti list endpoint.
-- Kembalikan detail record monitoring untuk satu dokumen BA.
+2. (Opsional) `GET /api/v1/signature-urls/recent`
+- Shortcut untuk ambil URL terbaru/tersering dipakai per company (untuk dropdown cepat di FrontEnd).
 
 ## Perubahan Kode yang Direncanakan
-- Tambah migration untuk kolom baru di `generated_pdfs`.
-- Update proses penyimpanan hasil PDF agar menulis `letter_no` dan `batch_id`.
-- Tambah controller baru untuk endpoint monitoring.
-- Tambah route baru di `start/routes.js`.
+- Tambah migration tabel `company_signature_urls`.
+- Tambah service untuk normalisasi + upsert histori URL.
+- Integrasi service ke flow single BA:
+  - `PdfController.generate` (single generate PDF)
+  - `SingleEmailController` (single send email BA)
+- Tambah controller endpoint list Signature URL.
+- Tambah route di `start/routes.js`.
 - Update dokumentasi API (`README.md` dan `API_DOCUMENTATION.md`).
 
 ## Skenario Test (Tingkat Tinggi)
-- Role `user` hanya melihat data BA miliknya.
-- Role `admin` melihat semua data BA dalam company-nya.
-- Role `superadmin` melihat lintas company.
-- Filtering `template`, `letter_no`, `date range`, dan `batch_id` bekerja sesuai query.
-- Pagination list berjalan benar.
-- Endpoint detail menolak akses ke data di luar scope role.
-- Record BA baru menyimpan `letter_no` dan file path dengan benar.
-- Record non-BA tidak merusak flow existing (regression check).
+- Single generate BA dengan `signatureLeftUrl`/`signatureRightUrl` menyimpan histori.
+- Single send email BA dengan signature URL menyimpan histori.
+- URL yang sama dipakai ulang tidak membuat row baru (upsert berjalan), `use_count` bertambah.
+- URL invalid (non-http/https) tidak masuk histori.
+- User/admin hanya bisa melihat daftar URL dalam company sendiri.
+- Superadmin bisa melihat lintas company sesuai filter.
+- Endpoint list mendukung pagination dan pencarian.
 
 ## Out of Scope
-- Dashboard agregasi analytics lanjutan (chart/ringkasan KPI).
-- Export CSV/Excel.
-- Audit log perubahan nomor BA manual.
+- Upload file tanda tangan ke server.
+- Sinkronisasi histori URL dari endpoint bulk.
+- Fitur edit/delete manual histori URL dari UI.
 
 ## Acceptance Criteria
-- API list/detail monitoring BA tersedia dan bisa dipakai semua role sesuai scope.
-- Data nomor BA dan lokasi file PDF bisa ditelusuri tanpa parsing manual dari payload JSON.
-- Flow generate PDF existing tetap berjalan normal untuk template BA dan non-BA.
+- Histori Signature URL tersimpan otomatis dari single generate PDF BA dan single send email BA.
+- Tabel baru tersedia dan URL tidak duplikat dalam company yang sama.
+- Endpoint list Signature URL per company tersedia untuk kebutuhan FrontEnd.
+- User/admin tidak bisa melihat URL dari company lain.
