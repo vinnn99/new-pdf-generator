@@ -3,6 +3,8 @@
 const JobService = require('../../Services/JobService')
 const Database = use('Database')
 const GeneratePdfJob = use('App/Jobs/GeneratePdfJob')
+const BaTemplateService = use('App/Services/BaTemplateService')
+const BaLetterNoService = use('App/Services/BaLetterNoService')
 const Env = use('Env')
 
 class SingleEmailController {
@@ -65,6 +67,23 @@ class SingleEmailController {
 
       if (!to) {
         return response.status(422).json({ status: 'validation_failed', message: 'Field to wajib diisi' })
+      }
+
+      const normalizedTemplate = BaTemplateService.normalizeTemplate(cfg.template)
+      if (BaTemplateService.isBaTemplate(normalizedTemplate)) {
+        try {
+          const numbering = await BaLetterNoService.nextLetterNo({
+            companyId: company.company_id,
+            template: normalizedTemplate,
+            createdBy: user.id
+          })
+          data.letterNo = numbering.letterNo
+        } catch (err) {
+          return response.status(422).json({
+            status: 'validation_failed',
+            message: `Gagal generate letterNo: ${err.message}`
+          })
+        }
       }
 
       // Validasi field wajib per template
@@ -208,13 +227,13 @@ function cfgBa(template) {
 
 function requiredFields(template) {
   const map = {
-    'ba-penempatan': ['letterNo', 'mdsName', 'placementDate', 'outlet'],
-    'ba-request-id': ['letterNo', 'mdsName', 'nik', 'joinDate'],
-    'ba-hold': ['letterNo', 'region', 'holdDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
-    'ba-rolling': ['letterNo', 'region', 'rollingDate', 'mdsName', 'mdsCode', 'status', 'outletFrom', 'outletTo'],
-    'ba-hold-activate': ['letterNo', 'region', 'reactivateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
-    'ba-takeout': ['letterNo', 'region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
-    'ba-terminated': ['letterNo', 'region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet']
+    'ba-penempatan': ['mdsName', 'placementDate', 'outlet'],
+    'ba-request-id': ['mdsName', 'nik', 'joinDate'],
+    'ba-hold': ['region', 'holdDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
+    'ba-rolling': ['region', 'rollingDate', 'mdsName', 'mdsCode', 'status', 'outletFrom', 'outletTo'],
+    'ba-hold-activate': ['region', 'reactivateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
+    'ba-takeout': ['region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
+    'ba-terminated': ['region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet']
   }
   return map[template] || []
 }
