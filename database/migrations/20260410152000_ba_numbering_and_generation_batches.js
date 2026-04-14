@@ -8,7 +8,7 @@ class BaNumberingAndGenerationBatchesSchema extends Schema {
     this.create('company_ba_numbering_settings', (table) => {
       table.increments()
       table.integer('company_id').unsigned().notNullable().references('company_id').inTable('companies').onDelete('CASCADE')
-      table.string('format_pattern', 255).notNullable().defaultTo('{seq:04}/{templateCode}/{romanMonth}/{year}')
+      table.string('format_pattern', 255).notNullable().defaultTo('{seq}/{CompanyCode}/{templateCode}/{romanMonth}/{Year}')
       table.string('timezone', 64).notNullable().defaultTo('Asia/Jakarta')
       table.integer('created_by').unsigned().nullable().references('id').inTable('users').onDelete('SET NULL')
       table.integer('updated_by').unsigned().nullable().references('id').inTable('users').onDelete('SET NULL')

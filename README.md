@@ -973,7 +973,7 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
   - Header contoh: `region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
 
 Catatan khusus BA:
-- `letterNo` selalu di-generate otomatis sistem (format default: `{seq:04}/{templateCode}/{romanMonth}/{year}`, timezone server `Asia/Jakarta`).
+- `letterNo` selalu di-generate otomatis sistem (format default: `{seq}/{CompanyCode}/{templateCode}/{romanMonth}/{Year}`, timezone server `Asia/Jakarta`).
 - Jika request bulk BA bukan `dryRun`, response akan mengembalikan `batch_id` untuk referensi kirim email bulk BA.
 
 Kolom opsional umum (semua mode): `employeeId`, `department/departement/departemen`, `joinDate`, `ptkp`, `targetHK`, `attendance`, `note`, `data_json` (JSON string untuk override/tambah field data), `callback_url`, `callback_header`.

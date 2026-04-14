@@ -498,7 +498,7 @@ Webhook payload (on success):
 
 Catatan BA:
 - `data.letterNo` selalu di-generate otomatis oleh sistem (override).
-- Format default: `{seq:04}/{templateCode}/{romanMonth}/{year}`.
+- Format default: `{seq}/{CompanyCode}/{templateCode}/{romanMonth}/{Year}`.
 - `data.signatureLeftUrl` dan `data.signatureRightUrl` bersifat opsional untuk override gambar tanda tangan.
 
 **Penamaan file:**

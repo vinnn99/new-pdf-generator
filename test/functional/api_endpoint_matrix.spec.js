@@ -642,6 +642,7 @@ async function resetSchema() {
   await Database.schema.createTable('companies', (table) => {
     table.increments('company_id')
     table.string('name', 191).notNullable()
+    table.string('code', 20).nullable()
     table.string('api_key', 191).notNullable().unique()
     table.string('smtp_host', 191).nullable()
     table.integer('smtp_port').nullable()

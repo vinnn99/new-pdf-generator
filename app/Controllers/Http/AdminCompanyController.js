@@ -6,6 +6,7 @@ const uuid = () => Math.random().toString(36).slice(2, 12)
 const fs = require('fs')
 const path = require('path')
 const TemplateResolver = require('../../Services/TemplateResolver')
+const CompanyCodeService = use('App/Services/CompanyCodeService')
 
 class AdminCompanyController {
   _listTemplates() {
@@ -96,7 +97,7 @@ class AdminCompanyController {
       }
     }
 
-    const payload = request.only(['name', 'api_key', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure', 'mail_from', 'is_active'])
+    const payload = request.only(['name', 'code', 'api_key', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure', 'mail_from', 'is_active'])
 
     const rules = {
       name: 'required',
@@ -116,6 +117,7 @@ class AdminCompanyController {
 
     const company = {
       name: payload.name,
+      code: CompanyCodeService.resolve(payload.code, payload.name),
       api_key: payload.api_key || uuid(),
       smtp_host: payload.smtp_host || null,
       smtp_port: payload.smtp_port || null,
@@ -148,11 +150,14 @@ class AdminCompanyController {
     const id = Number(params.id)
     if (!id) return response.status(400).json({ status: 'error', message: 'company_id tidak valid' })
 
-    const payload = request.only(['name', 'api_key', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure', 'mail_from', 'is_active', 'allowed_templates'])
+    const payload = request.only(['name', 'code', 'api_key', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure', 'mail_from', 'is_active', 'allowed_templates'])
 
     if (isAdmin && admin.company_id && admin.company_id !== id) {
       return response.status(403).json({ status: 'forbidden', message: 'Tidak boleh mengubah company lain' })
     }
+
+    const existingCompany = await Database.table('companies').where('company_id', id).first()
+    if (!existingCompany) return response.status(404).json({ status: 'error', message: 'Company tidak ditemukan' })
 
     // uniqueness api_key
     if (payload.api_key) {
@@ -163,6 +168,12 @@ class AdminCompanyController {
     const updateData = {}
     const assign = (key, val) => { if (val !== undefined) updateData[key] = val }
     assign('name', payload.name)
+    if (payload.code !== undefined) {
+      const companyNameForCode = payload.name !== undefined ? payload.name : existingCompany.name
+      assign('code', CompanyCodeService.resolve(payload.code, companyNameForCode))
+    } else if (!existingCompany.code && payload.name !== undefined) {
+      assign('code', CompanyCodeService.resolve(existingCompany.code, payload.name))
+    }
     assign('api_key', payload.api_key)
     assign('smtp_host', payload.smtp_host)
     assign('smtp_port', payload.smtp_port)

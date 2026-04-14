@@ -32,6 +32,7 @@ class CompanyController {
       company: {
         id: company.company_id,
         name: company.name,
+        code: company.code || null,
         apiKey: company.api_key,
         allowed_templates: safeJsonArray(company.allowed_templates)
       }

@@ -2,8 +2,13 @@
 
 const Database = use('Database')
 const BaTemplateService = use('App/Services/BaTemplateService')
+const CompanyCodeService = use('App/Services/CompanyCodeService')
 
-const DEFAULT_PATTERN = '{seq:04}/{templateCode}/{romanMonth}/{year}'
+const DEFAULT_PATTERN = '{seq}/{CompanyCode}/{templateCode}/{romanMonth}/{Year}'
+const LEGACY_DEFAULT_PATTERNS = [
+  '{seq:04}/{templateCode}/{romanMonth}/{year}',
+  '{seq:04}/{templateCode}/{romanMonth}/{Year}'
+]
 const DEFAULT_TIMEZONE = 'Asia/Jakarta'
 const ROMAN_MONTH = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
 
@@ -26,6 +31,19 @@ class BaLetterNoService {
     const run = async (trxLocal) => {
       const now = new Date()
       await this._ensureSetting(trxLocal, companyId, createdBy, now)
+      const company = await trxLocal.table('companies').where('company_id', companyId).first()
+      if (!company) throw new Error('Company tidak ditemukan')
+
+      const storedCompanyCode = CompanyCodeService.normalize(company.code)
+      const companyCode = CompanyCodeService.resolve(storedCompanyCode, company.name)
+      if (!storedCompanyCode || storedCompanyCode !== companyCode) {
+        await trxLocal.table('companies')
+          .where('company_id', companyId)
+          .update({
+            code: companyCode,
+            updated_at: now
+          })
+      }
 
       const counterFilter = { company_id: companyId, template: normalizedTemplate }
       let counterRow = await trxLocal.table('company_ba_numbering_counters').where(counterFilter).forUpdate().first()
@@ -55,7 +73,18 @@ class BaLetterNoService {
       const seq = nextSeq
 
       const setting = await trxLocal.table('company_ba_numbering_settings').where('company_id', companyId).first()
-      const pattern = (setting && setting.format_pattern) || DEFAULT_PATTERN
+      let pattern = (setting && setting.format_pattern) || DEFAULT_PATTERN
+      if (isLegacyDefaultPattern(pattern)) {
+        pattern = DEFAULT_PATTERN
+        const updatePayload = {
+          format_pattern: DEFAULT_PATTERN,
+          updated_at: now
+        }
+        if (createdBy) updatePayload.updated_by = createdBy
+        await trxLocal.table('company_ba_numbering_settings')
+          .where('company_id', companyId)
+          .update(updatePayload)
+      }
       const timezone = DEFAULT_TIMEZONE
 
       const dateParts = getDateParts(timezone)
@@ -65,6 +94,7 @@ class BaLetterNoService {
         year: dateParts.year,
         month: dateParts.month,
         romanMonth: dateParts.romanMonth,
+        companyCode,
         templateCode,
         template: normalizedTemplate
       })
@@ -115,11 +145,12 @@ function renderPattern(pattern, context) {
   })
 
   return seqRendered
-    .replace(/\{templateCode\}/g, String(context.templateCode || 'BA'))
-    .replace(/\{template\}/g, String(context.template || 'ba'))
-    .replace(/\{romanMonth\}/g, String(context.romanMonth || 'I'))
-    .replace(/\{year\}/g, String(context.year || '1970'))
-    .replace(/\{month\}/g, String(context.month || '01'))
+    .replace(/\{CompanyCode\}/gi, String(context.companyCode || 'COMP'))
+    .replace(/\{templateCode\}/gi, String(context.templateCode || 'BA'))
+    .replace(/\{template\}/gi, String(context.template || 'ba'))
+    .replace(/\{romanMonth\}/gi, String(context.romanMonth || 'I'))
+    .replace(/\{year\}/gi, String(context.year || '1970'))
+    .replace(/\{month\}/gi, String(context.month || '01'))
 }
 
 function getDateParts(timezone) {
@@ -145,6 +176,11 @@ function getDateParts(timezone) {
 function isUniqueError(error) {
   const msg = String((error && error.message) || '').toLowerCase()
   return msg.includes('unique') || msg.includes('duplicate')
+}
+
+function isLegacyDefaultPattern(pattern) {
+  const normalized = String(pattern || '').trim().toLowerCase()
+  return LEGACY_DEFAULT_PATTERNS.some((item) => normalized === item.toLowerCase())
 }
 
 module.exports = BaLetterNoService
