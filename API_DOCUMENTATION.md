@@ -807,7 +807,51 @@ Contoh response 200:
 
 ---
 
-## 12) Dashboard Summary
+## 12) Preview PDF BA (Single, Non-final)
+- Endpoint generate preview:
+  - `POST /api/v1/preview/ba/:template`
+  - Headers: `Authorization: Bearer <JWT>`
+  - Role: `user`, `admin`, `superadmin`
+  - Template didukung: `ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`
+  - Body minimum:
+```json
+{
+  "data": {
+    "mdsName": "SANTI",
+    "placementDate": "2026-04-15",
+    "outlet": "GLOBAL CAFE"
+  }
+}
+```
+- Catatan:
+  - `superadmin` tanpa `company_id` pada akun wajib mengirim `company_id` atau `companyId` di body.
+  - Preview membuat `letterNo` sementara format: `PREVIEW/{CompanyCode}/{templateCode}/{romanMonth}/{Year}`.
+  - Preview **tidak** memanggil increment counter `BaLetterNoService.nextLetterNo()` untuk nomor final.
+  - Response sukses:
+```json
+{
+  "status": "ok",
+  "message": "Preview generated",
+  "data": {
+    "preview_url": "http://localhost:3334/api/v1/preview/ba/file/12",
+    "expires_at": "2026-04-16T03:22:00.000Z"
+  }
+}
+```
+- Endpoint akses file preview:
+  - `GET /api/v1/preview/ba/file/:id`
+  - Headers: `Authorization: Bearer <JWT>`
+  - Mengembalikan binary PDF (`application/pdf`) jika belum expired.
+  - Jika expired: `410 Preview sudah kedaluwarsa`.
+
+Job cleanup preview (wajib):
+- Scheduler `start/previewCleanup.js` jalan otomatis tiap 5 menit (atur lewat `PREVIEW_CLEANUP_INTERVAL_MINUTES`).
+- Menghapus file fisik preview expired dan menandai metadata `status=expired` (`deleted_at` diisi).
+- Aman dijalankan berulang (idempotent).
+
+---
+
+## 13) Dashboard Summary
 `GET /api/v1/dashboard/summary`  
 Headers: `Authorization: Bearer <JWT>`  
 Query opsional: `scope=user|all`; default `scope` adalah perusahaan (company).  

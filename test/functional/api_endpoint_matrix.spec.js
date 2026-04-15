@@ -15,6 +15,7 @@ const User = use('App/Models/User')
 const Helpers = use('Helpers')
 const ContactService = use('App/Services/ContactService')
 const SignatureUrlHistoryService = use('App/Services/SignatureUrlHistoryService')
+const BaLetterNoService = use('App/Services/BaLetterNoService')
 const SendEmailJob = use('App/Jobs/SendEmailJob')
 
 trait('Test/ApiClient')
@@ -459,6 +460,34 @@ const endpointCases = [
     }
   },
   {
+    method: 'post',
+    url: () => '/api/v1/preview/ba/ba-penempatan',
+    auth: 'jwt',
+    expected: { user: 200, admin: 200, superadmin: 200 },
+    body: ({ role }) => {
+      const payload = {
+        data: {
+          mdsName: `Preview MDS ${uniqueId(role)}`,
+          nik: '1234567890',
+          placementDate: '2026-04-15',
+          outlet: 'Outlet Preview'
+        }
+      }
+      if (role === 'superadmin') payload.company_id = seed.companyAId
+      return payload
+    },
+    assertBody: ({ response, expectedStatus }) => {
+      if (expectedStatus !== 200) return
+      if (!response.body || response.body.status !== 'ok') {
+        throw new Error('Response preview BA harus status=ok')
+      }
+      const data = response.body.data || {}
+      if (!data.preview_url || !data.expires_at) {
+        throw new Error('Response preview BA harus menyertakan preview_url dan expires_at')
+      }
+    }
+  },
+  {
     method: 'get',
     url: () => '/api/v1/email-logs?page=1&perPage=10&q=test',
     auth: 'jwt',
@@ -685,6 +714,39 @@ test('SendEmailJob tetap upsert contact saat kirim email gagal', async ({ assert
   assert.equal(emailLog.status, 'failed')
 })
 
+test('Preview BA tidak menambah counter letterNo final', async ({ client, assert }) => {
+  const token = await loginAndGetToken(client, seed.credentials.user)
+
+  const firstFinal = await BaLetterNoService.nextLetterNo({
+    companyId: seed.companyAId,
+    template: 'ba-penempatan',
+    createdBy: seed.userMainId
+  })
+
+  const previewResponse = await client
+    .post('/api/v1/preview/ba/ba-penempatan')
+    .header('Authorization', `Bearer ${token}`)
+    .send({
+      data: {
+        mdsName: 'Preview Counter',
+        nik: '3216549870',
+        placementDate: '2026-04-15',
+        outlet: 'Outlet Counter'
+      }
+    })
+    .end()
+
+  previewResponse.assertStatus(200)
+
+  const secondFinal = await BaLetterNoService.nextLetterNo({
+    companyId: seed.companyAId,
+    template: 'ba-penempatan',
+    createdBy: seed.userMainId
+  })
+
+  assert.equal(Number(secondFinal.seq), Number(firstFinal.seq) + 1)
+})
+
 async function loginAndGetToken(client, credentials) {
   const response = await client
     .post('/api/v1/login')
@@ -719,7 +781,20 @@ function uniqueSlug(prefix) {
 async function resetSchema() {
   await Database.raw('PRAGMA foreign_keys = OFF')
 
-  const tables = ['contacts', 'company_signature_urls', 'dynamic_templates', 'email_logs', 'generated_pdfs', 'jobs', 'tokens', 'users', 'companies']
+  const tables = [
+    'contacts',
+    'ba_preview_files',
+    'company_signature_urls',
+    'company_ba_numbering_counters',
+    'company_ba_numbering_settings',
+    'dynamic_templates',
+    'email_logs',
+    'generated_pdfs',
+    'jobs',
+    'tokens',
+    'users',
+    'companies'
+  ]
   for (const table of tables) {
     const exists = await Database.schema.hasTable(table)
     if (exists) await Database.schema.dropTable(table)
@@ -819,6 +894,45 @@ async function resetSchema() {
     table.index(['company_id'])
     table.index(['last_used_at'])
     table.index(['company_id', 'last_used_at'])
+  })
+
+  await Database.schema.createTable('company_ba_numbering_settings', (table) => {
+    table.increments()
+    table.integer('company_id').unsigned().notNullable().references('company_id').inTable('companies').onDelete('CASCADE')
+    table.string('format_pattern', 255).notNullable().defaultTo('{seq}/{CompanyCode}/{templateCode}/{romanMonth}/{Year}')
+    table.string('timezone', 64).notNullable().defaultTo('Asia/Jakarta')
+    table.integer('created_by').unsigned().nullable().references('id').inTable('users').onDelete('SET NULL')
+    table.integer('updated_by').unsigned().nullable().references('id').inTable('users').onDelete('SET NULL')
+    table.timestamps()
+    table.unique(['company_id'])
+  })
+
+  await Database.schema.createTable('company_ba_numbering_counters', (table) => {
+    table.increments()
+    table.integer('company_id').unsigned().notNullable().references('company_id').inTable('companies').onDelete('CASCADE')
+    table.string('template', 100).notNullable()
+    table.integer('last_seq').notNullable().defaultTo(0)
+    table.timestamps()
+    table.unique(['company_id', 'template'])
+    table.index(['company_id'])
+    table.index(['template'])
+  })
+
+  await Database.schema.createTable('ba_preview_files', (table) => {
+    table.increments()
+    table.integer('company_id').unsigned().notNullable().references('company_id').inTable('companies').onDelete('CASCADE')
+    table.integer('user_id').unsigned().nullable().references('id').inTable('users').onDelete('SET NULL')
+    table.string('template', 100).notNullable()
+    table.string('filename', 191).notNullable()
+    table.string('saved_path', 500).notNullable()
+    table.string('preview_url', 500).nullable()
+    table.datetime('expires_at').notNullable()
+    table.string('status', 32).notNullable().defaultTo('active')
+    table.datetime('deleted_at').nullable()
+    table.timestamps()
+    table.index(['company_id'])
+    table.index(['expires_at'])
+    table.index(['status'])
   })
 
   await Database.schema.createTable('contacts', (table) => {
