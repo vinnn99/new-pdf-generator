@@ -68,6 +68,9 @@ Route.group(() => {
   Route.post('/send/ba-hold-activate', 'SingleEmailController.sendBaHoldActivate').middleware(['auth:jwt'])
   Route.post('/send/ba-takeout', 'SingleEmailController.sendBaTakeout').middleware(['auth:jwt'])
   Route.post('/send/ba-terminated', 'SingleEmailController.sendBaTerminated').middleware(['auth:jwt'])
+  Route.post('/preview/:template', 'BaPreviewController.generate').middleware(['auth:jwt'])
+  Route.get('/preview/file/:id', 'BaPreviewController.download').middleware(['auth:jwt'])
+  // Backward compatibility untuk endpoint preview BA lama.
   Route.post('/preview/ba/:template', 'BaPreviewController.generate').middleware(['auth:jwt'])
   Route.get('/preview/ba/file/:id', 'BaPreviewController.download').middleware(['auth:jwt'])
   Route.get('/company/api-key', 'CompanyController.apiKey').middleware(['auth:jwt'])

@@ -13,7 +13,6 @@ const CompanyCodeService = use('App/Services/CompanyCodeService')
 
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000
 const ROMAN_MONTH = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
-const BA_TEMPLATE_SET = new Set(BaTemplateService.getSupportedTemplates())
 
 const fontsDir = path.join(__dirname, '../Fonts')
 const printer = new PdfPrinter({
@@ -31,8 +30,8 @@ class BaPreviewService {
   }
 
   static supportsTemplate (template) {
-    const normalized = BaTemplateService.normalizeTemplate(template)
-    return BA_TEMPLATE_SET.has(normalized)
+    const normalized = normalizeTemplateKey(template)
+    return !!normalized
   }
 
   static buildPreviewLetterNo ({ companyCode, template, now = new Date() } = {}) {
@@ -46,11 +45,11 @@ class BaPreviewService {
   }
 
   static async generate ({ template, data, company, user, actorEmail = '' } = {}) {
-    const normalizedTemplate = BaTemplateService.normalizeTemplate(template)
+    const normalizedTemplate = normalizeTemplateKey(template)
     if (!this.supportsTemplate(normalizedTemplate)) {
-      const err = new Error(`Template '${template}' tidak didukung untuk preview BA`)
+      const err = new Error('Template preview tidak valid')
       err.code = 'VALIDATION_FAILED'
-      err.details = [`Template '${template}' bukan template BA single yang didukung`]
+      err.details = ['Field template wajib diisi']
       throw err
     }
 
@@ -63,10 +62,12 @@ class BaPreviewService {
 
     const payloadData = data && typeof data === 'object' ? { ...data } : {}
     payloadData.companyName = payloadData.companyName || company.name
-    payloadData.letterNo = this.buildPreviewLetterNo({
-      companyCode: company.code || company.name,
-      template: normalizedTemplate
-    })
+    if (BaTemplateService.isBaTemplate(normalizedTemplate)) {
+      payloadData.letterNo = this.buildPreviewLetterNo({
+        companyCode: company.code || company.name,
+        template: normalizedTemplate
+      })
+    }
 
     const resolvedTemplate = await TemplateResolver.resolve(normalizedTemplate, {
       companyId: company.company_id
@@ -120,7 +121,7 @@ class BaPreviewService {
       updated_at: now
     })
     const previewId = Array.isArray(inserted) ? inserted[0] : inserted
-    const previewUrl = `${resolveBaseUrl()}/api/v1/preview/ba/file/${previewId}`
+    const previewUrl = `${resolveBaseUrl()}/api/v1/preview/file/${previewId}`
 
     await Database.table('ba_preview_files')
       .where('id', previewId)
@@ -239,14 +240,30 @@ function buildPreviewFilename (template, payloadData) {
     return cleaned || fallback
   }
 
-  const templateLabel = safe(template, 'ba')
-  const mdsName = safe(payloadData && payloadData.mdsName, 'MDS')
-  const letterNo = safe(
-    payloadData && payloadData.letterNo ? String(payloadData.letterNo).replace(/\//g, '-') : '',
-    'PREVIEW'
+  const templateLabel = safe(template, 'template')
+  const subject = safe(
+    payloadData && (
+      payloadData.mdsName ||
+      payloadData.employeeName ||
+      payloadData.clientName ||
+      payloadData.nama
+    ),
+    'preview'
+  )
+  const marker = safe(
+    payloadData && (
+      payloadData.letterNo
+        ? String(payloadData.letterNo).replace(/\//g, '-')
+        : payloadData.period || payloadData.periode || payloadData.position
+    ),
+    'sample'
   )
 
-  return `preview.${templateLabel}.${mdsName}.${letterNo}.${uniqueId}.pdf`
+  return `preview.${templateLabel}.${subject}.${marker}.${uniqueId}.pdf`
+}
+
+function normalizeTemplateKey (template) {
+  return String(template || '').trim().toLowerCase()
 }
 
 function sanitizeSegment (value) {

@@ -807,13 +807,16 @@ Contoh response 200:
 
 ---
 
-## 12) Preview PDF BA (Single, Non-final)
-- Endpoint generate preview:
+## 12) Preview PDF (Single, Non-final)
+- Endpoint generate preview (utama):
+  - `POST /api/v1/preview/:template`
+- Endpoint kompatibilitas lama (BA):
   - `POST /api/v1/preview/ba/:template`
   - Headers: `Authorization: Bearer <JWT>`
   - Role: `user`, `admin`, `superadmin`
-  - Template didukung: `ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`
-  - Body minimum:
+  - Template didukung: semua template single yang tersedia (`payslip`, `insentif`, `thr`, semua `ba-*`, dan template dinamis aktif).
+  - Body minimum mengikuti required fields template target.
+  - Contoh body untuk `ba-penempatan`:
 ```json
 {
   "data": {
@@ -825,21 +828,22 @@ Contoh response 200:
 ```
 - Catatan:
   - `superadmin` tanpa `company_id` pada akun wajib mengirim `company_id` atau `companyId` di body.
-  - Preview membuat `letterNo` sementara format: `PREVIEW/{CompanyCode}/{templateCode}/{romanMonth}/{Year}`.
-  - Preview **tidak** memanggil increment counter `BaLetterNoService.nextLetterNo()` untuk nomor final.
+  - Khusus template BA (`ba-*`), preview membuat `letterNo` sementara format: `PREVIEW/{CompanyCode}/{templateCode}/{romanMonth}/{Year}`.
+  - Preview BA **tidak** memanggil increment counter `BaLetterNoService.nextLetterNo()` untuk nomor final.
   - Response sukses:
 ```json
 {
   "status": "ok",
   "message": "Preview generated",
   "data": {
-    "preview_url": "http://localhost:3334/api/v1/preview/ba/file/12",
+    "preview_url": "http://localhost:3334/api/v1/preview/file/12",
     "expires_at": "2026-04-16T03:22:00.000Z"
   }
 }
 ```
 - Endpoint akses file preview:
-  - `GET /api/v1/preview/ba/file/:id`
+  - `GET /api/v1/preview/file/:id`
+  - Alias kompatibilitas lama: `GET /api/v1/preview/ba/file/:id`
   - Headers: `Authorization: Bearer <JWT>`
   - Mengembalikan binary PDF (`application/pdf`) jika belum expired.
   - Jika expired: `410 Preview sudah kedaluwarsa`.

@@ -488,6 +488,33 @@ const endpointCases = [
     }
   },
   {
+    method: 'post',
+    url: () => '/api/v1/preview/payslip',
+    auth: 'jwt',
+    expected: { user: 200, admin: 200, superadmin: 200 },
+    body: ({ role }) => {
+      const payload = {
+        data: {
+          employeeName: `Preview Employee ${uniqueId(role)}`,
+          position: 'Staff',
+          period: '2026-04'
+        }
+      }
+      if (role === 'superadmin') payload.company_id = seed.companyAId
+      return payload
+    },
+    assertBody: ({ response, expectedStatus }) => {
+      if (expectedStatus !== 200) return
+      const data = response.body && response.body.data ? response.body.data : {}
+      if (!data.preview_url || !data.expires_at) {
+        throw new Error('Response preview payslip harus menyertakan preview_url dan expires_at')
+      }
+      if (!String(data.preview_url).includes('/api/v1/preview/file/')) {
+        throw new Error('preview_url endpoint generic harus mengarah ke /api/v1/preview/file/:id')
+      }
+    }
+  },
+  {
     method: 'get',
     url: () => '/api/v1/email-logs?page=1&perPage=10&q=test',
     auth: 'jwt',

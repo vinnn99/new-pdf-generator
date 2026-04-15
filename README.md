@@ -325,21 +325,23 @@ Endpoint list:
   - `user/admin`: otomatis hanya company sendiri
   - `superadmin`: bisa lintas company (opsional filter `company_id`)
 
-### Preview BA (JWT, tanpa mengubah nomor final)
+### Preview PDF (JWT, tanpa mengubah nomor final BA)
 
-- `POST /api/v1/preview/ba/:template`
+- Endpoint utama: `POST /api/v1/preview/:template`
+- Endpoint kompatibilitas lama BA: `POST /api/v1/preview/ba/:template`
   - Role: `user`, `admin`, `superadmin`
-  - Template didukung: `ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`
-  - Body minimum mengikuti field wajib tiap template (contoh `ba-penempatan`: `mdsName`, `placementDate`, `outlet`)
+  - Template didukung: semua template single yang tersedia (termasuk `payslip`, `insentif`, `thr`, semua `ba-*`, dan template dinamis aktif)
+  - Body minimum mengikuti field wajib tiap template (contoh `ba-penempatan`: `mdsName`, `placementDate`, `outlet`; contoh `payslip`: `employeeName`, `position`, `period`)
   - Khusus `superadmin` tanpa `company_id` di akun, kirim `company_id` atau `companyId` di body
 - Response sukses:
   - `status: "ok"`
   - `message: "Preview generated"`
   - `data.preview_url`
   - `data.expires_at` (TTL 24 jam)
-- Nomor surat preview menggunakan format sementara `PREVIEW/{CompanyCode}/{templateCode}/{romanMonth}/{Year}` dan **tidak** mengubah counter `LetterNo` final.
+- Untuk template BA (`ba-*`), nomor surat preview menggunakan format sementara `PREVIEW/{CompanyCode}/{templateCode}/{romanMonth}/{Year}` dan **tidak** mengubah counter `LetterNo` final.
 - Akses file preview:
-  - `GET /api/v1/preview/ba/file/:id` (JWT)
+  - `GET /api/v1/preview/file/:id` (JWT)
+  - Alias kompatibilitas lama: `GET /api/v1/preview/ba/file/:id`
   - PDF yang expired mengembalikan `410`.
 - Cleanup otomatis:
   - Scheduler `start/previewCleanup.js` berjalan default tiap 5 menit (config `PREVIEW_CLEANUP_INTERVAL_MINUTES`).

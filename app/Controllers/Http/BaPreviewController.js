@@ -2,7 +2,6 @@
 
 const fs = require('fs')
 const Database = use('Database')
-const BaTemplateService = use('App/Services/BaTemplateService')
 const BaPreviewService = use('App/Services/BaPreviewService')
 
 class BaPreviewController {
@@ -14,15 +13,13 @@ class BaPreviewController {
       if (!isAllowedRole(role)) {
         return response.status(403).json({
           status: 'forbidden',
-          message: 'Role tidak diizinkan mengakses preview BA'
+          message: 'Role tidak diizinkan mengakses preview PDF'
         })
       }
 
-      const template = BaTemplateService.normalizeTemplate(params.template)
+      const template = normalizeTemplateKey(params.template)
       if (!BaPreviewService.supportsTemplate(template)) {
-        return validationFailed(response, [
-          `Template '${params.template}' bukan template BA single yang didukung`
-        ])
+        return validationFailed(response, ['Field template wajib diisi'])
       }
 
       const body = request.all()
@@ -39,7 +36,7 @@ class BaPreviewController {
         if (role !== 'superadmin') {
           return response.status(403).json({
             status: 'forbidden',
-            message: 'User/Admin harus memiliki company_id untuk preview BA'
+            message: 'User/Admin harus memiliki company_id untuk preview PDF'
           })
         }
         return validationFailed(response, ['company_id wajib diisi untuk superadmin'])
@@ -79,10 +76,10 @@ class BaPreviewController {
         return validationFailed(response, error.details || [error.message])
       }
 
-      console.error('[ba.preview.generate] error:', error.message)
+      console.error('[preview.generate] error:', error.message)
       return response.status(500).json({
         status: 'error',
-        message: 'Gagal membuat preview BA',
+        message: 'Gagal membuat preview PDF',
         error: error.message
       })
     }
@@ -96,7 +93,7 @@ class BaPreviewController {
       if (!isAllowedRole(role)) {
         return response.status(403).json({
           status: 'forbidden',
-          message: 'Role tidak diizinkan mengakses preview BA'
+          message: 'Role tidak diizinkan mengakses preview PDF'
         })
       }
 
@@ -149,10 +146,10 @@ class BaPreviewController {
 
       return response.send(fileBuffer)
     } catch (error) {
-      console.error('[ba.preview.download] error:', error.message)
+      console.error('[preview.download] error:', error.message)
       return response.status(500).json({
         status: 'error',
-        message: 'Gagal mengunduh preview BA',
+        message: 'Gagal mengunduh preview PDF',
         error: error.message
       })
     }
@@ -192,6 +189,10 @@ function parseAllowedTemplates (rawValue) {
   } catch (_) {
     return []
   }
+}
+
+function normalizeTemplateKey (template) {
+  return String(template || '').trim().toLowerCase()
 }
 
 function validationFailed (response, errors) {
