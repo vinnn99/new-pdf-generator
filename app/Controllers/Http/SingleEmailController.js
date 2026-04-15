@@ -5,6 +5,7 @@ const Database = use('Database')
 const GeneratePdfJob = use('App/Jobs/GeneratePdfJob')
 const BaTemplateService = use('App/Services/BaTemplateService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
+const SignatureUrlHistoryService = use('App/Services/SignatureUrlHistoryService')
 const Env = use('Env')
 
 class SingleEmailController {
@@ -97,6 +98,16 @@ class SingleEmailController {
 
       // Sisipkan companyName bila belum ada
       if (!data.companyName) data.companyName = company.name
+
+      try {
+        await SignatureUrlHistoryService.recordFromPayload({
+          companyId: company.company_id,
+          createdBy: user.id,
+          payloadData: data
+        })
+      } catch (historyErr) {
+        console.warn('[SingleEmail] gagal simpan histori signature URL:', historyErr.message)
+      }
 
       // Generate PDF secara sinkron
       const generator = new GeneratePdfJob()

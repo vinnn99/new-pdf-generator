@@ -84,6 +84,7 @@ Route.group(() => {
   Route.post('/bulk/ba-hold-activate', 'BulkPdfController.baHoldActivateFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/ba-takeout', 'BulkPdfController.baTakeoutFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/ba-terminated', 'BulkPdfController.baTerminatedFromExcel').middleware(['auth:jwt'])
+  Route.get('/signature-urls', 'SignatureUrlController.index').middleware(['auth:jwt'])
   Route.get('/email-logs', 'EmailLogController.index').middleware(['auth:jwt'])
   // Dashboard summary
   Route.get('/dashboard/summary', 'DashboardController.summary').middleware(['auth:jwt'])

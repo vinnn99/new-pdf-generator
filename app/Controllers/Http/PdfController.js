@@ -4,6 +4,7 @@ const JobService = require('../../Services/JobService')
 const TemplateResolver = require('../../Services/TemplateResolver')
 const BaTemplateService = use('App/Services/BaTemplateService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
+const SignatureUrlHistoryService = use('App/Services/SignatureUrlHistoryService')
 const path = require('path')
 const fs = require('fs')
 
@@ -101,6 +102,18 @@ class PdfController {
       // Sisipkan user/company id untuk pencatatan hasil
       payload.userId = user ? user.id : null
       payload.companyId = company ? company.company_id : null
+
+      if (BaTemplateService.isBaTemplate(normalizedTemplate) && payload.data && typeof payload.data === 'object') {
+        try {
+          await SignatureUrlHistoryService.recordFromPayload({
+            companyId: payload.companyId,
+            createdBy: payload.userId,
+            payloadData: payload.data
+          })
+        } catch (err) {
+          console.warn('[SignatureHistory] gagal simpan histori signature URL:', err.message)
+        }
+      }
 
       // Push job to queue
       await JobService.dispatch('App/Jobs/GeneratePdfJob', payload, {

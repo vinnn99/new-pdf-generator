@@ -303,6 +303,28 @@ Catatan:
 - Unik per user berdasarkan `(user_id, email)`.
 - Pengiriman email (bulk/single), termasuk gagal kirim, otomatis upsert ke tabel `contacts` untuk semua penerima `to/cc/bcc` dan menaikkan `send_count`.
 
+### Histori Signature URL BA (JWT)
+
+Histori URL tanda tangan BA disimpan otomatis saat:
+- `POST /api/v1/generate-pdf` (single BA)
+- `POST /api/v1/send/ba-*` (single send BA)
+
+Aturan:
+- Hanya URL `http/https` yang dicatat.
+- Nama/jabatan signer disimpan dari `signerLeftName`/`signerLeftTitle` dan `signerRightName`/`signerRightTitle`.
+- URL disimpan unik per company berdasarkan `(company_id, url_normalized)`.
+- URL yang dipakai ulang akan menambah `use_count` dan memperbarui `last_used_at`.
+
+Endpoint list:
+- `GET /api/v1/signature-urls?page=1&perPage=10&q=signature&sort=last_used_at`
+- Query:
+  - `q` (search URL)
+  - `sort=last_used_at|created_at`
+  - `company_id` (hanya superadmin)
+- Role scope:
+  - `user/admin`: otomatis hanya company sendiri
+  - `superadmin`: bisa lintas company (opsional filter `company_id`)
+
 ### List Company (Admin/Superadmin)
 
 ```

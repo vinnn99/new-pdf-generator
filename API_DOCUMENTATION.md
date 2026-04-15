@@ -760,7 +760,54 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
 
 ---
 
-## 11) Dashboard Summary
+## 11) Histori Signature URL (Single BA)
+- Histori URL tanda tangan BA disimpan otomatis saat:
+  - `POST /api/v1/generate-pdf` untuk template BA single.
+  - `POST /api/v1/send/ba-*` (single generate + send email BA).
+- URL valid yang dicatat hanya `http/https`.
+- Nama/jabatan signer diambil dari payload:
+  - kiri: `signerLeftName`, `signerLeftTitle`
+  - kanan: `signerRightName`, `signerRightTitle`
+- URL diupsert per company berdasarkan `(company_id, url_normalized)`; penggunaan ulang menambah `use_count` dan update `last_used_at`.
+- Akses daftar histori:
+  - `GET /api/v1/signature-urls`
+  - Headers: `Authorization: Bearer <JWT>`
+  - Query opsional:
+    - `page`, `perPage` (default 10, max 100)
+    - `q` (search URL)
+    - `sort=last_used_at|created_at` (default `last_used_at`)
+    - `company_id` (khusus superadmin)
+  - Scope role:
+    - `user/admin`: otomatis hanya company sendiri
+    - `superadmin`: bisa semua company, atau filter `company_id`
+
+Contoh response 200:
+```json
+{
+  "status": "ok",
+  "total": 2,
+  "perPage": 10,
+  "page": 1,
+  "lastPage": 1,
+  "data": [
+    {
+      "id": 1,
+      "company_id": 1,
+      "company_name": "Contoh Corp",
+      "url": "https://example.com/signature-left.png",
+      "name": "Adi Anto",
+      "title": "Team Leader TEMA Agency",
+      "use_count": 3,
+      "last_used_at": "2026-04-15T03:22:00.000Z",
+      "created_at": "2026-04-10T07:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+## 12) Dashboard Summary
 `GET /api/v1/dashboard/summary`  
 Headers: `Authorization: Bearer <JWT>`  
 Query opsional: `scope=user|all`; default `scope` adalah perusahaan (company).  
@@ -885,7 +932,7 @@ Field update: `email`, `name`, `phone`, `notes`.
 
 ---
 
-## 12) Template Ringkas (payload)
+## 13) Template Ringkas (payload)
 - **musik**: surat perjanjian lisensi musik (lihat contoh di README).
 - **invoice**: invoice dengan tabel item, PPN default 11%.
 - **payslip**: slip gaji; earnings/deductions array atau kolom terpisah di Excel.
@@ -901,7 +948,7 @@ Field update: `email`, `name`, `phone`, `notes`.
 
 ---
 
-## 13) Status & Error
+## 14) Status & Error
 - 202 queued (generate-pdf).
 - 422 validation_failed (field wajib kosong).
 - 401 unauthorized (JWT tidak ada / API key salah / email tidak terdaftar).
@@ -909,7 +956,7 @@ Field update: `email`, `name`, `phone`, `notes`.
 
 ---
 
-## 14) Catatan untuk Frontend (React)
+## 15) Catatan untuk Frontend (React)
 - Endpoint single generate memakai `x-api-key`; bulk & list memakai Bearer JWT.
 - Untuk upload Excel gunakan `FormData` dengan field `file`.
 - Saat dryRun, backend tidak enqueue job tapi mengembalikan payload per baris; gunakan ini untuk preview di UI.
