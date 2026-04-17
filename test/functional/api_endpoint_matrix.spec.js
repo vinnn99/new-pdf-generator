@@ -49,6 +49,14 @@ const seed = {
   contactManagedId: null,
   contactOutsiderId: null,
   contactUpdateId: null,
+  signatureOwnId: null,
+  signatureUpdateId: null,
+  signatureOutsiderId: null,
+  signatureDeleteByRole: {
+    user: null,
+    admin: null,
+    superadmin: null
+  },
   contactDeleteByRole: {
     user: null,
     admin: null,
@@ -458,6 +466,140 @@ const endpointCases = [
         throw new Error('Filter company_id pada signature-urls harus membatasi data ke company target')
       }
     }
+  },
+  {
+    method: 'get',
+    url: () => `/api/v1/signature-urls/${seed.signatureOwnId}`,
+    label: '/api/v1/signature-urls/:id own',
+    auth: 'jwt',
+    expected: { user: 200, admin: 200, superadmin: 200 },
+    assertBody: ({ response, role, expectedStatus }) => {
+      if (expectedStatus !== 200) return
+      const data = response.body && response.body.data
+      if (!data || !data.id) throw new Error('Response signature-urls/:id harus menyertakan data')
+      if ((role === 'user' || role === 'admin') && Number(data.company_id) !== Number(seed.companyAId)) {
+        throw new Error('Role user/admin tidak boleh melihat signature URL di luar company sendiri')
+      }
+    }
+  },
+  {
+    method: 'get',
+    url: () => `/api/v1/signature-urls/${seed.signatureOutsiderId}`,
+    label: '/api/v1/signature-urls/:id outsider',
+    auth: 'jwt',
+    expected: { user: 404, admin: 404, superadmin: 200 }
+  },
+  {
+    method: 'post',
+    url: () => '/api/v1/signature-urls',
+    label: '/api/v1/signature-urls create',
+    auth: 'jwt',
+    body: ({ role }) => {
+      const id = uniqueId(`signature_create_${role}`)
+      const payload = {
+        url: `https://files.example.com/${id}.png`,
+        name: `Signature ${id}`,
+        title: `Signer ${id}`
+      }
+      if (role === 'superadmin') payload.company_id = seed.companyBId
+      return payload
+    },
+    expected: { user: 201, admin: 201, superadmin: 201 },
+    assertBody: ({ response, role, expectedStatus }) => {
+      if (expectedStatus !== 201) return
+      const data = response.body && response.body.data
+      if (!data || !data.id) throw new Error('Response create signature URL tidak memiliki data.id')
+      if ((role === 'user' || role === 'admin') && Number(data.company_id) !== Number(seed.companyAId)) {
+        throw new Error('Create signature URL role user/admin harus tersimpan di company actor')
+      }
+      if (role === 'superadmin' && Number(data.company_id) !== Number(seed.companyBId)) {
+        throw new Error('Create signature URL role superadmin harus mengikuti company_id payload')
+      }
+    }
+  },
+  {
+    method: 'post',
+    url: () => '/api/v1/signature-urls',
+    label: '/api/v1/signature-urls create company_id scope',
+    auth: 'jwt',
+    body: ({ role }) => ({
+      company_id: seed.companyBId,
+      url: `https://files.example.com/${uniqueId(`signature_scope_${role}`)}.png`,
+      name: 'Scope check'
+    }),
+    expected: { user: 403, admin: 403, superadmin: 201 }
+  },
+  {
+    method: 'post',
+    url: () => '/api/v1/signature-urls',
+    label: '/api/v1/signature-urls create invalid url',
+    auth: 'jwt',
+    body: ({ role }) => {
+      const payload = {
+        url: 'ftp://invalid-signature-url.png',
+        name: 'Invalid URL'
+      }
+      if (role === 'superadmin') payload.company_id = seed.companyAId
+      return payload
+    },
+    expected: { user: 400, admin: 400, superadmin: 400 }
+  },
+  {
+    method: 'put',
+    url: () => `/api/v1/signature-urls/${seed.signatureUpdateId}`,
+    label: '/api/v1/signature-urls/:id update own-company',
+    auth: 'jwt',
+    body: ({ role }) => {
+      const id = uniqueId(`signature_update_${role}`)
+      return {
+        url: `https://files.example.com/${id}.png`,
+        name: `Updated ${id}`,
+        title: `Updated Title ${id}`
+      }
+    },
+    expected: { user: 200, admin: 200, superadmin: 200 }
+  },
+  {
+    method: 'put',
+    url: () => `/api/v1/signature-urls/${seed.signatureOutsiderId}`,
+    label: '/api/v1/signature-urls/:id update outsider',
+    auth: 'jwt',
+    body: () => ({ name: `Outsider ${uniqueId('signature_outsider')}` }),
+    expected: { user: 404, admin: 404, superadmin: 200 }
+  },
+  {
+    method: 'put',
+    url: () => `/api/v1/signature-urls/${seed.signatureUpdateId}`,
+    label: '/api/v1/signature-urls/:id update company_id scope',
+    auth: 'jwt',
+    body: ({ role }) => ({
+      company_id: seed.companyAId,
+      title: `Scope ${uniqueId(`signature_company_scope_${role}`)}`
+    }),
+    expected: { user: 403, admin: 403, superadmin: 200 }
+  },
+  {
+    method: 'put',
+    url: () => `/api/v1/signature-urls/${seed.signatureUpdateId}`,
+    label: '/api/v1/signature-urls/:id update invalid url',
+    auth: 'jwt',
+    body: () => ({ url: 'mailto:not-valid' }),
+    expected: { user: 400, admin: 400, superadmin: 400 }
+  },
+  {
+    method: 'put',
+    url: () => `/api/v1/signature-urls/${seed.signatureUpdateId}`,
+    label: '/api/v1/signature-urls/:id update duplicate url',
+    auth: 'jwt',
+    body: () => ({ url: 'https://files.example.com/signature-company-a.png' }),
+    expected: { user: 409, admin: 409, superadmin: 409 }
+  },
+  {
+    method: 'delete',
+    url: ({ role }) => `/api/v1/signature-urls/${seed.signatureDeleteByRole[role]}`,
+    label: '/api/v1/signature-urls/:id delete',
+    auth: 'jwt',
+    expected: { user: 200, admin: 200, superadmin: 200 }
   },
   {
     method: 'post',
@@ -1315,8 +1457,64 @@ async function seedData() {
       created_by: seed.outsiderUserId,
       created_at: now,
       updated_at: now
+    },
+    {
+      company_id: seed.companyAId,
+      url: 'https://files.example.com/signature-delete-user.png',
+      url_normalized: 'https://files.example.com/signature-delete-user.png',
+      name: 'Delete User Signature',
+      title: 'Signer User',
+      last_used_at: now,
+      use_count: 1,
+      created_by: seed.userMainId,
+      created_at: now,
+      updated_at: now
+    },
+    {
+      company_id: seed.companyAId,
+      url: 'https://files.example.com/signature-delete-admin.png',
+      url_normalized: 'https://files.example.com/signature-delete-admin.png',
+      name: 'Delete Admin Signature',
+      title: 'Signer Admin',
+      last_used_at: now,
+      use_count: 1,
+      created_by: seed.adminMainId,
+      created_at: now,
+      updated_at: now
+    },
+    {
+      company_id: seed.companyBId,
+      url: 'https://files.example.com/signature-delete-super.png',
+      url_normalized: 'https://files.example.com/signature-delete-super.png',
+      name: 'Delete Super Signature',
+      title: 'Signer Super',
+      last_used_at: now,
+      use_count: 1,
+      created_by: seed.superMainId,
+      created_at: now,
+      updated_at: now
     }
   ])
+
+  const seededSignatureRows = await Database.table('company_signature_urls')
+    .select('id', 'url')
+    .whereIn('url', [
+      'https://files.example.com/signature-company-a.png',
+      'https://files.example.com/signature-company-a-2.png',
+      'https://files.example.com/signature-company-b.png',
+      'https://files.example.com/signature-delete-user.png',
+      'https://files.example.com/signature-delete-admin.png',
+      'https://files.example.com/signature-delete-super.png'
+    ])
+
+  for (const row of seededSignatureRows) {
+    if (row.url === 'https://files.example.com/signature-company-a.png') seed.signatureOwnId = row.id
+    if (row.url === 'https://files.example.com/signature-company-a-2.png') seed.signatureUpdateId = row.id
+    if (row.url === 'https://files.example.com/signature-company-b.png') seed.signatureOutsiderId = row.id
+    if (row.url === 'https://files.example.com/signature-delete-user.png') seed.signatureDeleteByRole.user = row.id
+    if (row.url === 'https://files.example.com/signature-delete-admin.png') seed.signatureDeleteByRole.admin = row.id
+    if (row.url === 'https://files.example.com/signature-delete-super.png') seed.signatureDeleteByRole.superadmin = row.id
+  }
 
   const dt = await Database.table('dynamic_templates').insert({
     template_key: 'dyn-company-a',

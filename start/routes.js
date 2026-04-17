@@ -90,6 +90,10 @@ Route.group(() => {
   Route.post('/bulk/ba-takeout', 'BulkPdfController.baTakeoutFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/ba-terminated', 'BulkPdfController.baTerminatedFromExcel').middleware(['auth:jwt'])
   Route.get('/signature-urls', 'SignatureUrlController.index').middleware(['auth:jwt'])
+  Route.get('/signature-urls/:id', 'SignatureUrlController.show').middleware(['auth:jwt'])
+  Route.post('/signature-urls', 'SignatureUrlController.store').middleware(['auth:jwt'])
+  Route.put('/signature-urls/:id', 'SignatureUrlController.update').middleware(['auth:jwt'])
+  Route.delete('/signature-urls/:id', 'SignatureUrlController.destroy').middleware(['auth:jwt'])
   Route.get('/email-logs', 'EmailLogController.index').middleware(['auth:jwt'])
   // Dashboard summary
   Route.get('/dashboard/summary', 'DashboardController.summary').middleware(['auth:jwt'])

@@ -781,6 +781,25 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
     - `user/admin`: otomatis hanya company sendiri
     - `superadmin`: bisa semua company, atau filter `company_id`
 
+- CRUD histori:
+  - `GET /api/v1/signature-urls/:id`
+  - `POST /api/v1/signature-urls`
+    - Body: `url` (wajib), opsional `name`, `title`
+    - `company_id` hanya boleh dikirim oleh `superadmin`
+  - `PUT /api/v1/signature-urls/:id`
+    - Body updatable: `url`, `name`, `title`
+    - `company_id` hanya boleh dikirim oleh `superadmin`
+  - `DELETE /api/v1/signature-urls/:id`
+
+- Aturan akses CRUD:
+  - `user/admin` hanya bisa akses data company sendiri.
+  - Untuk `show/update/delete`, data di luar scope role mengembalikan `404`.
+
+- Validasi CRUD:
+  - `url` wajib valid `http/https`.
+  - Duplikasi URL per company berdasarkan `(company_id, url_normalized)` mengembalikan `409`.
+  - Field sistem tidak boleh diisi manual: `url_normalized`, `use_count`, `last_used_at`, `created_by`, `created_at`, `updated_at`.
+
 Contoh response 200:
 ```json
 {

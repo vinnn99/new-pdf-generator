@@ -1,94 +1,87 @@
-# Issue Plan: Histori Signature URL untuk Single Generate BA
+# Issue Plan: CRUD `company_signature_urls`
 
-## Ringkasan Masalah
-Saat ini pada alur single BA (generate PDF single dan single send email), payload bisa membawa `signatureLeftUrl` dan `signatureRightUrl`. Namun belum ada histori URL tanda tangan yang bisa dipakai ulang oleh FrontEnd, sehingga user harus upload/input ulang URL.
+## Ringkasan
+Saat ini endpoint `signature-urls` baru menyediakan list (`GET /api/v1/signature-urls`).  
+Kebutuhan berikutnya adalah CRUD lengkap untuk tabel `company_signature_urls` dengan aturan role yang sama seperti sekarang.
 
 ## Tujuan
-- Menyimpan histori `signatureLeftUrl` dan `signatureRightUrl` yang pernah dipakai di alur single.
-- FrontEnd bisa mengambil ulang daftar URL tanpa upload/input baru.
-- Histori terikat ke company sehingga user/admin hanya melihat data company-nya.
-- URL di tabel harus unik (tidak duplikat).
+- Menyediakan endpoint create, read detail, update, dan delete untuk `company_signature_urls`.
+- Menjaga aturan akses role tetap berlaku.
+- Menjaga validasi URL dan normalisasi agar constraint unik tetap aman.
 
 ## Scope Implementasi
-1. Simpan histori Signature URL saat:
-- `POST /api/v1/generate-pdf` (single BA)
-- endpoint single send email BA (`/api/v1/send/ba-*`)
+1. Tambah endpoint baru:
+- `GET /api/v1/signature-urls/:id`
+- `POST /api/v1/signature-urls`
+- `PUT /api/v1/signature-urls/:id`
+- `DELETE /api/v1/signature-urls/:id`
 
-2. Buat tabel baru khusus histori Signature URL.
-3. Tambah endpoint untuk menampilkan daftar Signature URL per company.
-4. Terapkan validasi URL dan normalisasi agar constraint unik konsisten.
+2. Endpoint list existing tetap dipakai:
+- `GET /api/v1/signature-urls`
 
-## Keputusan Desain Data
-Gunakan tabel baru: `company_signature_urls`.
+3. Extend `SignatureUrlController`:
+- Tambah method `show`, `store`, `update`, `destroy`.
+- Gunakan helper scope role yang konsisten untuk semua method.
 
-Field yang direkomendasikan:
-- `id`
-- `company_id` (FK ke `companies.company_id`)
-- `url` (raw URL yang dipakai)
-- `url_normalized` (hasil trim/normalisasi untuk kebutuhan unique key)
-- `last_used_at`
-- `use_count`
-- `created_by` (FK user, nullable)
-- `created_at`, `updated_at`
+4. Update routing di `start/routes.js`.
 
-Constraint/index:
-- `UNIQUE (company_id, url_normalized)` untuk memastikan URL unik dalam scope company.
-- Index `company_id`, `last_used_at` untuk list cepat.
+5. Update dokumentasi API (`README.md` dan `API_DOCUMENTATION.md`).
 
-Catatan:
-- Requirement unik dipenuhi dalam konteks company (tidak duplikat dalam 1 company).
-- Jika URL yang sama dipakai lagi, lakukan upsert + increment `use_count`.
+## Aturan Role (Tetap Berlaku)
+- Role yang diizinkan: `user`, `admin`, `superadmin`.
+- `user` dan `admin`:
+- Hanya boleh akses data company milik sendiri.
+- Tidak boleh kirim `company_id` sebagai filter/payload.
+- Jika tidak punya `company_id` maka akses ditolak (`403`).
+- `superadmin`:
+- Bisa akses lintas company.
+- Boleh kirim `company_id` untuk list/create/update.
 
-## Alur Simpan Histori
-Saat request single BA diterima:
-- Ambil `signatureLeftUrl` dan `signatureRightUrl` dari payload (jika ada).
-- Validasi hanya `http/https`.
-- Normalisasi URL (trim, lowercase host, buang spasi berlebih).
-- Upsert ke `company_signature_urls` berdasarkan `(company_id, url_normalized)`.
-- Update `last_used_at` dan `use_count`.
+Catatan keamanan:
+- Untuk `show`, `update`, `delete` by `:id`, jika data di luar scope actor, responkan `404` agar tidak bocor informasi keberadaan data.
 
-## Rencana API
-1. `GET /api/v1/signature-urls`
-- Auth: JWT
-- Role behavior:
-  - `user` / `admin`: otomatis hanya company miliknya
-  - `superadmin`: bisa semua company, dengan query `company_id`
-- Query opsional:
-  - `q` (search URL)
-  - `page`, `perPage`
-  - `sort=last_used_at|created_at`
-- Response per item minimal:
-  - `id`, `url`, `use_count`, `last_used_at`, `created_at`
+## Aturan Data dan Validasi
+- Field input utama: `url`, `name`, `title`.
+- `url` wajib valid `http/https`.
+- Normalisasi URL gunakan utilitas yang sudah ada (`SignatureUrlHistoryService.normalizeHttpUrl`).
+- Constraint unik tetap mengacu ke `(company_id, url_normalized)`.
+- Jika bentrok data unik, respon `409`.
+- Field sistem (`use_count`, `last_used_at`, `created_by`, `created_at`, `updated_at`) tidak boleh diisi bebas dari client.
 
-2. (Opsional) `GET /api/v1/signature-urls/recent`
-- Shortcut untuk ambil URL terbaru/tersering dipakai per company (untuk dropdown cepat di FrontEnd).
+## Rencana Teknis Singkat
+1. Refactor helper scope role pada `SignatureUrlController` agar reusable.
+2. Implement `show` dengan query ter-scope role.
+3. Implement `store`:
+- tentukan `company_id` berdasarkan role.
+- validasi + normalisasi URL.
+- insert row baru.
+4. Implement `update`:
+- cari row berdasarkan `id` dalam scope role.
+- validasi input yang dikirim.
+- jika `url` berubah, hitung ulang `url_normalized` dan cek konflik unik.
+5. Implement `destroy`:
+- hapus row berdasarkan `id` dalam scope role.
+6. Tambahkan response error yang konsisten (`400`, `403`, `404`, `409`).
 
-## Perubahan Kode yang Direncanakan
-- Tambah migration tabel `company_signature_urls`.
-- Tambah service untuk normalisasi + upsert histori URL.
-- Integrasi service ke flow single BA:
-  - `PdfController.generate` (single generate PDF)
-  - `SingleEmailController` (single send email BA)
-- Tambah controller endpoint list Signature URL.
-- Tambah route di `start/routes.js`.
-- Update dokumentasi API (`README.md` dan `API_DOCUMENTATION.md`).
-
-## Skenario Test (Tingkat Tinggi)
-- Single generate BA dengan `signatureLeftUrl`/`signatureRightUrl` menyimpan histori.
-- Single send email BA dengan signature URL menyimpan histori.
-- URL yang sama dipakai ulang tidak membuat row baru (upsert berjalan), `use_count` bertambah.
-- URL invalid (non-http/https) tidak masuk histori.
-- User/admin hanya bisa melihat daftar URL dalam company sendiri.
-- Superadmin bisa melihat lintas company sesuai filter.
-- Endpoint list mendukung pagination dan pencarian.
+## Skenario Yang Harus Diuji (High-Level)
+- Semua endpoint CRUD wajib JWT.
+- `user/admin` hanya bisa CRUD data pada company sendiri.
+- `user/admin` ditolak saat kirim `company_id`.
+- `superadmin` bisa CRUD lintas company.
+- Create dengan URL valid berhasil.
+- Create/update dengan URL invalid ditolak (`400`).
+- Create/update yang melanggar unique `(company_id, url_normalized)` ditolak (`409`).
+- `GET /:id` untuk data di luar scope role menghasilkan `404`.
+- Delete berhasil menghapus data dan data tidak bisa diambil lagi.
+- List existing tetap berjalan normal (pagination, sorting, search) setelah perubahan CRUD.
 
 ## Out of Scope
-- Upload file tanda tangan ke server.
-- Sinkronisasi histori URL dari endpoint bulk.
-- Fitur edit/delete manual histori URL dari UI.
+- Perubahan UI frontend.
+- Perubahan skema tabel baru (tanpa migration tambahan, kecuali benar-benar dibutuhkan oleh implementor).
+- Perubahan mekanisme auto-history dari flow generate/send yang sudah berjalan.
 
 ## Acceptance Criteria
-- Histori Signature URL tersimpan otomatis dari single generate PDF BA dan single send email BA.
-- Tabel baru tersedia dan URL tidak duplikat dalam company yang sama.
-- Endpoint list Signature URL per company tersedia untuk kebutuhan FrontEnd.
-- User/admin tidak bisa melihat URL dari company lain.
+- CRUD endpoint `company_signature_urls` tersedia dan berfungsi.
+- Aturan role lama tetap konsisten pada seluruh operasi CRUD.
+- Validasi URL dan normalisasi berjalan konsisten dengan sistem existing.
+- Error handling dan response status jelas untuk kasus invalid, forbidden, not found, dan duplicate.
