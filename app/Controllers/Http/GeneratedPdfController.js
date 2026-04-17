@@ -13,19 +13,40 @@ class GeneratedPdfController {
     const isAdmin = role === 'admin'
     const isSuper = role === 'superadmin'
 
-    const query = Database.table('generated_pdfs')
-    if (isSuper) {
-      // superadmin melihat semua
-    } else if (isAdmin) {
-      if (user.company_id) query.where('company_id', user.company_id)
-      else query.whereRaw('1=0') // admin tanpa company tidak boleh melihat apa pun
-    } else {
+    const applyRoleScope = (query) => {
+      if (isSuper) {
+        return query // superadmin melihat semua
+      }
+
+      if (isAdmin) {
+        if (user.company_id) query.where('company_id', user.company_id)
+        else query.whereRaw('1=0') // admin tanpa company tidak boleh melihat apa pun
+        return query
+      }
+
       query.where('user_id', user.id)
+      return query
     }
 
-    const results = await query
+    // Ambil ID dulu agar ORDER BY tidak menyortir baris besar (json/text) di memori.
+    const idPage = await applyRoleScope(Database.table('generated_pdfs'))
+      .select('id')
       .orderBy('created_at', 'desc')
+      .orderBy('id', 'desc')
       .paginate(page, perPage)
+
+    const orderedIds = idPage.data.map((row) => row.id)
+    let rows = []
+
+    if (orderedIds.length > 0) {
+      const fullRows = await Database.table('generated_pdfs')
+        .whereIn('id', orderedIds)
+
+      const byId = new Map(fullRows.map((row) => [String(row.id), row]))
+      rows = orderedIds
+        .map((id) => byId.get(String(id)))
+        .filter(Boolean)
+    }
 
     // Format tanggal ke YYYY-MM-DD hh:mm:ss
     const formatDate = (d) => {
@@ -35,7 +56,7 @@ class GeneratedPdfController {
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
     }
 
-    const formattedData = results.data.map((row) => ({
+    const formattedData = rows.map((row) => ({
       ...row,
       created_at: formatDate(row.created_at),
       updated_at: formatDate(row.updated_at)
@@ -43,10 +64,10 @@ class GeneratedPdfController {
 
     return response.json({
       status: 'ok',
-      total: results.total,
-      perPage: results.perPage,
-      page: results.page,
-      lastPage: results.lastPage,
+      total: idPage.total,
+      perPage: idPage.perPage,
+      page: idPage.page,
+      lastPage: idPage.lastPage,
       data: formattedData
     })
   }
