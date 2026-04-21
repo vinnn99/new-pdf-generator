@@ -523,6 +523,25 @@ class BulkEmailController {
     }
     return this._sendBaTemplate({ request, response, auth }, cfg)
   }
+
+  async sendBaCancelJoin({ request, response, auth }) {
+    const cfg = {
+      template: 'ba-cancel-join',
+      required: ['mdsName', 'region'],
+      subject: (f, _company, item) => `Berita Acara Batal Join - ${f.mdsName || (item && item.letter_no) || ''}`,
+      body: (f, company, item) => [
+        `Yth. ${f.mdsName || 'Bapak/Ibu'},`,
+        '',
+        'Berikut terlampir Berita Acara Batal Join MDS.',
+        f.region ? `Wilayah: ${f.region}` : null,
+        item && item.letter_no ? `Nomor Surat: ${item.letter_no}` : null,
+        '',
+        company && company.name ? company.name : '',
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ].filter(Boolean).join('\n')
+    }
+    return this._sendBaTemplate({ request, response, auth }, cfg)
+  }
 }
 
 function findSlipAttachmentCandidates({ bases, periodPrefix, slipTemplate, employeeId, employeeName }) {

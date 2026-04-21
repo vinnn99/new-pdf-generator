@@ -20,6 +20,7 @@ const LEGACY_REQUIRED_FIELDS = {
   'ba-hold-activate': ['letterNo', 'region', 'reactivateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
   'ba-takeout': ['letterNo', 'region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
   'ba-terminated': ['letterNo', 'region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
+  'ba-cancel-join': ['letterNo', 'region', 'cancelJoinDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
 }
 
 class TemplateResolver {

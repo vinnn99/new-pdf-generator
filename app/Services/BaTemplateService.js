@@ -7,7 +7,8 @@ const TEMPLATE_CODES = Object.freeze({
   'ba-rolling': 'BAR',
   'ba-hold-activate': 'BAHA',
   'ba-takeout': 'BAT',
-  'ba-terminated': 'BATR'
+  'ba-terminated': 'BATR',
+  'ba-cancel-join': 'BABJ'
 })
 
 const MATCH_KEY_FIELDS = Object.freeze({
@@ -17,7 +18,8 @@ const MATCH_KEY_FIELDS = Object.freeze({
   'ba-rolling': ['mdsName', 'region'],
   'ba-hold-activate': ['mdsName', 'region'],
   'ba-takeout': ['mdsName', 'region'],
-  'ba-terminated': ['mdsName', 'region']
+  'ba-terminated': ['mdsName', 'region'],
+  'ba-cancel-join': ['mdsName', 'region']
 })
 
 class BaTemplateService {

@@ -60,6 +60,7 @@ Route.group(() => {
   Route.post('/send-ba-hold-activate-emails', 'BulkEmailController.sendBaHoldActivate').middleware(['auth:jwt'])
   Route.post('/send-ba-takeout-emails', 'BulkEmailController.sendBaTakeout').middleware(['auth:jwt'])
   Route.post('/send-ba-terminated-emails', 'BulkEmailController.sendBaTerminated').middleware(['auth:jwt'])
+  Route.post('/send-ba-cancel-join-emails', 'BulkEmailController.sendBaCancelJoin').middleware(['auth:jwt'])
   // Single email (generate + kirim) per template
   Route.post('/send/ba-penempatan', 'SingleEmailController.sendBaPenempatan').middleware(['auth:jwt'])
   Route.post('/send/ba-request-id', 'SingleEmailController.sendBaRequestId').middleware(['auth:jwt'])
@@ -68,6 +69,7 @@ Route.group(() => {
   Route.post('/send/ba-hold-activate', 'SingleEmailController.sendBaHoldActivate').middleware(['auth:jwt'])
   Route.post('/send/ba-takeout', 'SingleEmailController.sendBaTakeout').middleware(['auth:jwt'])
   Route.post('/send/ba-terminated', 'SingleEmailController.sendBaTerminated').middleware(['auth:jwt'])
+  Route.post('/send/ba-cancel-join', 'SingleEmailController.sendBaCancelJoin').middleware(['auth:jwt'])
   Route.post('/preview/:template', 'BaPreviewController.generate').middleware(['auth:jwt'])
   Route.get('/preview/file/:id', 'BaPreviewController.download').middleware(['auth:jwt'])
   // Backward compatibility untuk endpoint preview BA lama.
@@ -89,6 +91,7 @@ Route.group(() => {
   Route.post('/bulk/ba-hold-activate', 'BulkPdfController.baHoldActivateFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/ba-takeout', 'BulkPdfController.baTakeoutFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/ba-terminated', 'BulkPdfController.baTerminatedFromExcel').middleware(['auth:jwt'])
+  Route.post('/bulk/ba-cancel-join', 'BulkPdfController.baCancelJoinFromExcel').middleware(['auth:jwt'])
   Route.get('/signature-urls', 'SignatureUrlController.index').middleware(['auth:jwt'])
   Route.get('/signature-urls/:id', 'SignatureUrlController.show').middleware(['auth:jwt'])
   Route.post('/signature-urls', 'SignatureUrlController.store').middleware(['auth:jwt'])

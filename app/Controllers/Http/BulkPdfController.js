@@ -50,6 +50,10 @@ class BulkPdfController {
     return this._handleExcel(ctx, 'ba-terminated')
   }
 
+  async baCancelJoinFromExcel(ctx) {
+    return this._handleExcel(ctx, 'ba-cancel-join')
+  }
+
   /**
    * mode: payslip | insentif | thr
    */
@@ -434,6 +438,7 @@ function buildPayloadForMode(lower, mode, opts) {
   if (mode === 'ba-hold-activate') return buildBaHoldActivatePayload(lower, opts)
   if (mode === 'ba-takeout') return buildBaTakeoutPayload(lower, opts)
   if (mode === 'ba-terminated') return buildBaTerminatedPayload(lower, opts)
+  if (mode === 'ba-cancel-join') return buildBaCancelJoinPayload(lower, opts)
   return buildPayslipPayload(lower, opts)
 }
 
@@ -809,6 +814,37 @@ function buildBaTerminatedPayload(lower, opts) {
   }
 
   const required = ['region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet']
+  const missing = required.filter((k) => !payload.data[k])
+  if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
+
+  return payload
+}
+
+function buildBaCancelJoinPayload(lower, opts) {
+  const payload = basePayload(lower, opts)
+  payload.template = 'ba-cancel-join'
+  const pick = (keys) => pickFromLower(lower, keys)
+
+  payload.data = {
+    ...payload.data,
+    companyName: lower.companyname || opts.defaultCompany,
+    letterNo: pick(['letterno', 'letter no', 'no surat', 'letter_number', 'letter number']),
+    region: pick(['region', 'wilayah']),
+    cancelJoinDate: parseExcelDate(pick(['canceljoindate', 'cancel join date', 'batal join date', 'tanggal batal join', 'tgl batal join'])),
+    mdsName: pick(['mdsname', 'mds name', 'nama mds']),
+    mdsCode: pick(['mdscode', 'mds code', 'code mds', 'kode mds']),
+    status: pick(['status']),
+    outlet: pick(['outlet', 'outlet penempatan', 'toko']),
+    reason: pick(['reason', 'alasan batal join', 'alasan']),
+    location: pick(['location', 'lokasi']),
+    letterDate: parseExcelDate(pick(['letterdate', 'letter date', 'tanggal surat'])),
+    signerLeftName: pick(['signerleftname', 'signer left name', 'penandatangan kiri']),
+    signerLeftTitle: pick(['signerlefttitle', 'signer left title', 'jabatan kiri']),
+    signerRightName: pick(['signerrightname', 'signer right name', 'penandatangan kanan']),
+    signerRightTitle: pick(['signerrighttitle', 'signer right title', 'jabatan kanan']),
+  }
+
+  const required = ['region', 'cancelJoinDate', 'mdsName', 'mdsCode', 'status', 'outlet']
   const missing = required.filter((k) => !payload.data[k])
   if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
 

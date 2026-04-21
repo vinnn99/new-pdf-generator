@@ -22,6 +22,7 @@ const templates = {
   'ba-hold-activate': tpl('ba-hold-activate'),
   'ba-takeout': tpl('ba-takeout'),
   'ba-terminated': tpl('ba-terminated'),
+  'ba-cancel-join': tpl('ba-cancel-join'),
 };
 
 const dummySignatureLeft = path.join(projectRoot, 'resources', 'images', 'signature_dummy_left.png');
@@ -137,6 +138,19 @@ const payloads = {
     reasons: ['Uji coba terminasi', 'Dokumentasi QA'],
     letterDate: today,
     location: 'Malang',
+    ...signer,
+  },
+  'ba-cancel-join': {
+    letterNo: '008/TEST/BA/CANCEL-JOIN/IV/2026',
+    region: 'SMS',
+    cancelJoinDate: '2026-04-17',
+    mdsName: 'Contoh Batal Join',
+    mdsCode: 'MDS006',
+    status: 'MOBILE',
+    outlet: 'TOKO BATAL JOIN',
+    reason: 'Tidak dapat mengikuti instruksi TL',
+    letterDate: today,
+    location: 'Jakarta',
     ...signer,
   },
 };

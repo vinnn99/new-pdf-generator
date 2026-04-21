@@ -367,6 +367,49 @@ const TEMPLATE_DEFINITIONS = {
       'https://example.com/callback',
       '{"x-api-key":"demo"}'
     ]
+  },
+  'ba-cancel-join': {
+    filename: 'ba-cancel-join-bulk-template.xlsx',
+    headers: [
+      'region',
+      'cancelJoinDate',
+      'mdsName',
+      'mdsCode',
+      'status',
+      'outlet',
+      'reason',
+      'location',
+      'letterDate',
+      'signerLeftName',
+      'signerLeftTitle',
+      'signerRightName',
+      'signerRightTitle',
+      'signatureLeftUrl',
+      'signatureRightUrl',
+      'email',
+      'callback_url',
+      'callback_header'
+    ],
+    sample: [
+      'SMS',
+      '2026-04-17',
+      'VINALIA',
+      'MDSHSMS114',
+      'MOBILE',
+      'CAFE SAYANGAN DAN ANA BEERHOUSE',
+      'Tidak dapat mengikuti instruksi TL dan ketentuan kerja MDS',
+      'Jakarta',
+      '2026-04-17',
+      'Adi Anto Gustuti',
+      'Team Leader TEMA Agency',
+      'Nuryah',
+      'PIC TEMA Agency',
+      'https://example.com/signature-left.png',
+      'https://example.com/signature-right.png',
+      'user@example.com',
+      'https://example.com/callback',
+      '{"x-api-key":"demo"}'
+    ]
   }
 }
 

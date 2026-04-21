@@ -329,7 +329,7 @@ Contoh payload `ba-request-id`:
   }
 }
 ```
-Semua template BA (`ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`) mendukung field opsional:
+Semua template BA (`ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`, `ba-cancel-join`) mendukung field opsional:
 - `signerLeftName`, `signerLeftTitle`, `signerRightName`, `signerRightTitle`
 - `signatureLeftUrl`, `signatureRightUrl` (hanya `http/https`)
 Jika signer tidak dikirim, sistem memakai default “Adi Anto / Team Leader TEMA Agency” dan “Rizqi Arumdhita / Project Manager Tema Agency”.
@@ -458,6 +458,30 @@ Contoh payload `ba-terminated`:
   }
 }
 ```
+Contoh payload `ba-cancel-join`:
+```json
+{
+  "template": "ba-cancel-join",
+  "email": "user@example.com",
+  "data": {
+    "region": "SMS",
+    "cancelJoinDate": "2026-04-17",
+    "mdsName": "VINALIA",
+    "mdsCode": "MDSHSMS114",
+    "status": "MOBILE",
+    "outlet": "CAFE SAYANGAN DAN ANA BEERHOUSE",
+    "reason": "TIDAK DAPAT MENGIKUTI INSTRUKSI TL DAN KETENTUAN KERJA MDS",
+    "letterDate": "2026-04-17",
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto Gustuti",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Nuryah",
+    "signerRightTitle": "PIC TEMA Agency",
+    "signatureLeftUrl": "https://example.com/signature-left.png",
+    "signatureRightUrl": "https://example.com/signature-right.png"
+  }
+}
+```
 Response 202:
 ```json
 { "status": "queued", "message": "PDF generation is being processed" }
@@ -495,6 +519,7 @@ Webhook payload (on success):
 - `ba-hold-activate`: `region`, `reactivateDate`, `mdsName`, `mdsCode`, `status`, `outlet`
 - `ba-takeout`: `region`, `takeoutDate`, `mdsName`, `mdsCode`, `status`, `outlet`
 - `ba-terminated`: `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`
+- `ba-cancel-join`: `region`, `cancelJoinDate`, `mdsName`, `mdsCode`, `status`, `outlet`
 
 Catatan BA:
 - `data.letterNo` selalu di-generate otomatis oleh sistem (override).
@@ -510,6 +535,7 @@ Catatan BA:
 - `ba-hold-activate`: `ba-hold-activate.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-takeout`: `ba-takeout.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-terminated`: `ba-terminated.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
+- `ba-cancel-join`: `ba-cancel-join.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - Lainnya: `<template>_<unik>.pdf`
 
 ---
@@ -559,6 +585,7 @@ Content-Type: `multipart/form-data` dengan field `file` (xls/xlsx, max 10 MB). O
 - `POST /api/v1/bulk/ba-hold-activate`
 - `POST /api/v1/bulk/ba-takeout`
 - `POST /api/v1/bulk/ba-terminated`
+- `POST /api/v1/bulk/ba-cancel-join`
 
 Catatan: Template yang di-bulk harus termasuk dalam `allowed_templates` company; jika tidak, request ditolak 403 sebelum baris diproses.
 Semua template BA mendukung field opsional `signerLeftName`, `signerLeftTitle`, `signerRightName`, `signerRightTitle`, `signatureLeftUrl`, `signatureRightUrl`; jika dikosongkan akan memakai default tanda tangan.
@@ -618,6 +645,7 @@ Response 200:
 - **BA HOLD Activate**: `region | reactivateDate | mdsName | mdsCode | status | outlet | holdReason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional)`
 - **BA Takeout**: `region | takeoutDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional)`
 - **BA Terminated**: `region | terminateDate | mdsName | mdsCode | status | outlet | reasons | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional)`
+- **BA Cancel Join**: `region | cancelJoinDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional)`
 
 Catatan:
 - Kolom `letterNo` boleh ada di Excel (untuk kompatibilitas), tetapi akan diabaikan karena sistem selalu auto-generate nomor.
@@ -684,7 +712,7 @@ Response 200:
 
 ---
 
-## 7) Bulk Kirim Email BA (Request ID, HOLD, Rolling, HOLD Activate, Takeout, Terminated)
+## 7) Bulk Kirim Email BA (Request ID, HOLD, Rolling, HOLD Activate, Takeout, Terminated, Cancel Join)
 Auth: `Authorization: Bearer <JWT>`  
 Form-data:
 - `batch_id` (wajib): id batch dari endpoint generate bulk BA sesuai template
@@ -707,6 +735,9 @@ Lookup lampiran berbasis metadata batch (`batch_id + template + match_key`).
   - Wajib: `mdsName`, `region/wilayah`
 
 - `POST /api/v1/send-ba-terminated-emails`  
+  - Wajib: `mdsName`, `region/wilayah`
+
+- `POST /api/v1/send-ba-cancel-join-emails`  
   - Wajib: `mdsName`, `region/wilayah`
 
 ---
@@ -1012,6 +1043,7 @@ Field update: `email`, `name`, `phone`, `notes`.
 - **ba-hold-activate**: berita acara MDS hold diaktifkan kembali.
 - **ba-takeout**: berita acara pemberitahuan toko takeout MDS.
 - **ba-terminated**: berita acara terminasi MDS.
+- **ba-cancel-join**: berita acara batal join MDS.
 
 ---
 
