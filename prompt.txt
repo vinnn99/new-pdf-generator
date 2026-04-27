@@ -2,8 +2,10 @@ buatkan issue.md yang berisi perencanaan untuk nanti di implementasikan oleh jon
 
 isi planning nya sebagai berikut:
 
-- buatkan endpoint CRUD untuk table company_signature_url
-- aturan role tetap berlaku
+- buatkan template baru bernama ba-cancel-join
+- contoh ba-cancel-join ada dilampiran
+- buatkan single generate dan builk termasuk pengiriman email sigle dan bulk mengikuti pola yang sama seperti template ba-* yang lain
+- update dokumentasi 
  
 
 jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah

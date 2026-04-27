@@ -10,6 +10,7 @@ const Database = use('Database')
 const TemplateResolver = use('App/Services/TemplateResolver')
 const BaTemplateService = use('App/Services/BaTemplateService')
 const CompanyCodeService = use('App/Services/CompanyCodeService')
+const SlipPayloadNormalizer = use('App/Services/SlipPayloadNormalizer')
 
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000
 const ROMAN_MONTH = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
@@ -60,7 +61,11 @@ class BaPreviewService {
       throw err
     }
 
-    const payloadData = data && typeof data === 'object' ? { ...data } : {}
+    const sourceData = data && typeof data === 'object' ? { ...data } : {}
+    const payloadData = SlipPayloadNormalizer.normalize({
+      template: normalizedTemplate,
+      data: sourceData
+    })
     payloadData.companyName = payloadData.companyName || company.name
     if (BaTemplateService.isBaTemplate(normalizedTemplate)) {
       payloadData.letterNo = this.buildPreviewLetterNo({

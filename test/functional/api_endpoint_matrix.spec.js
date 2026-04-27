@@ -658,6 +658,69 @@ const endpointCases = [
     }
   },
   {
+    method: 'post',
+    url: () => '/api/v1/preview/insentif',
+    auth: 'jwt',
+    expected: { user: 200, admin: 200, superadmin: 200 },
+    body: ({ role }) => {
+      const payload = {
+        data: {
+          employeeName: `Preview Insentif ${uniqueId(role)}`,
+          position: 'TL',
+          period: '202603',
+          employeeId: 'MDS2',
+          departement: 'SALE',
+          joinDate: '2026-03-01',
+          ptkp: 'PTK0',
+          targetHK: '24',
+          attendance: '24',
+          gajiPokok: '1000000',
+          tunjanganMakan: '33999',
+          tunjanganTransport: '40000',
+          tunjanganKomunikasi: '34999',
+          pph21: '4088'
+        }
+      }
+      if (role === 'superadmin') payload.company_id = seed.companyAId
+      return payload
+    },
+    assertBody: ({ response, expectedStatus }) => {
+      if (expectedStatus !== 200) return
+      const data = response.body && response.body.data ? response.body.data : {}
+      if (!data.preview_url || !data.expires_at) {
+        throw new Error('Response preview insentif harus menyertakan preview_url dan expires_at')
+      }
+    }
+  },
+  {
+    method: 'post',
+    url: () => '/api/v1/preview/thr',
+    auth: 'jwt',
+    expected: { user: 200, admin: 200, superadmin: 200 },
+    body: ({ role }) => {
+      const payload = {
+        data: {
+          employeeName: `Preview THR ${uniqueId(role)}`,
+          position: 'TL',
+          period: '202603',
+          departement: 'SALE',
+          tanggalBayar: '2026-03-25',
+          gajiPokok: '1000000',
+          pph21: '4088'
+        }
+      }
+      if (role === 'superadmin') payload.company_id = seed.companyAId
+      return payload
+    },
+    assertBody: ({ response, expectedStatus }) => {
+      if (expectedStatus !== 200) return
+      const data = response.body && response.body.data ? response.body.data : {}
+      if (!data.preview_url || !data.expires_at) {
+        throw new Error('Response preview THR harus menyertakan preview_url dan expires_at')
+      }
+    }
+  },
+  {
     method: 'get',
     url: () => '/api/v1/email-logs?page=1&perPage=10&q=test',
     auth: 'jwt',

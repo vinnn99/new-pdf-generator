@@ -2,6 +2,7 @@
 
 const JobService = require('../../Services/JobService')
 const TemplateResolver = require('../../Services/TemplateResolver')
+const SlipPayloadNormalizer = use('App/Services/SlipPayloadNormalizer')
 const BaTemplateService = use('App/Services/BaTemplateService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
 const SignatureUrlHistoryService = use('App/Services/SignatureUrlHistoryService')
@@ -29,6 +30,13 @@ class PdfController {
       }
 
       const normalizedTemplate = BaTemplateService.normalizeTemplate(payload.template)
+      if (payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) {
+        payload.data = SlipPayloadNormalizer.normalize({
+          template: normalizedTemplate,
+          data: payload.data
+        })
+      }
+
       if (BaTemplateService.isBaTemplate(normalizedTemplate) && payload.data && typeof payload.data === 'object') {
         if (!company || !company.company_id) {
           errors.push('Company tidak valid untuk generate letterNo BA')
