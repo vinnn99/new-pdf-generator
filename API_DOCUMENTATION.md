@@ -329,7 +329,7 @@ Contoh payload `ba-request-id`:
   }
 }
 ```
-Semua template BA (`ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`, `ba-cancel-join`) mendukung field opsional:
+Semua template BA (`ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`, `ba-cancel-join`, `ba-resign`) mendukung field opsional:
 - `signerLeftName`, `signerLeftTitle`, `signerRightName`, `signerRightTitle`
 - `signatureLeftUrl`, `signatureRightUrl` (hanya `http/https`)
 Jika signer tidak dikirim, sistem memakai default “Adi Anto / Team Leader TEMA Agency” dan “Rizqi Arumdhita / Project Manager Tema Agency”.
@@ -482,6 +482,33 @@ Contoh payload `ba-cancel-join`:
   }
 }
 ```
+Contoh payload `ba-resign`:
+```json
+{
+  "template": "ba-resign",
+  "email": "user@example.com",
+  "data": {
+    "region": "SMS",
+    "mdsName": "VENI OKTAVIA WIDIA NINGRUM",
+    "mdsCode": "MDSHSMS067",
+    "nik": "1603064510930002",
+    "birthDate": "1996-10-05",
+    "effectiveResignDate": "2026-04-08",
+    "status": "MOBILE",
+    "mdsCategory": "REGULER",
+    "outletFrom": "4TB NOBU DAN 8ARCODE",
+    "resignReason": "SAKIT (ADA BENJOLAN/KELENJAR DI BAGIAN LEHER)",
+    "letterDate": "2026-04-09",
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency",
+    "signatureLeftUrl": "https://example.com/signature-left.png",
+    "signatureRightUrl": "https://example.com/signature-right.png"
+  }
+}
+```
 Response 202:
 ```json
 { "status": "queued", "message": "PDF generation is being processed" }
@@ -520,6 +547,7 @@ Webhook payload (on success):
 - `ba-takeout`: `region`, `takeoutDate`, `mdsName`, `mdsCode`, `status`, `outlet`
 - `ba-terminated`: `region`, `terminateDate`, `mdsName`, `mdsCode`, `status`, `outlet`
 - `ba-cancel-join`: `region`, `cancelJoinDate`, `mdsName`, `mdsCode`, `status`, `outlet`
+- `ba-resign`: `region`, `mdsName`, `mdsCode`, `nik`, `effectiveResignDate`, `status`, `mdsCategory`, `outletFrom`
 
 Catatan BA:
 - `data.letterNo` selalu di-generate otomatis oleh sistem (override).
@@ -536,6 +564,7 @@ Catatan BA:
 - `ba-takeout`: `ba-takeout.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-terminated`: `ba-terminated.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-cancel-join`: `ba-cancel-join.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
+- `ba-resign`: `ba-resign.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - Lainnya: `<template>_<unik>.pdf`
 
 ---
@@ -586,6 +615,7 @@ Content-Type: `multipart/form-data` dengan field `file` (xls/xlsx, max 10 MB). O
 - `POST /api/v1/bulk/ba-takeout`
 - `POST /api/v1/bulk/ba-terminated`
 - `POST /api/v1/bulk/ba-cancel-join`
+- `POST /api/v1/bulk/ba-resign`
 
 Catatan: Template yang di-bulk harus termasuk dalam `allowed_templates` company; jika tidak, request ditolak 403 sebelum baris diproses.
 Semua template BA mendukung field opsional `signerLeftName`, `signerLeftTitle`, `signerRightName`, `signerRightTitle`, `signatureLeftUrl`, `signatureRightUrl`; jika dikosongkan akan memakai default tanda tangan.
@@ -712,7 +742,7 @@ Response 200:
 
 ---
 
-## 7) Bulk Kirim Email BA (Request ID, HOLD, Rolling, HOLD Activate, Takeout, Terminated, Cancel Join)
+## 7) Bulk Kirim Email BA (Request ID, HOLD, Rolling, HOLD Activate, Takeout, Terminated, Cancel Join, Resign)
 Auth: `Authorization: Bearer <JWT>`  
 Form-data:
 - `batch_id` (wajib): id batch dari endpoint generate bulk BA sesuai template
@@ -738,6 +768,9 @@ Lookup lampiran berbasis metadata batch (`batch_id + template + match_key`).
   - Wajib: `mdsName`, `region/wilayah`
 
 - `POST /api/v1/send-ba-cancel-join-emails`  
+  - Wajib: `mdsName`, `region/wilayah`
+
+- `POST /api/v1/send-ba-resign-emails`  
   - Wajib: `mdsName`, `region/wilayah`
 
 ---
@@ -1044,6 +1077,7 @@ Field update: `email`, `name`, `phone`, `notes`.
 - **ba-takeout**: berita acara pemberitahuan toko takeout MDS.
 - **ba-terminated**: berita acara terminasi MDS.
 - **ba-cancel-join**: berita acara batal join MDS.
+- **ba-resign**: berita acara resign MDS.
 
 ---
 

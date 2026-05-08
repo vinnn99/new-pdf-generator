@@ -32,7 +32,8 @@ const BULK_ENDPOINTS = [
   '/api/v1/bulk/ba-hold-activate',
   '/api/v1/bulk/ba-takeout',
   '/api/v1/bulk/ba-terminated',
-  '/api/v1/bulk/ba-cancel-join'
+  '/api/v1/bulk/ba-cancel-join',
+  '/api/v1/bulk/ba-resign'
 ]
 
 const seed = {

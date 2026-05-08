@@ -33,6 +33,9 @@ class SingleEmailController {
   async sendBaCancelJoin(ctx) {
     return this._send(ctx, cfgBa('ba-cancel-join'))
   }
+  async sendBaResign(ctx) {
+    return this._send(ctx, cfgBa('ba-resign'))
+  }
 
   /**
    * Generic handler untuk BA single email.
@@ -214,6 +217,7 @@ function cfgBa(template) {
         template === 'ba-hold-activate' ? 'Berita Acara HOLD Aktif Kembali' :
         template === 'ba-takeout' ? 'Berita Acara Toko Takeout' :
         template === 'ba-cancel-join' ? 'Berita Acara Batal Join' :
+        template === 'ba-resign' ? 'Berita Acara Resign' :
         'Berita Acara Terminasi'
       const who = f.mdsName || f.letterNo || ''
       return who ? `${base} - ${who}` : base
@@ -230,6 +234,8 @@ function cfgBa(template) {
           ? 'Berikut terlampir Berita Acara Toko Takeout MDS.'
           : template === 'ba-cancel-join'
           ? 'Berikut terlampir Berita Acara Batal Join MDS.'
+          : template === 'ba-resign'
+          ? 'Berikut terlampir Berita Acara Resign MDS.'
           : `Berikut terlampir Berita Acara ${title(template)}.`,
         f.region ? `Wilayah: ${f.region}` : null,
         f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
@@ -251,7 +257,8 @@ function requiredFields(template) {
     'ba-hold-activate': ['region', 'reactivateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
     'ba-takeout': ['region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
     'ba-terminated': ['region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
-    'ba-cancel-join': ['region', 'cancelJoinDate', 'mdsName', 'mdsCode', 'status', 'outlet']
+    'ba-cancel-join': ['region', 'cancelJoinDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
+    'ba-resign': ['region', 'mdsName', 'mdsCode', 'nik', 'effectiveResignDate', 'status', 'mdsCategory', 'outletFrom']
   }
   return map[template] || []
 }
@@ -265,7 +272,8 @@ function title(template) {
     'ba-hold-activate': 'Hold Aktivasi',
     'ba-takeout': 'Takeout',
     'ba-terminated': 'Terminasi',
-    'ba-cancel-join': 'Batal Join'
+    'ba-cancel-join': 'Batal Join',
+    'ba-resign': 'Resign'
   }
   return map[template] || template
 }

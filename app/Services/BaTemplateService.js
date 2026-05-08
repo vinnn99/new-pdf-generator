@@ -8,7 +8,8 @@ const TEMPLATE_CODES = Object.freeze({
   'ba-hold-activate': 'BAHA',
   'ba-takeout': 'BAT',
   'ba-terminated': 'BATR',
-  'ba-cancel-join': 'BABJ'
+  'ba-cancel-join': 'BABJ',
+  'ba-resign': 'BARS'
 })
 
 const MATCH_KEY_FIELDS = Object.freeze({
@@ -19,7 +20,8 @@ const MATCH_KEY_FIELDS = Object.freeze({
   'ba-hold-activate': ['mdsName', 'region'],
   'ba-takeout': ['mdsName', 'region'],
   'ba-terminated': ['mdsName', 'region'],
-  'ba-cancel-join': ['mdsName', 'region']
+  'ba-cancel-join': ['mdsName', 'region'],
+  'ba-resign': ['mdsName', 'region']
 })
 
 class BaTemplateService {

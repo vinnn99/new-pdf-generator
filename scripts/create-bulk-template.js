@@ -410,6 +410,55 @@ const TEMPLATE_DEFINITIONS = {
       'https://example.com/callback',
       '{"x-api-key":"demo"}'
     ]
+  },
+  'ba-resign': {
+    filename: 'ba-resign-bulk-template.xlsx',
+    headers: [
+      'region',
+      'mdsName',
+      'mdsCode',
+      'nik',
+      'birthDate',
+      'effectiveResignDate',
+      'status',
+      'mdsCategory',
+      'outletFrom',
+      'resignReason',
+      'location',
+      'letterDate',
+      'signerLeftName',
+      'signerLeftTitle',
+      'signerRightName',
+      'signerRightTitle',
+      'signatureLeftUrl',
+      'signatureRightUrl',
+      'email',
+      'callback_url',
+      'callback_header'
+    ],
+    sample: [
+      'SMS',
+      'VENI OKTAVIA WIDIA NINGRUM',
+      'MDSHSMS067',
+      '1603064510930002',
+      '1996-10-05',
+      '2026-04-08',
+      'MOBILE',
+      'REGULER',
+      '4TB NOBU DAN 8ARCODE',
+      'SAKIT (ADA BENJOLAN/KELENJAR DI BAGIAN LEHER)',
+      'Jakarta',
+      '2026-04-09',
+      'Adi Anto',
+      'Team Leader TEMA Agency',
+      'Rizqi Arumdhita',
+      'Project Manager Tema Agency',
+      'https://example.com/signature-left.png',
+      'https://example.com/signature-right.png',
+      'user@example.com',
+      'https://example.com/callback',
+      '{"x-api-key":"demo"}'
+    ]
   }
 }
 

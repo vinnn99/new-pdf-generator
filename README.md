@@ -844,6 +844,39 @@ Response: file PDF (`Content-Type: application/pdf`) siap diunduh.
 
 > **Field wajib `ba-cancel-join`:** `region`, `cancelJoinDate`, `mdsName`, `mdsCode`, `status`, `outlet`. `data.letterNo` selalu di-generate otomatis (override nilai request). Nama file output: `ba-cancel-join.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
 
+### `ba-resign` - Berita Acara Resign MDS
+
+```json
+{
+  "template": "ba-resign",
+  "email": "user@email.com",
+  "data": {
+    "letterNo": "007/OMI-TM/BAK/IV/2026",
+    "region": "SMS",
+    "mdsName": "VENI OKTAVIA WIDIA NINGRUM",
+    "mdsCode": "MDSHSMS067",
+    "nik": "1603064510930002",
+    "birthDate": "1996-10-05",
+    "effectiveResignDate": "2026-04-08",
+    "status": "MOBILE",
+    "mdsCategory": "REGULER",
+    "outletFrom": "4TB NOBU DAN 8ARCODE",
+    "resignReason": "SAKIT (ADA BENJOLAN/KELENJAR DI BAGIAN LEHER)",
+    "letterDate": "2026-04-09",
+    "location": "Jakarta",
+    "signerLeftName": "Adi Anto",
+    "signerLeftTitle": "Team Leader TEMA Agency",
+    "signerRightName": "Rizqi Arumdhita",
+    "signerRightTitle": "Project Manager Tema Agency"
+  },
+  "callback": {
+    "url": "https://webhook.site/xxx"
+  }
+}
+```
+
+> **Field wajib `ba-resign`:** `region`, `mdsName`, `mdsCode`, `nik`, `effectiveResignDate`, `status`, `mdsCategory`, `outletFrom`. `data.letterNo` selalu di-generate otomatis (override nilai request). Nama file output: `ba-resign.[namaMDS].[region].[letterNo].[unique].pdf` (karakter `/` pada `letterNo` diganti `-`). Header/footer otomatis memakai `resources/images/header_omi.png` dan `resources/images/footer_omi.png`.
+
 
 ---
 
@@ -928,6 +961,7 @@ Response contoh:
     'ba-request-id': ['area', 'mdsName', 'nik', 'joinDate'],
     'ba-takeout': ['region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
     'ba-cancel-join': ['region', 'cancelJoinDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
+    'ba-resign': ['region', 'mdsName', 'mdsCode', 'nik', 'effectiveResignDate', 'status', 'mdsCategory', 'outletFrom'],
     namaTemplate:  ['field1', 'field2'],  // ← tambahkan di sini
   }
   ```
@@ -954,6 +988,7 @@ app/
     ba-takeout.js
     ba-terminated.js
     ba-cancel-join.js
+    ba-resign.js
   Services/
     JobService.js                     ? helper dispatch queue
     WebhookSender.js                  ? kirim hasil ke callback URL (dengan retry)
@@ -972,6 +1007,7 @@ resources/pdf-templates/              ? re-export template (dipakai job)
   ba-takeout.js
   ba-terminated.js
   ba-cancel-join.js
+  ba-resign.js
 
 public/
   download/                           ? folder penyimpanan PDF yang sudah digenerate
@@ -1069,6 +1105,10 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
   - Minimal: `region`, `cancelJoinDate`, `mdsName`, `mdsCode`, `status`, `outlet`.  
   - Tambahan: `reason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `signatureLeftUrl`, `signatureRightUrl`, `callback_url`, `callback_header`, `data_json`.  
   - Header contoh: `region | cancelJoinDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
+- `POST /api/v1/bulk/ba-resign`  
+  - Minimal: `region`, `mdsName`, `mdsCode`, `nik`, `effectiveResignDate`, `status`, `mdsCategory`, `outletFrom`.  
+  - Tambahan: `birthDate`, `resignReason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `signatureLeftUrl`, `signatureRightUrl`, `callback_url`, `callback_header`, `data_json`.  
+  - Header contoh: `region | mdsName | mdsCode | nik | birthDate | effectiveResignDate | status | mdsCategory | outletFrom | resignReason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
 
 Catatan khusus BA:
 - `letterNo` selalu di-generate otomatis sistem (format default: `{seq}/{CompanyCode}/{templateCode}/{romanMonth}/{Year}`, timezone server `Asia/Jakarta`).
@@ -1128,6 +1168,7 @@ Endpoint (auth: JWT, form-data `batch_id` + `file` xls/xlsx; kolom minimal `sent
 - `POST /api/v1/send-ba-takeout-emails` — wajib: `mdsName`, `region/wilayah`
 - `POST /api/v1/send-ba-terminated-emails` — wajib: `mdsName`, `region/wilayah`
 - `POST /api/v1/send-ba-cancel-join-emails` — wajib: `mdsName`, `region/wilayah`
+- `POST /api/v1/send-ba-resign-emails` — wajib: `mdsName`, `region/wilayah`
 
 ## History Batch BA
 - `GET /api/v1/batches?template=<ba-template>&page=1&perPage=10`

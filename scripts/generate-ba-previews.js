@@ -23,6 +23,7 @@ const templates = {
   'ba-takeout': tpl('ba-takeout'),
   'ba-terminated': tpl('ba-terminated'),
   'ba-cancel-join': tpl('ba-cancel-join'),
+  'ba-resign': tpl('ba-resign'),
 };
 
 const dummySignatureLeft = path.join(projectRoot, 'resources', 'images', 'signature_dummy_left.png');
@@ -149,6 +150,22 @@ const payloads = {
     status: 'MOBILE',
     outlet: 'TOKO BATAL JOIN',
     reason: 'Tidak dapat mengikuti instruksi TL',
+    letterDate: today,
+    location: 'Jakarta',
+    ...signer,
+  },
+  'ba-resign': {
+    letterNo: '009/TEST/BA/RESIGN/IV/2026',
+    region: 'SMS',
+    mdsName: 'Contoh Resign',
+    mdsCode: 'MDS007',
+    nik: '1603064510930002',
+    birthDate: '1996-10-05',
+    effectiveResignDate: '2026-04-08',
+    status: 'MOBILE',
+    mdsCategory: 'REGULER',
+    outletFrom: 'TOKO CONTOH A DAN TOKO CONTOH B',
+    resignReason: 'Uji coba resign',
     letterDate: today,
     location: 'Jakarta',
     ...signer,

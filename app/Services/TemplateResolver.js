@@ -22,6 +22,7 @@ const LEGACY_REQUIRED_FIELDS = {
   'ba-takeout': ['letterNo', 'region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
   'ba-terminated': ['letterNo', 'region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
   'ba-cancel-join': ['letterNo', 'region', 'cancelJoinDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
+  'ba-resign': ['letterNo', 'region', 'mdsName', 'mdsCode', 'nik', 'effectiveResignDate', 'status', 'mdsCategory', 'outletFrom'],
 }
 
 class TemplateResolver {
