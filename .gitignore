@@ -23,3 +23,7 @@ npm-debug.log*
 .history
 .idea
 .vscode
+
+# Generated preview files
+public/preview/*
+!public/preview/.gitkeep
