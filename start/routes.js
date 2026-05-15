@@ -63,6 +63,9 @@ Route.group(() => {
   Route.post('/send-ba-cancel-join-emails', 'BulkEmailController.sendBaCancelJoin').middleware(['auth:jwt'])
   Route.post('/send-ba-resign-emails', 'BulkEmailController.sendBaResign').middleware(['auth:jwt'])
   // Single email (generate + kirim) per template
+  Route.post('/send/payslip', 'SingleEmailController.sendPayslip').middleware(['auth:jwt'])
+  Route.post('/send/insentif', 'SingleEmailController.sendInsentif').middleware(['auth:jwt'])
+  Route.post('/send/thr', 'SingleEmailController.sendThr').middleware(['auth:jwt'])
   Route.post('/send/ba-penempatan', 'SingleEmailController.sendBaPenempatan').middleware(['auth:jwt'])
   Route.post('/send/ba-request-id', 'SingleEmailController.sendBaRequestId').middleware(['auth:jwt'])
   Route.post('/send/ba-hold', 'SingleEmailController.sendBaHold').middleware(['auth:jwt'])

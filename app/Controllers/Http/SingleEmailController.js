@@ -9,6 +9,16 @@ const SignatureUrlHistoryService = use('App/Services/SignatureUrlHistoryService'
 const Env = use('Env')
 
 class SingleEmailController {
+  async sendPayslip(ctx) {
+    return this._send(ctx, cfgSlip('payslip'))
+  }
+  async sendInsentif(ctx) {
+    return this._send(ctx, cfgSlip('insentif'))
+  }
+  async sendThr(ctx) {
+    return this._send(ctx, cfgSlip('thr'))
+  }
+
   async sendBaPenempatan(ctx) {
     return this._send(ctx, cfgBa('ba-penempatan'))
   }
@@ -248,8 +258,42 @@ function cfgBa(template) {
   }
 }
 
+function cfgSlip(template) {
+  return {
+    template,
+    required: requiredFields(template),
+    subject: (f) => {
+      const base =
+        template === 'insentif' ? 'Slip Insentif' :
+        template === 'thr' ? 'Slip THR' :
+        'Slip Gaji'
+      const who = f.employeeName || f.employeeId || ''
+      return who ? `${base} - ${who}` : base
+    },
+    body: (f, company) => {
+      const lines = [
+        `Yth. ${f.employeeName || 'Bapak/Ibu'},`,
+        '',
+        template === 'insentif'
+          ? 'Berikut terlampir slip insentif Anda.'
+          : template === 'thr'
+          ? 'Berikut terlampir slip THR Anda.'
+          : 'Berikut terlampir slip gaji Anda.',
+        f.period ? `Periode: ${f.period}` : null,
+        '',
+        company && company.name ? company.name : '',
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ]
+      return lines.filter(Boolean).join('\n')
+    }
+  }
+}
+
 function requiredFields(template) {
   const map = {
+    payslip: ['employeeName', 'position', 'period'],
+    insentif: ['employeeName', 'position', 'period'],
+    thr: ['employeeName', 'position', 'period', 'payoutDate', 'baseSalary'],
     'ba-penempatan': ['mdsName', 'placementDate', 'outlet'],
     'ba-request-id': ['mdsName', 'nik', 'joinDate'],
     'ba-hold': ['region', 'holdDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
