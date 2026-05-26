@@ -22,53 +22,63 @@ class DashboardController {
 
     const role = String(user.role || '').toLowerCase()
     const isSuper = role === 'superadmin'
+    const isAdmin = role === 'admin'
     const scopeParam = (request.input('scope') || '').toString().toLowerCase()
-    let scope = scopeParam === 'all' ? 'all' : scopeParam === 'user' ? 'user' : 'company'
+    const normalizedScopeParam = ['user', 'company', 'all'].includes(scopeParam) ? scopeParam : ''
 
-    if (scope === 'all' && !isSuper) {
+    // Samakan default scope dengan /generated-pdfs:
+    // - user      -> user
+    // - admin     -> company
+    // - superadmin-> all
+    let scope = isSuper ? 'all' : isAdmin ? 'company' : 'user'
+
+    if (normalizedScopeParam === 'all' && !isSuper) {
       return response.status(403).json({
         status: 'forbidden',
         message: 'Scope all hanya untuk superadmin'
       })
     }
 
-    // Superadmin yang tidak terhubung company default melihat ringkasan semua company.
-    if (!user.company_id && isSuper && scope === 'company') {
+    // Scope override hanya untuk superadmin.
+    if (isSuper && normalizedScopeParam) {
+      scope = normalizedScopeParam
+    }
+
+    // Superadmin tanpa company tidak bisa dipaksa ke scope company/user.
+    if (!user.company_id && isSuper && scope !== 'all') {
       scope = 'all'
     }
 
-    if (!user.company_id && !isSuper) {
-      return response.status(401).json({ status: 'error', message: 'User belum terhubung ke perusahaan' })
-    }
-
     let company = null
-    const needsCompanyScope = scope !== 'all' && !!user.company_id
-    if (needsCompanyScope) {
+    if (user.company_id) {
       company = await Database.table('companies')
         .where('company_id', user.company_id)
         .first()
-      if (!company) {
+      if (scope === 'company' && !company) {
         return response.status(404).json({ status: 'error', message: 'Perusahaan tidak ditemukan' })
       }
     }
 
     const scopeUser = scope === 'user'
     const scopeAllCompanies = scope === 'all'
+    const scopeCompany = scope === 'company'
     const companyId = company ? company.company_id : null
 
     // Total PDF
     const pdfTotalRow = await Database.table('generated_pdfs')
       .where((qb) => {
-        if (companyId && !scopeAllCompanies) qb.andWhere('company_id', companyId)
+        if (scopeCompany && companyId) qb.andWhere('company_id', companyId)
         if (scopeUser) qb.andWhere('user_id', user.id)
+        if (scopeCompany && !companyId) qb.whereRaw('1=0')
       })
       .count('* as total')
       .first()
 
     const pdfByTemplate = await Database.from('generated_pdfs')
       .where((qb) => {
-        if (companyId && !scopeAllCompanies) qb.andWhere('company_id', companyId)
+        if (scopeCompany && companyId) qb.andWhere('company_id', companyId)
         if (scopeUser) qb.andWhere('user_id', user.id)
+        if (scopeCompany && !companyId) qb.whereRaw('1=0')
       })
       .select('template')
       .count('* as total')
@@ -77,8 +87,9 @@ class DashboardController {
     const pdfRecent = await Database.from('generated_pdfs as gp')
       .leftJoin('companies as c', 'gp.company_id', 'c.company_id')
       .where((qb) => {
-        if (companyId && !scopeAllCompanies) qb.andWhere('gp.company_id', companyId)
+        if (scopeCompany && companyId) qb.andWhere('gp.company_id', companyId)
         if (scopeUser) qb.andWhere('gp.user_id', user.id)
+        if (scopeCompany && !companyId) qb.whereRaw('1=0')
       })
       .orderBy('gp.created_at', 'desc')
       .limit(5)
@@ -87,8 +98,9 @@ class DashboardController {
     // Email logs
     const emailSentRow = await Database.table('email_logs')
       .where((qb) => {
-        if (companyId && !scopeAllCompanies) qb.andWhere('company_id', companyId)
+        if (scopeCompany && companyId) qb.andWhere('company_id', companyId)
         if (scopeUser) qb.andWhere('user_id', user.id)
+        if (scopeCompany && !companyId) qb.whereRaw('1=0')
       })
       .where('status', 'sent')
       .count('* as total')
@@ -96,8 +108,9 @@ class DashboardController {
 
     const emailFailedRow = await Database.table('email_logs')
       .where((qb) => {
-        if (companyId && !scopeAllCompanies) qb.andWhere('company_id', companyId)
+        if (scopeCompany && companyId) qb.andWhere('company_id', companyId)
         if (scopeUser) qb.andWhere('user_id', user.id)
+        if (scopeCompany && !companyId) qb.whereRaw('1=0')
       })
       .where('status', 'failed')
       .count('* as total')
@@ -105,8 +118,9 @@ class DashboardController {
 
     const emailByTemplate = await Database.from('email_logs')
       .where((qb) => {
-        if (companyId && !scopeAllCompanies) qb.andWhere('company_id', companyId)
+        if (scopeCompany && companyId) qb.andWhere('company_id', companyId)
         if (scopeUser) qb.andWhere('user_id', user.id)
+        if (scopeCompany && !companyId) qb.whereRaw('1=0')
       })
       .select('template', 'context')
       .count('* as total')
@@ -115,8 +129,9 @@ class DashboardController {
     const emailRecentRaw = await Database.from('email_logs as el')
       .leftJoin('companies as c', 'el.company_id', 'c.company_id')
       .where((qb) => {
-        if (companyId && !scopeAllCompanies) qb.andWhere('el.company_id', companyId)
+        if (scopeCompany && companyId) qb.andWhere('el.company_id', companyId)
         if (scopeUser) qb.andWhere('el.user_id', user.id)
+        if (scopeCompany && !companyId) qb.whereRaw('1=0')
       })
       .orderBy('el.created_at', 'desc')
       .limit(5)

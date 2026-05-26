@@ -944,11 +944,14 @@ Job cleanup preview (wajib):
 ## 13) Dashboard Summary
 `GET /api/v1/dashboard/summary`  
 Headers: `Authorization: Bearer <JWT>`  
-Query opsional: `scope=user|all`; default `scope` adalah perusahaan (company).  
+Query opsional: `scope=user|company|all` (override hanya untuk `superadmin`).  
 Syarat:
-- User biasa/admin wajib punya `company_id`; jika tidak, respons 401.
 - `scope=all` hanya boleh dipakai `superadmin` (selain itu respons 403).
-- Untuk `superadmin` tanpa `company_id`, default `scope=company` otomatis diperlakukan sebagai `scope=all`.
+- Scope default mengikuti role (konsisten dengan `/generated-pdfs`):
+  - `user` -> `scope=user`
+  - `admin` -> `scope=company`
+  - `superadmin` -> `scope=all`
+- Untuk `superadmin` tanpa `company_id`, `scope=company`/`scope=user` otomatis diperlakukan sebagai `scope=all`.
 Ringkasan:
 ```json
 {
@@ -975,7 +978,11 @@ Ringkasan:
   }
 }
 ```
-Catatan: default data difilter `company_id` user login. Jika `scope=all`, data lintas company akan dikembalikan. `attachments` pada `recent` sudah di-parse menjadi array.
+Catatan:
+- Untuk `scope=company`, data difilter `company_id` user login.
+- Untuk `scope=user`, data difilter `user_id` user login.
+- Untuk `scope=all`, data lintas company.
+- `attachments` pada `recent` sudah di-parse menjadi array.
 
 ---
 

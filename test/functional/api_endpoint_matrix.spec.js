@@ -948,6 +948,35 @@ test('SendEmailJob tetap upsert contact saat kirim email gagal', async ({ assert
   assert.equal(emailLog.status, 'failed')
 })
 
+test('Dashboard summary default scope konsisten dengan generated-pdfs per role', async ({ client, assert }) => {
+  const expectedScopeByRole = {
+    user: 'user',
+    admin: 'company',
+    superadmin: 'all'
+  }
+
+  for (const role of Object.keys(expectedScopeByRole)) {
+    const token = await loginAndGetToken(client, seed.credentials[role])
+    const response = await client
+      .get('/api/v1/dashboard/summary')
+      .header('Authorization', `Bearer ${token}`)
+      .end()
+
+    response.assertStatus(200)
+    assert.equal(response.body.scope, expectedScopeByRole[role])
+  }
+})
+
+test('Dashboard summary scope=user diabaikan untuk non-superadmin', async ({ client, assert }) => {
+  const adminToken = await loginAndGetToken(client, seed.credentials.admin)
+  const adminResponse = await client
+    .get('/api/v1/dashboard/summary?scope=user')
+    .header('Authorization', `Bearer ${adminToken}`)
+    .end()
+  adminResponse.assertStatus(200)
+  assert.equal(adminResponse.body.scope, 'company')
+})
+
 test('SendEmailJob update row queued email_logs saat emailLogId tersedia', async ({ assert }) => {
   const stamp = uniqueId('sendjob_queue')
   const toEmail = `sendjob.queue.${stamp}@test.local`
