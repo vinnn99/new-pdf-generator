@@ -6,6 +6,7 @@ const GeneratePdfJob = use('App/Jobs/GeneratePdfJob')
 const BaTemplateService = use('App/Services/BaTemplateService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
 const SignatureUrlHistoryService = use('App/Services/SignatureUrlHistoryService')
+const EmailLogService = use('App/Services/EmailLogService')
 const Env = use('Env')
 
 class SingleEmailController {
@@ -138,28 +139,54 @@ class SingleEmailController {
 
       const subject = bodyJson.subject || cfg.subject(data, company)
       const textBody = bodyJson.body || cfg.body(data, company)
+      const jobAttachments = [
+        { filename: pdfMeta.filename, path: pdfMeta.filePath }
+      ]
+
+      let emailLogId = null
+      try {
+        emailLogId = await EmailLogService.createQueued({
+          userId: user.id,
+          companyId: company.company_id,
+          template: cfg.template,
+          context: 'single-send',
+          to,
+          cc,
+          bcc,
+          subject,
+          body: textBody,
+          attachments: jobAttachments,
+          status: 'queued'
+        })
+      } catch (logErr) {
+        throw new Error(`Gagal menyimpan email log sebelum enqueue: ${logErr.message}`)
+      }
 
       // Queue pengiriman email dengan lampiran PDF
-      await JobService.dispatch('App/Jobs/SendEmailJob', {
-        smtpHost,
-        smtpPort,
-        smtpSecure,
-        smtpUser,
-        smtpPass,
-        mailFrom,
-        to,
-        cc,
-        bcc,
-        subject,
-        text: textBody,
-        attachments: [
-          { filename: pdfMeta.filename, path: pdfMeta.filePath }
-        ],
-        userId: user.id,
-        companyId: company.company_id,
-        template: cfg.template,
-        context: 'single-send'
-      }, { attempts: 3, timeout: 120000 })
+      try {
+        await JobService.dispatch('App/Jobs/SendEmailJob', {
+          smtpHost,
+          smtpPort,
+          smtpSecure,
+          smtpUser,
+          smtpPass,
+          mailFrom,
+          to,
+          cc,
+          bcc,
+          subject,
+          text: textBody,
+          attachments: jobAttachments,
+          userId: user.id,
+          companyId: company.company_id,
+          template: cfg.template,
+          context: 'single-send',
+          emailLogId
+        }, { attempts: 3, timeout: 120000 })
+      } catch (dispatchErr) {
+        await markDispatchFailed(emailLogId, dispatchErr.message)
+        throw dispatchErr
+      }
 
       return response.status(202).json({
         status: 'queued',
@@ -255,6 +282,15 @@ function cfgBa(template) {
       ]
       return lines.filter(Boolean).join('\n')
     }
+  }
+}
+
+async function markDispatchFailed(emailLogId, error) {
+  if (!emailLogId) return
+  try {
+    await EmailLogService.markDispatchFailed({ id: emailLogId, error })
+  } catch (logErr) {
+    console.error('[SingleEmail] gagal update email_log dispatch failed:', logErr.message)
   }
 }
 

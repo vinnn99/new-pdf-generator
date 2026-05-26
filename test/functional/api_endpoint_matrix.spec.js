@@ -948,6 +948,68 @@ test('SendEmailJob tetap upsert contact saat kirim email gagal', async ({ assert
   assert.equal(emailLog.status, 'failed')
 })
 
+test('SendEmailJob update row queued email_logs saat emailLogId tersedia', async ({ assert }) => {
+  const stamp = uniqueId('sendjob_queue')
+  const toEmail = `sendjob.queue.${stamp}@test.local`
+  const now = new Date()
+
+  const inserted = await Database.table('email_logs').insert({
+    user_id: seed.userMainId,
+    company_id: seed.companyAId,
+    template: 'ba-penempatan',
+    context: 'single-send',
+    to_email: toEmail,
+    cc: JSON.stringify([]),
+    bcc: JSON.stringify([]),
+    subject: 'Queued Subject',
+    body: 'Queued Body',
+    attachments: JSON.stringify([]),
+    status: 'queued',
+    error: null,
+    created_at: now,
+    updated_at: now
+  })
+  const emailLogId = Array.isArray(inserted) ? inserted[0] : inserted
+
+  const originalCreateTransport = nodemailer.createTransport
+  nodemailer.createTransport = () => ({
+    sendMail: async () => ({ accepted: [toEmail], messageId: 'mock-message-id' })
+  })
+
+  try {
+    await new SendEmailJob().handle({
+      smtpHost: 'localhost',
+      smtpPort: 25,
+      smtpSecure: false,
+      smtpUser: 'noreply@test.local',
+      smtpPass: 'dummy',
+      mailFrom: 'noreply@test.local',
+      to: toEmail,
+      cc: [],
+      bcc: [],
+      subject: 'Updated Subject',
+      text: 'Updated Body',
+      attachments: [],
+      userId: seed.userMainId,
+      companyId: seed.companyAId,
+      template: 'ba-penempatan',
+      context: 'single-send',
+      emailLogId
+    })
+  } finally {
+    nodemailer.createTransport = originalCreateTransport
+  }
+
+  const rows = await Database.table('email_logs')
+    .where('to_email', toEmail)
+    .orderBy('id', 'asc')
+
+  assert.equal(rows.length, 1)
+  assert.equal(Number(rows[0].id), Number(emailLogId))
+  assert.equal(rows[0].status, 'sent')
+  assert.equal(rows[0].subject, 'Updated Subject')
+})
+
 test('Preview BA tidak menambah counter letterNo final', async ({ client, assert }) => {
   const token = await loginAndGetToken(client, seed.credentials.user)
 

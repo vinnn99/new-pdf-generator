@@ -802,7 +802,10 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
 - Setiap pengiriman email (bulk/single), termasuk yang gagal, otomatis melakukan upsert ke tabel `contacts` berdasarkan `(user_id, email)` untuk penerima `to`, `cc`, dan `bcc`:
   - jika belum ada: dibuat contact baru (`source` otomatis `auto-bulk`/`auto-single`, `send_count=1`, `last_sent_at` terisi).
   - jika sudah ada: `send_count` bertambah, `last_sent_at` diperbarui, tanpa duplikasi.
-- Status: `sent` atau `failed` (jika nodemailer error).
+- Status:
+  - `queued`: request kirim email sudah terekam dan job masuk antrean.
+  - `sent`: email berhasil dikirim.
+  - `failed`: gagal enqueue job atau nodemailer error saat proses kirim.
 - Nilai `context`:
   - `bulk-slip` untuk `/send-slip-emails`
   - `bulk-ba` untuk semua BA bulk send

@@ -8,6 +8,7 @@ const path = require('path')
 const JobService = require('../../Services/JobService')
 const Database = use('Database')
 const BaTemplateService = use('App/Services/BaTemplateService')
+const EmailLogService = use('App/Services/EmailLogService')
 
 const LOG_DIR = path.join(Helpers.appRoot(), 'logs')
 const LOG_FILE = path.join(LOG_DIR, 'bulk-email.log')
@@ -148,7 +149,22 @@ class BulkEmailController {
           continue
         }
 
+        let emailLogId = null
         try {
+          emailLogId = await EmailLogService.createQueued({
+            userId: user.id,
+            companyId: company.company_id,
+            template: 'payslip-email',
+            context: 'bulk-slip',
+            to,
+            cc,
+            bcc,
+            subject: slipTitle,
+            body,
+            attachments: selectedAttachments,
+            status: 'queued'
+          })
+
           await JobService.dispatch('App/Jobs/SendEmailJob', {
             smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
             to, cc, bcc, subject: slipTitle, text: body,
@@ -157,7 +173,8 @@ class BulkEmailController {
             userId: user.id,
             companyId: company.company_id,
             template: 'payslip-email',
-            context: 'bulk-slip'
+            context: 'bulk-slip',
+            emailLogId
           }, { attempts: 3, timeout: 120000 })
           const attachNames = selectedAttachments.map(a => a.filename)
           results.push({ row: i + 1, status: 'queued', to, attachments: attachNames })
@@ -173,6 +190,7 @@ class BulkEmailController {
           })
           queuedCount++
         } catch (err) {
+          await markDispatchFailed(emailLogId, err.message)
           results.push({ row: i + 1, status: 'failed', to, message: err.message })
           appendLog({ row: i + 1, to, status: 'failed', error: err.message, employeeId, employeeName })
           failedCount++
@@ -357,16 +375,33 @@ class BulkEmailController {
         const cc = norm.cc ? norm.cc.split(';').map(s => s.trim()).filter(Boolean) : []
         const bcc = norm.bcc ? norm.bcc.split(';').map(s => s.trim()).filter(Boolean) : []
 
+        let emailLogId = null
         try {
+          const jobAttachments = [{ filename: batchAttachment.filename, path: batchAttachment.path }]
+          emailLogId = await EmailLogService.createQueued({
+            userId: user.id,
+            companyId: company.company_id,
+            template: cfg.template,
+            context: 'bulk-ba',
+            to,
+            cc,
+            bcc,
+            subject,
+            body,
+            attachments: jobAttachments,
+            status: 'queued'
+          })
+
           await JobService.dispatch('App/Jobs/SendEmailJob', {
             smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
             to, cc, bcc, subject, text: body,
-            attachments: [{ filename: batchAttachment.filename, path: batchAttachment.path }],
+            attachments: jobAttachments,
             employeeName: fields.mdsName,
             userId: user.id,
             companyId: company.company_id,
             template: cfg.template,
-            context: 'bulk-ba'
+            context: 'bulk-ba',
+            emailLogId
           }, { attempts: 3, timeout: 120000 })
           results.push({ row: i + 1, status: 'queued', to, attachment: batchAttachment.filename })
           appendLog({
@@ -382,6 +417,7 @@ class BulkEmailController {
           })
           queuedCount++
         } catch (err) {
+          await markDispatchFailed(emailLogId, err.message)
           results.push({ row: i + 1, status: 'failed', to, message: err.message })
           appendLog({ row: i + 1, to, status: 'failed', error: err.message, template: cfg.template, batchId, matchKey })
           failedCount++
@@ -779,6 +815,15 @@ function appendLog(entry) {
     fs.appendFileSync(LOG_FILE, line)
   } catch (e) {
     console.error('Failed to write log:', e.message)
+  }
+}
+
+async function markDispatchFailed(emailLogId, error) {
+  if (!emailLogId) return
+  try {
+    await EmailLogService.markDispatchFailed({ id: emailLogId, error })
+  } catch (logErr) {
+    console.error('[BulkEmail] gagal update email_log dispatch failed:', logErr.message)
   }
 }
 
