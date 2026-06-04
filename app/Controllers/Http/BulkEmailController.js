@@ -111,13 +111,42 @@ class BulkEmailController {
         const bcc = norm.bcc ? norm.bcc.split(';').map(s => s.trim()).filter(Boolean) : []
 
         if (!to) {
+          const error = `Row ${i + 1}: sentTo/email kosong. Email tidak dikirim.`
           results.push({ row: i + 1, status: 'skipped', message: 'sentTo/email kosong' })
-          appendLog({ row: i + 1, status: 'skipped', reason: 'no_recipient', employeeId, employeeName })
+          await createEmailStatusLogSafe({
+            status: 'skipped',
+            user,
+            company,
+            template: 'payslip-email',
+            context: 'bulk-slip',
+            to: '',
+            cc,
+            bcc,
+            subject: slipTitle,
+            body,
+            error
+          })
+          appendLog({ row: i + 1, status: 'skipped', reason: 'no_recipient', error, employeeId, employeeName })
           skippedCount++
           continue
         }
         if (!employeeId) {
-          results.push({ row: i + 1, status: 'failed', message: 'employeeId kosong' })
+          const error = `Row ${i + 1}: employeeId kosong. Lampiran slip tidak dapat dicari dan email tidak dikirim.`
+          results.push({ row: i + 1, status: 'failed', to, message: 'employeeId kosong' })
+          await createEmailStatusLogSafe({
+            status: 'failed',
+            user,
+            company,
+            template: 'payslip-email',
+            context: 'bulk-slip',
+            to,
+            cc,
+            bcc,
+            subject: slipTitle,
+            body,
+            error
+          })
+          appendLog({ row: i + 1, to, status: 'failed', reason: 'missing_employee_id', error, employeeName })
           failedCount++
           continue
         }
@@ -135,7 +164,34 @@ class BulkEmailController {
           : []
 
         if (selectedAttachments.length === 0) {
-          results.push({ row: i + 1, status: 'skipped', to, message: 'Lampiran tidak ditemukan untuk employeeId/name' })
+          const diagnostic = buildSlipAttachmentDiagnostic({
+            bases,
+            periodPrefix,
+            slipTemplate,
+            employeeId,
+            employeeName
+          })
+          const error = formatSlipAttachmentError(diagnostic)
+          results.push({
+            row: i + 1,
+            status: 'skipped',
+            to,
+            message: 'Lampiran tidak ditemukan untuk employeeId/name',
+            detail: diagnostic
+          })
+          await createEmailStatusLogSafe({
+            status: 'skipped',
+            user,
+            company,
+            template: 'payslip-email',
+            context: 'bulk-slip',
+            to,
+            cc,
+            bcc,
+            subject: slipTitle,
+            body,
+            error
+          })
           appendLog({
             row: i + 1,
             to,
@@ -143,7 +199,9 @@ class BulkEmailController {
             reason: 'no_attachments',
             employeeId,
             employeeName,
-            slipTemplate
+            slipTemplate,
+            diagnostic,
+            error
           })
           skippedCount++
           continue
@@ -169,6 +227,7 @@ class BulkEmailController {
             smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
             to, cc, bcc, subject: slipTitle, text: body,
             attachments: selectedAttachments,
+            requireAttachments: true,
             employeeId, employeeName,
             userId: user.id,
             companyId: company.company_id,
@@ -396,6 +455,7 @@ class BulkEmailController {
             smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
             to, cc, bcc, subject, text: body,
             attachments: jobAttachments,
+            requireAttachments: true,
             employeeName: fields.mdsName,
             userId: user.id,
             companyId: company.company_id,
@@ -604,7 +664,8 @@ function findSlipAttachmentCandidates({ bases, periodPrefix, slipTemplate, emplo
   if (!targetId) return []
 
   const targetName = normalizeSlipSegment(employeeName).toLowerCase()
-  const candidates = []
+  const exactNameCandidates = []
+  const idOnlyCandidates = []
 
   for (const base of bases) {
     const dir = base.dir
@@ -615,17 +676,28 @@ function findSlipAttachmentCandidates({ bases, periodPrefix, slipTemplate, emplo
       const parsed = parseSlipAttachmentFilename(filename)
       if (!parsed) continue
 
-      const periodOk = !periodPrefix || parsed.period.startsWith(periodPrefix)
+      const periodOk = slipPeriodMatches(parsed.period, periodPrefix)
       const templateOk = !slipTemplate || parsed.template === slipTemplate
       const idOk = parsed.employeeId === targetId
-      const nameOk = !targetName || parsed.employeeName === targetName
-      if (!periodOk || !templateOk || !idOk || !nameOk) continue
+      if (!periodOk || !templateOk || !idOk) continue
 
-      candidates.push(buildAttachmentCandidate(filename, path.join(dir, filename), 'new-format'))
+      const nameOk = !targetName || parsed.employeeName === targetName
+      const candidate = buildAttachmentCandidate(
+        filename,
+        path.join(dir, filename),
+        nameOk ? 'new-format' : 'new-format-id-only'
+      )
+
+      if (nameOk) {
+        exactNameCandidates.push(candidate)
+      } else {
+        idOnlyCandidates.push(candidate)
+      }
     }
   }
 
-  if (candidates.length > 0) return candidates
+  if (exactNameCandidates.length > 0) return exactNameCandidates
+  if (idOnlyCandidates.length > 0) return idOnlyCandidates
   return findLegacySlipAttachmentCandidates({ bases, periodPrefix, employeeId, employeeName })
 }
 
@@ -644,7 +716,7 @@ function findLegacySlipAttachmentCandidates({ bases, periodPrefix, employeeId, e
     for (const filename of files) {
       const lower = filename.toLowerCase()
       if (!lower.endsWith('.pdf')) continue
-      const periodOk = !periodPrefix || lower.startsWith(periodPrefix)
+      const periodOk = slipFilenamePeriodMatches(lower, periodPrefix)
       const hasId = lower.includes(targetId)
       const hasName = !targetName || lower.includes(targetName)
       if (!periodOk || !hasId || !hasName) continue
@@ -709,7 +781,39 @@ function parseSlipAttachmentFilename(filename) {
 }
 
 function normalizePeriodPrefix(val) {
-  return normalizeSlipSegment((val || '').toString().trim().replace(/\//g, '-')).toLowerCase()
+  return normalizeSlipPeriodSegment(val).toLowerCase()
+}
+
+function slipPeriodMatches(filePeriod, targetPeriod) {
+  if (!targetPeriod) return true
+
+  const fileKey = normalizeSlipPeriodSegment(filePeriod).toLowerCase()
+  const targetKey = normalizeSlipPeriodSegment(targetPeriod).toLowerCase()
+  if (fileKey && targetKey && fileKey.startsWith(targetKey)) return true
+
+  const fileCompact = normalizeSlipPeriodCompact(filePeriod)
+  const targetCompact = normalizeSlipPeriodCompact(targetPeriod)
+  return Boolean(fileCompact && targetCompact && fileCompact.startsWith(targetCompact))
+}
+
+function slipFilenamePeriodMatches(filename, targetPeriod) {
+  if (!targetPeriod) return true
+
+  const fileKey = normalizeSlipPeriodSegment(filename).toLowerCase()
+  const targetKey = normalizeSlipPeriodSegment(targetPeriod).toLowerCase()
+  if (fileKey && targetKey && fileKey.startsWith(targetKey)) return true
+
+  const fileCompact = normalizeSlipPeriodCompact(filename)
+  const targetCompact = normalizeSlipPeriodCompact(targetPeriod)
+  return Boolean(fileCompact && targetCompact && fileCompact.startsWith(targetCompact))
+}
+
+function normalizeSlipPeriodSegment(str) {
+  return normalizeSlipSegment((str || '').toString().trim().replace(/[\/._\s]+/g, '-'))
+}
+
+function normalizeSlipPeriodCompact(str) {
+  return (str || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
 function resolveSlipTemplate(norm, requestTemplate, slipTitle) {
@@ -805,6 +909,119 @@ function ensureLogDir() {
     if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true })
   } catch (e) {
     console.error('Failed to create log dir:', e.message)
+  }
+}
+
+async function createEmailStatusLogSafe({
+  status,
+  user,
+  company,
+  template,
+  context,
+  to,
+  cc = [],
+  bcc = [],
+  subject,
+  body,
+  attachments = [],
+  error
+}) {
+  try {
+    const payload = {
+      userId: user && user.id,
+      companyId: company && company.company_id,
+      template,
+      context,
+      to,
+      cc,
+      bcc,
+      subject,
+      body,
+      attachments,
+      error
+    }
+
+    if (status === 'failed') {
+      return await EmailLogService.createFailed(payload)
+    }
+
+    return await EmailLogService.createSkipped(payload)
+  } catch (logErr) {
+    console.error('[BulkEmail] gagal simpan email log status:', logErr.message)
+    appendLog({
+      status: 'log_failed',
+      intendedStatus: status,
+      to,
+      template,
+      context,
+      error: logErr.message
+    })
+    return null
+  }
+}
+
+function buildSlipAttachmentDiagnostic({ bases, periodPrefix, slipTemplate, employeeId, employeeName }) {
+  return {
+    reason: 'no_attachments',
+    periode: periodPrefix || null,
+    template: slipTemplate || null,
+    employeeId: employeeId || null,
+    employeeName: employeeName || null,
+    normalizedEmployeeId: normalizeSlipSegment(employeeId).toLowerCase() || null,
+    normalizedEmployeeName: normalizeSlipSegment(employeeName).toLowerCase() || null,
+    searchDirs: (bases || []).map((base) => describeSearchDir(base && base.dir))
+  }
+}
+
+function describeSearchDir(dir) {
+  const info = {
+    dir: toRelativePath(dir),
+    exists: false,
+    pdfCount: 0,
+    samples: []
+  }
+
+  try {
+    if (!dir || !fs.existsSync(dir)) return info
+
+    info.exists = true
+    const pdfFiles = fs.readdirSync(dir)
+      .filter((filename) => String(filename || '').toLowerCase().endsWith('.pdf'))
+      .sort((a, b) => String(a).localeCompare(String(b), 'en', { sensitivity: 'base' }))
+
+    info.pdfCount = pdfFiles.length
+    info.samples = pdfFiles.slice(0, 5)
+  } catch (err) {
+    info.error = err.message
+  }
+
+  return info
+}
+
+function formatSlipAttachmentError(diagnostic) {
+  const dirs = (diagnostic.searchDirs || [])
+    .map((dir) => `${dir.dir} (exists=${dir.exists}, pdf=${dir.pdfCount})`)
+    .join('; ')
+  const samples = (diagnostic.searchDirs || [])
+    .reduce((acc, dir) => acc.concat(dir.samples || []), [])
+    .slice(0, 3)
+
+  return [
+    'Lampiran slip tidak ditemukan; email tidak dikirim.',
+    `Filter: periode=${diagnostic.periode || '-'}, template=${diagnostic.template || '-'}, employeeId=${diagnostic.normalizedEmployeeId || '-'}, employeeName=${diagnostic.normalizedEmployeeName || '-'}.`,
+    dirs ? `Folder dicek: ${dirs}.` : 'Tidak ada folder pencarian attachment.',
+    samples.length ? `Contoh PDF di folder: ${samples.join(', ')}.` : 'Tidak ada contoh PDF di folder pencarian.',
+    'Pastikan generate bulk PDF sudah selesai diproses queue dan file tersimpan di folder company/email user login yang sama.'
+  ].join(' ')
+}
+
+function toRelativePath(targetPath) {
+  if (!targetPath) return ''
+  try {
+    const rel = path.relative(process.cwd(), targetPath)
+    return (rel || targetPath).replace(/\\/g, '/')
+  } catch (e) {
+    return String(targetPath).replace(/\\/g, '/')
   }
 }
 

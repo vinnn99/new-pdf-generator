@@ -19,6 +19,7 @@ class SendEmailJob {
     const {
       smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
       to, cc = [], bcc = [], subject, text, attachments = [],
+      requireAttachments = false,
       employeeId = '', employeeName = '',
       userId = null, companyId = null, template = null, context = null, emailLogId = null
     } = data
@@ -28,14 +29,19 @@ class SendEmailJob {
     let sendError = null
 
     try {
+      const validAttachments = attachments.filter((a) => a && a.path && fs.existsSync(a.path))
+      const missingAttachments = attachments.filter((a) => !a || !a.path || !fs.existsSync(a.path))
+
+      if (requireAttachments && (attachments.length === 0 || missingAttachments.length > 0)) {
+        throw new Error(formatMissingAttachmentError(attachments, missingAttachments))
+      }
+
       const transporter = nodemailer.createTransport({
         host: smtpHost,
         port: Number(smtpPort),
         secure: smtpSecure,
         auth: { user: smtpUser, pass: smtpPass }
       })
-
-      const validAttachments = attachments.filter((a) => a && a.path && fs.existsSync(a.path))
 
       await transporter.sendMail({
         from: mailFrom || smtpUser,
@@ -115,6 +121,32 @@ function appendLog(entry) {
   } catch (e) {
     console.error('Failed to write log:', e.message)
   }
+}
+
+function formatMissingAttachmentError(attachments, missingAttachments) {
+  const expected = attachmentNames(attachments)
+  const missing = attachmentNames(missingAttachments)
+
+  if (!expected.length) {
+    return 'Lampiran email wajib, tetapi daftar attachment kosong. Email tidak dikirim.'
+  }
+
+  return [
+    'Lampiran email wajib tidak ditemukan atau tidak dapat dibaca. Email tidak dikirim.',
+    `Expected: ${expected.join(', ')}.`,
+    missing.length ? `Missing: ${missing.join(', ')}.` : ''
+  ].filter(Boolean).join(' ')
+}
+
+function attachmentNames(list = []) {
+  return (list || [])
+    .map((item) => {
+      if (!item) return null
+      if (item.filename) return item.filename
+      if (item.path) return path.basename(item.path)
+      return String(item)
+    })
+    .filter(Boolean)
 }
 
 async function persistEmailLogSafe(entry) {

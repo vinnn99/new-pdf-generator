@@ -5,10 +5,22 @@ const Database = use('Database')
 
 class EmailLogService {
   static async createQueued(entry = {}) {
+    return this._createWithStatus(entry, entry.status || 'queued', entry.error || null)
+  }
+
+  static async createSkipped(entry = {}) {
+    return this._createWithStatus(entry, 'skipped', entry.error || 'Skipped before enqueue')
+  }
+
+  static async createFailed(entry = {}) {
+    return this._createWithStatus(entry, 'failed', entry.error || 'Failed before enqueue')
+  }
+
+  static async _createWithStatus(entry = {}, status, error) {
     const payload = this._buildPayload({
       ...entry,
-      status: entry.status || 'queued',
-      error: entry.error || null
+      status,
+      error
     })
     const now = new Date()
     const inserted = await this._withRetry(() => Database.table('email_logs').insert({

@@ -177,6 +177,7 @@ class SingleEmailController {
           subject,
           text: textBody,
           attachments: jobAttachments,
+          requireAttachments: true,
           userId: user.id,
           companyId: company.company_id,
           template: cfg.template,

@@ -121,12 +121,12 @@ class GeneratePdfJob {
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
       })()
       const normalizedPeriod = periodFromPayload
-        ? sanitizeSlipSegment(String(periodFromPayload).trim().replace(/\//g, '-'), currentPeriod)
+        ? sanitizeSlipPeriodSegment(periodFromPayload, currentPeriod)
         : currentPeriod
       const normalizedFilenameTemplate = sanitizeSlipSegment(normalizeFilenameTemplate(filenameTemplate || template), 'payslip').toLowerCase()
 
       // Penamaan file per template
-      if (isSlipFilenameTemplate(template)) {
+      if (isSlipFilenameTemplate(filenameTemplate || template)) {
         const nip = payloadData && payloadData.employeeId ? String(payloadData.employeeId) : 'NIP'
         const nama = payloadData && payloadData.employeeName ? String(payloadData.employeeName) : 'NAME'
         filename = `${normalizedPeriod}.${normalizedFilenameTemplate}.${sanitizeSlipSegment(nip, 'NIP')}.${sanitizeSlipSegment(nama, 'NAME')}.${uniqueId}.pdf`
@@ -328,6 +328,14 @@ function sanitizeSlipSegment(value, fallback) {
 
   if (cleaned) return cleaned
   return fallback || 'UNKNOWN'
+}
+
+function sanitizeSlipPeriodSegment(value, fallback) {
+  const canonical = (value === undefined || value === null ? '' : String(value))
+    .trim()
+    .replace(/[\/._\s]+/g, '-')
+
+  return sanitizeSlipSegment(canonical, fallback)
 }
 
 async function updateBatchItemStatus({

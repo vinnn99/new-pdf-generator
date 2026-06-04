@@ -5,6 +5,7 @@ const path = require('path')
 const http = require('http')
 const nodemailer = require('nodemailer')
 const { spawn } = require('child_process')
+const XLSX = require('xlsx')
 
 const suite = use('Test/Suite')('API Endpoint Matrix (No Email Send)')
 suite.timeout(0)
@@ -17,6 +18,7 @@ const ContactService = use('App/Services/ContactService')
 const SignatureUrlHistoryService = use('App/Services/SignatureUrlHistoryService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
 const SendEmailJob = use('App/Jobs/SendEmailJob')
+const GeneratePdfJob = use('App/Jobs/GeneratePdfJob')
 
 trait('Test/ApiClient')
 
@@ -1037,6 +1039,195 @@ test('SendEmailJob update row queued email_logs saat emailLogId tersedia', async
   assert.equal(Number(rows[0].id), Number(emailLogId))
   assert.equal(rows[0].status, 'sent')
   assert.equal(rows[0].subject, 'Updated Subject')
+})
+
+test('SendEmailJob gagal jelas saat attachment wajib hilang', async ({ assert }) => {
+  const stamp = uniqueId('sendjob_missing_attachment')
+  const toEmail = `sendjob.missing.${stamp}@test.local`
+  const missingFilename = `missing-${stamp}.pdf`
+  const missingPath = path.join(Helpers.tmpPath(), missingFilename)
+  let sendMailCalled = false
+
+  try {
+    fs.unlinkSync(missingPath)
+  } catch (e) {
+    // ignore
+  }
+
+  const originalCreateTransport = nodemailer.createTransport
+  nodemailer.createTransport = () => ({
+    sendMail: async () => {
+      sendMailCalled = true
+      return { accepted: [toEmail] }
+    }
+  })
+
+  try {
+    await new SendEmailJob().handle({
+      smtpHost: 'localhost',
+      smtpPort: 25,
+      smtpSecure: false,
+      smtpUser: 'noreply@test.local',
+      smtpPass: 'dummy',
+      mailFrom: 'noreply@test.local',
+      to: toEmail,
+      cc: [],
+      bcc: [],
+      subject: 'Attachment Required',
+      text: 'Body',
+      attachments: [{ filename: missingFilename, path: missingPath }],
+      requireAttachments: true,
+      userId: seed.userMainId,
+      companyId: seed.companyAId,
+      template: 'payslip-email',
+      context: 'bulk-slip'
+    })
+    throw new Error('SendEmailJob seharusnya throw saat attachment wajib hilang')
+  } catch (err) {
+    assert.equal(String(err.message || '').includes('Lampiran email wajib'), true)
+    assert.equal(String(err.message || '').includes(missingFilename), true)
+  } finally {
+    nodemailer.createTransport = originalCreateTransport
+  }
+
+  assert.equal(sendMailCalled, false)
+
+  const emailLog = await Database.table('email_logs')
+    .where('to_email', toEmail)
+    .orderBy('id', 'desc')
+    .first()
+
+  assert.ok(emailLog)
+  assert.equal(emailLog.status, 'failed')
+  assert.equal(String(emailLog.error || '').includes(missingFilename), true)
+})
+
+test('send-slip-emails mencatat skipped ke email_logs saat lampiran tidak ditemukan', async ({ client, assert }) => {
+  const stamp = uniqueId('slip_missing_attachment')
+  const toEmail = `slip.missing.${stamp}@test.local`
+  const employeeId = `EMP-${stamp}`
+  const employeeName = `Missing Attachment ${stamp}`
+  const xlsxPath = path.join(Helpers.tmpPath(), `send-slip-missing-${stamp}.xlsx`)
+
+  const workbook = XLSX.utils.book_new()
+  const sheet = XLSX.utils.json_to_sheet([
+    {
+      sentTo: toEmail,
+      employeeId,
+      employeeName,
+      slipTitle: 'Slip Gaji',
+      body: 'Body'
+    }
+  ])
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Sheet1')
+  XLSX.writeFile(workbook, xlsxPath)
+
+  try {
+    const token = await loginAndGetToken(client, seed.credentials.user)
+    const response = await client
+      .post('/api/v1/send-slip-emails')
+      .header('Authorization', `Bearer ${token}`)
+      .field('periode', '2099-12')
+      .attach('file', xlsxPath)
+      .end()
+
+    response.assertStatus(200)
+    assert.equal(response.body.status, 'ok')
+    assert.equal(Number(response.body.skipped), 1)
+    assert.equal(response.body.results[0].status, 'skipped')
+    assert.equal(response.body.results[0].detail.reason, 'no_attachments')
+
+    const emailLog = await Database.table('email_logs')
+      .where('to_email', toEmail)
+      .where('context', 'bulk-slip')
+      .orderBy('id', 'desc')
+      .first()
+
+    assert.ok(emailLog)
+    assert.equal(emailLog.status, 'skipped')
+    assert.equal(String(emailLog.error || '').includes('Lampiran slip tidak ditemukan'), true)
+    assert.equal(String(emailLog.error || '').includes('2099-12'), true)
+  } finally {
+    try {
+      fs.unlinkSync(xlsxPath)
+    } catch (e) {
+      // ignore
+    }
+  }
+})
+
+test('send-slip-emails menemukan PDF hasil generate bulk walau periode/nama beda separator', async ({ client, assert }) => {
+  const stamp = uniqueId('slip_match_generated')
+  const toEmail = `slip.match.${stamp}@test.local`
+  const employeeId = `EMP/${stamp}`
+  const generatedName = `Budi A. ${stamp}`
+  const emailSheetName = `Budi A ${stamp}`
+  const xlsxPath = path.join(Helpers.tmpPath(), `send-slip-match-${stamp}.xlsx`)
+  let pdfMeta = null
+
+  const company = await Database.table('companies')
+    .where('company_id', seed.companyAId)
+    .first()
+
+  pdfMeta = await new GeneratePdfJob().handle({
+    template: 'payslip',
+    filenameTemplate: 'payslip',
+    data: {
+      employeeId,
+      employeeName: generatedName,
+      position: 'Staff',
+      period: '2026.03',
+      earnings: [{ label: 'Gaji Pokok', amount: 1000000 }],
+      deductions: []
+    },
+    email: seed.credentials.user.email,
+    companyName: company.name,
+    userId: seed.userMainId,
+    companyId: seed.companyAId
+  })
+
+  const workbook = XLSX.utils.book_new()
+  const sheet = XLSX.utils.json_to_sheet([
+    {
+      sentTo: toEmail,
+      employeeId,
+      employeeName: emailSheetName,
+      slipTitle: 'Slip Gaji',
+      body: 'Body'
+    }
+  ])
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Sheet1')
+  XLSX.writeFile(workbook, xlsxPath)
+
+  try {
+    assert.equal(String(pdfMeta.filename).startsWith('2026-03.payslip.'), true)
+
+    const token = await loginAndGetToken(client, seed.credentials.user)
+    const response = await client
+      .post('/api/v1/send-slip-emails')
+      .header('Authorization', `Bearer ${token}`)
+      .field('periode', '2026-03')
+      .attach('file', xlsxPath)
+      .end()
+
+    response.assertStatus(200)
+    assert.equal(response.body.status, 'ok')
+    assert.equal(Number(response.body.queued), 1)
+    assert.equal(Number(response.body.skipped), 0)
+    assert.equal(response.body.results[0].status, 'queued')
+    assert.equal(response.body.results[0].attachments[0], pdfMeta.filename)
+  } finally {
+    try {
+      fs.unlinkSync(xlsxPath)
+    } catch (e) {
+      // ignore
+    }
+    try {
+      if (pdfMeta && pdfMeta.filePath) fs.unlinkSync(pdfMeta.filePath)
+    } catch (e) {
+      // ignore
+    }
+  }
 })
 
 test('Preview BA tidak menambah counter letterNo final', async ({ client, assert }) => {
