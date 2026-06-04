@@ -1140,7 +1140,7 @@ Form-data:
 Perilaku:
 - Lampiran dicari hanya di `public/download/{companyName}/{email_login}/` (folder disanitasi sesuai email user yang login).
 - Format file lampiran yang diprioritaskan: `[periode].[template].[employeeId].[nama].[kodeUnique].pdf`.
-- Separator periode dinormalisasi, sehingga `2026.03`, `2026_03`, `2026/03`, dan `2026-03` dianggap setara.
+- Separator periode dan nama bulan dinormalisasi, sehingga `2026.03`, `2026_03`, `2026/03`, `2026-03`, `april-2026`, dan `April 2026` dianggap setara.
 - Untuk format file bulk baru, kandidat diprioritaskan yang `employeeName` cocok; jika tidak ada, sistem fallback ke `employeeId` exact selama `periode` dan `template` cocok.
 - Jika ada lebih dari satu kandidat lampiran yang cocok (beda `kodeUnique`), sistem memilih file terbaru.
 - Satu lampiran dikirim per baris email.

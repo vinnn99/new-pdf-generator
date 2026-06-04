@@ -694,7 +694,7 @@ Form-data:
 
 Lampiran dicari hanya di `public/download/{companyName}/{email_login}/` (folder disanitasi sesuai email user login) dengan format:
 `[periode].[template].[employeeId].[nama].[kodeUnique].pdf`.
-Pencarian menormalisasi separator periode (`2026.03`, `2026_03`, `2026/03`, `2026-03`) ke bentuk yang sama. Untuk format file bulk baru, kandidat diprioritaskan yang `employeeName` cocok; jika tidak ada, sistem fallback ke `employeeId` exact selama `periode` dan `template` cocok.
+Pencarian menormalisasi separator periode (`2026.03`, `2026_03`, `2026/03`, `2026-03`) dan nama bulan (`april-2026`, `April 2026`, `apr-2026`) ke bentuk yang sama. Untuk format file bulk baru, kandidat diprioritaskan yang `employeeName` cocok; jika tidak ada, sistem fallback ke `employeeId` exact selama `periode` dan `template` cocok.
 Jika ditemukan lebih dari satu kandidat untuk baris yang sama, sistem memilih file paling baru (berdasarkan waktu file).
 SMTP: jika semua field SMTP di tabel `companies` terisi (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, opsional `smtp_secure`, `mail_from`) maka dipakai; jika tidak lengkap, fallback ke `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `MAIL_FROM`).
 

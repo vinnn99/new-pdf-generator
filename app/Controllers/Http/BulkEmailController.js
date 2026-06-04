@@ -809,11 +809,60 @@ function slipFilenamePeriodMatches(filename, targetPeriod) {
 }
 
 function normalizeSlipPeriodSegment(str) {
+  const canonical = canonicalSlipPeriod(str)
+  if (canonical) return canonical
+
   return normalizeSlipSegment((str || '').toString().trim().replace(/[\/._\s]+/g, '-'))
 }
 
 function normalizeSlipPeriodCompact(str) {
   return (str || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function canonicalSlipPeriod(value) {
+  const raw = (value === undefined || value === null ? '' : String(value)).trim().toLowerCase()
+  if (!raw) return ''
+
+  const numericYearFirst = raw.match(/^(\d{4})[\/._\s-]+(0?[1-9]|1[0-2])$/)
+  if (numericYearFirst) return `${numericYearFirst[1]}-${String(Number(numericYearFirst[2])).padStart(2, '0')}`
+
+  const numericMonthFirst = raw.match(/^(0?[1-9]|1[0-2])[\/._\s-]+(\d{4})$/)
+  if (numericMonthFirst) return `${numericMonthFirst[2]}-${String(Number(numericMonthFirst[1])).padStart(2, '0')}`
+
+  const compactMonthYear = raw.match(/^([a-z]+)(\d{4})$/)
+  if (compactMonthYear && monthNumber(compactMonthYear[1])) {
+    return `${compactMonthYear[2]}-${monthNumber(compactMonthYear[1])}`
+  }
+
+  const compactYearMonth = raw.match(/^(\d{4})([a-z]+)$/)
+  if (compactYearMonth && monthNumber(compactYearMonth[2])) {
+    return `${compactYearMonth[1]}-${monthNumber(compactYearMonth[2])}`
+  }
+
+  const tokens = raw.split(/[^a-z0-9]+/).filter(Boolean)
+  const year = tokens.find((token) => /^\d{4}$/.test(token))
+  const monthToken = tokens.find((token) => monthNumber(token))
+  if (year && monthToken) return `${year}-${monthNumber(monthToken)}`
+
+  return ''
+}
+
+function monthNumber(token) {
+  const months = {
+    jan: '01', january: '01', januari: '01',
+    feb: '02', february: '02', februari: '02',
+    mar: '03', march: '03', maret: '03',
+    apr: '04', april: '04',
+    may: '05', mei: '05',
+    jun: '06', june: '06', juni: '06',
+    jul: '07', july: '07', juli: '07',
+    aug: '08', august: '08', agustus: '08', agu: '08', agt: '08',
+    sep: '09', sept: '09', september: '09',
+    oct: '10', october: '10', okt: '10', oktober: '10',
+    nov: '11', november: '11',
+    dec: '12', december: '12', des: '12', desember: '12'
+  }
+  return months[String(token || '').toLowerCase()] || ''
 }
 
 function resolveSlipTemplate(norm, requestTemplate, slipTitle) {
@@ -969,8 +1018,62 @@ function buildSlipAttachmentDiagnostic({ bases, periodPrefix, slipTemplate, empl
     employeeName: employeeName || null,
     normalizedEmployeeId: normalizeSlipSegment(employeeId).toLowerCase() || null,
     normalizedEmployeeName: normalizeSlipSegment(employeeName).toLowerCase() || null,
-    searchDirs: (bases || []).map((base) => describeSearchDir(base && base.dir))
+    searchDirs: (bases || []).map((base) => describeSearchDir(base && base.dir)),
+    employeeIdCandidates: findSlipFilesByEmployeeId({ bases, employeeId }).slice(0, 5)
   }
+}
+
+function findSlipFilesByEmployeeId({ bases, employeeId }) {
+  const targetId = normalizeSlipSegment(employeeId).toLowerCase()
+  if (!targetId) return []
+
+  const candidates = []
+  for (const base of bases || []) {
+    const dir = base && base.dir
+    if (!dir || !fs.existsSync(dir)) continue
+
+    let files = []
+    try {
+      files = fs.readdirSync(dir)
+    } catch (e) {
+      continue
+    }
+
+    for (const filename of files) {
+      const parsed = parseSlipAttachmentFilename(filename)
+      if (parsed) {
+        if (parsed.employeeId !== targetId) continue
+        candidates.push({
+          filename,
+          period: normalizeSlipPeriodSegment(parsed.period).toLowerCase(),
+          template: parsed.template,
+          source: 'new-format',
+          mtimeMs: safeMtimeMs(path.join(dir, filename))
+        })
+        continue
+      }
+
+      const lower = String(filename || '').toLowerCase()
+      if (!lower.endsWith('.pdf') || !lower.includes(targetId)) continue
+      candidates.push({
+        filename,
+        period: null,
+        template: null,
+        source: 'legacy',
+        mtimeMs: safeMtimeMs(path.join(dir, filename))
+      })
+    }
+  }
+
+  return candidates.sort((a, b) => {
+    if ((b.mtimeMs || 0) !== (a.mtimeMs || 0)) return (b.mtimeMs || 0) - (a.mtimeMs || 0)
+    return String(b.filename || '').localeCompare(String(a.filename || ''), 'en', { sensitivity: 'base' })
+  }).map((item) => ({
+    filename: item.filename,
+    period: item.period,
+    template: item.template,
+    source: item.source
+  }))
 }
 
 function describeSearchDir(dir) {
@@ -1005,14 +1108,24 @@ function formatSlipAttachmentError(diagnostic) {
   const samples = (diagnostic.searchDirs || [])
     .reduce((acc, dir) => acc.concat(dir.samples || []), [])
     .slice(0, 3)
+  const employeeFiles = (diagnostic.employeeIdCandidates || []).map((item) => item.filename).slice(0, 3)
 
   return [
     'Lampiran slip tidak ditemukan; email tidak dikirim.',
     `Filter: periode=${diagnostic.periode || '-'}, template=${diagnostic.template || '-'}, employeeId=${diagnostic.normalizedEmployeeId || '-'}, employeeName=${diagnostic.normalizedEmployeeName || '-'}.`,
     dirs ? `Folder dicek: ${dirs}.` : 'Tidak ada folder pencarian attachment.',
     samples.length ? `Contoh PDF di folder: ${samples.join(', ')}.` : 'Tidak ada contoh PDF di folder pencarian.',
+    employeeFiles.length ? `PDF dengan employeeId ini ditemukan: ${employeeFiles.join(', ')}.` : 'Tidak ada PDF dengan employeeId ini di folder pencarian.',
     'Pastikan generate bulk PDF sudah selesai diproses queue dan file tersimpan di folder company/email user login yang sama.'
   ].join(' ')
+}
+
+function safeMtimeMs(filePath) {
+  try {
+    return fs.statSync(filePath).mtimeMs || 0
+  } catch (e) {
+    return 0
+  }
 }
 
 function toRelativePath(targetPath) {

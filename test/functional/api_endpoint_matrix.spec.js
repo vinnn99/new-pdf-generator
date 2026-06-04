@@ -1156,7 +1156,7 @@ test('send-slip-emails mencatat skipped ke email_logs saat lampiran tidak ditemu
   }
 })
 
-test('send-slip-emails menemukan PDF hasil generate bulk walau periode/nama beda separator', async ({ client, assert }) => {
+test('send-slip-emails menemukan PDF hasil generate bulk walau periode pakai nama bulan dan nama beda separator', async ({ client, assert }) => {
   const stamp = uniqueId('slip_match_generated')
   const toEmail = `slip.match.${stamp}@test.local`
   const employeeId = `EMP/${stamp}`
@@ -1176,7 +1176,7 @@ test('send-slip-emails menemukan PDF hasil generate bulk walau periode/nama beda
       employeeId,
       employeeName: generatedName,
       position: 'Staff',
-      period: '2026.03',
+      period: 'April 2026',
       earnings: [{ label: 'Gaji Pokok', amount: 1000000 }],
       deductions: []
     },
@@ -1200,13 +1200,13 @@ test('send-slip-emails menemukan PDF hasil generate bulk walau periode/nama beda
   XLSX.writeFile(workbook, xlsxPath)
 
   try {
-    assert.equal(String(pdfMeta.filename).startsWith('2026-03.payslip.'), true)
+    assert.equal(String(pdfMeta.filename).startsWith('2026-04.payslip.'), true)
 
     const token = await loginAndGetToken(client, seed.credentials.user)
     const response = await client
       .post('/api/v1/send-slip-emails')
       .header('Authorization', `Bearer ${token}`)
-      .field('periode', '2026-03')
+      .field('periode', 'april-2026')
       .attach('file', xlsxPath)
       .end()
 

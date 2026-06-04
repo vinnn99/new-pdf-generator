@@ -331,11 +331,60 @@ function sanitizeSlipSegment(value, fallback) {
 }
 
 function sanitizeSlipPeriodSegment(value, fallback) {
-  const canonical = (value === undefined || value === null ? '' : String(value))
+  const canonical = canonicalSlipPeriod(value)
+  if (canonical) return canonical
+
+  const normalized = (value === undefined || value === null ? '' : String(value))
     .trim()
     .replace(/[\/._\s]+/g, '-')
 
-  return sanitizeSlipSegment(canonical, fallback)
+  return sanitizeSlipSegment(normalized, fallback)
+}
+
+function canonicalSlipPeriod(value) {
+  const raw = (value === undefined || value === null ? '' : String(value)).trim().toLowerCase()
+  if (!raw) return ''
+
+  const numericYearFirst = raw.match(/^(\d{4})[\/._\s-]+(0?[1-9]|1[0-2])$/)
+  if (numericYearFirst) return `${numericYearFirst[1]}-${String(Number(numericYearFirst[2])).padStart(2, '0')}`
+
+  const numericMonthFirst = raw.match(/^(0?[1-9]|1[0-2])[\/._\s-]+(\d{4})$/)
+  if (numericMonthFirst) return `${numericMonthFirst[2]}-${String(Number(numericMonthFirst[1])).padStart(2, '0')}`
+
+  const compactMonthYear = raw.match(/^([a-z]+)(\d{4})$/)
+  if (compactMonthYear && monthNumber(compactMonthYear[1])) {
+    return `${compactMonthYear[2]}-${monthNumber(compactMonthYear[1])}`
+  }
+
+  const compactYearMonth = raw.match(/^(\d{4})([a-z]+)$/)
+  if (compactYearMonth && monthNumber(compactYearMonth[2])) {
+    return `${compactYearMonth[1]}-${monthNumber(compactYearMonth[2])}`
+  }
+
+  const tokens = raw.split(/[^a-z0-9]+/).filter(Boolean)
+  const year = tokens.find((token) => /^\d{4}$/.test(token))
+  const monthToken = tokens.find((token) => monthNumber(token))
+  if (year && monthToken) return `${year}-${monthNumber(monthToken)}`
+
+  return ''
+}
+
+function monthNumber(token) {
+  const months = {
+    jan: '01', january: '01', januari: '01',
+    feb: '02', february: '02', februari: '02',
+    mar: '03', march: '03', maret: '03',
+    apr: '04', april: '04',
+    may: '05', mei: '05',
+    jun: '06', june: '06', juni: '06',
+    jul: '07', july: '07', juli: '07',
+    aug: '08', august: '08', agustus: '08', agu: '08', agt: '08',
+    sep: '09', sept: '09', september: '09',
+    oct: '10', october: '10', okt: '10', oktober: '10',
+    nov: '11', november: '11',
+    dec: '12', december: '12', des: '12', desember: '12'
+  }
+  return months[String(token || '').toLowerCase()] || ''
 }
 
 async function updateBatchItemStatus({
