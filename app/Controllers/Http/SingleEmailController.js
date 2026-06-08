@@ -7,6 +7,7 @@ const BaTemplateService = use('App/Services/BaTemplateService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
 const SignatureUrlHistoryService = use('App/Services/SignatureUrlHistoryService')
 const EmailLogService = use('App/Services/EmailLogService')
+const ContactService = use('App/Services/ContactService')
 const Env = use('Env')
 
 class SingleEmailController {
@@ -78,13 +79,31 @@ class SingleEmailController {
       }
 
       const bodyJson = request.all()
-      const to = (bodyJson.to || '').toLowerCase().trim()
-      const cc = Array.isArray(bodyJson.cc) ? bodyJson.cc : []
-      const bcc = Array.isArray(bodyJson.bcc) ? bodyJson.bcc : []
-      const data = bodyJson.data || {}
+      const toParsed = normalizeRecipientInput(bodyJson.to)
+      const ccParsed = normalizeRecipientInput(bodyJson.cc)
+      const bccParsed = normalizeRecipientInput(bodyJson.bcc)
+      const invalidRecipients = [
+        ...toParsed.invalid,
+        ...ccParsed.invalid,
+        ...bccParsed.invalid
+      ]
+      const to = toParsed.valid.length === 1 ? toParsed.valid[0] : toParsed.valid
+      const primaryTo = toParsed.valid[0] || ''
+      const cc = ccParsed.valid
+      const bcc = bccParsed.valid
+      const data = bodyJson.data && typeof bodyJson.data === 'object' && !Array.isArray(bodyJson.data)
+        ? bodyJson.data
+        : {}
 
-      if (!to) {
-        return response.status(422).json({ status: 'validation_failed', message: 'Field to wajib diisi' })
+      if (!primaryTo) {
+        return response.status(422).json({ status: 'validation_failed', message: 'Field to wajib diisi dengan email valid' })
+      }
+
+      if (invalidRecipients.length) {
+        return response.status(422).json({
+          status: 'validation_failed',
+          message: `Email tidak valid: ${[...new Set(invalidRecipients)].join(', ')}`
+        })
       }
 
       const normalizedTemplate = BaTemplateService.normalizeTemplate(cfg.template)
@@ -131,14 +150,14 @@ class SingleEmailController {
       const pdfMeta = await generator.handle({
         template: cfg.template,
         data,
-        email: to, // dipakai untuk penamaan folder/file
+        email: primaryTo, // dipakai untuk penamaan folder/file
         companyName: company.name,
         userId: user.id,
         companyId: company.company_id
       })
 
-      const subject = bodyJson.subject || cfg.subject(data, company)
-      const textBody = bodyJson.body || cfg.body(data, company)
+      const subject = normalizeMessage(bodyJson.subject || cfg.subject(data, company))
+      const textBody = normalizeMessage(bodyJson.body || cfg.body(data, company))
       const jobAttachments = [
         { filename: pdfMeta.filename, path: pdfMeta.filePath }
       ]
@@ -240,6 +259,71 @@ function pickSmtpConfig(company) {
     : (envFrom || envUser)
 
   return { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, mailFrom }
+}
+
+function normalizeRecipientInput(input) {
+  const rawValues = collectRecipientValues(input)
+  const normalized = rawValues
+    .map((item) => ContactService.normalizeEmail(item))
+    .filter(Boolean)
+
+  const valid = []
+  const invalid = []
+
+  for (const email of normalized) {
+    if (ContactService.isValidEmail(email)) {
+      if (!valid.includes(email)) valid.push(email)
+    } else if (!invalid.includes(email)) {
+      invalid.push(email)
+    }
+  }
+
+  return { valid, invalid }
+}
+
+function collectRecipientValues(input) {
+  const values = []
+  pushRecipientValue(input, values)
+  return values
+}
+
+function pushRecipientValue(value, values) {
+  if (value === undefined || value === null) return
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => pushRecipientValue(item, values))
+    return
+  }
+
+  if (typeof value === 'object') {
+    const candidate = value.email || value.address || value.value || value.mail
+    if (candidate !== undefined && candidate !== null) pushRecipientValue(candidate, values)
+    return
+  }
+
+  const raw = String(value).trim()
+  if (!raw) return
+
+  if (/^[\[{]/.test(raw)) {
+    try {
+      pushRecipientValue(JSON.parse(raw), values)
+      return
+    } catch (e) {
+      // Treat non-JSON text as regular recipient input.
+    }
+  }
+
+  raw
+    .split(/[;,]/g)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .forEach((part) => values.push(part))
+}
+
+function normalizeMessage(value) {
+  if (value === undefined || value === null) return ''
+  if (typeof value === 'string') return value
+  return String(value)
 }
 
 function cfgBa(template) {

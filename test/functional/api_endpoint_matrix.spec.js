@@ -17,6 +17,7 @@ const Helpers = use('Helpers')
 const ContactService = use('App/Services/ContactService')
 const SignatureUrlHistoryService = use('App/Services/SignatureUrlHistoryService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
+const JobService = use('App/Services/JobService')
 const SendEmailJob = use('App/Jobs/SendEmailJob')
 const GeneratePdfJob = use('App/Jobs/GeneratePdfJob')
 
@@ -948,6 +949,66 @@ test('SendEmailJob tetap upsert contact saat kirim email gagal', async ({ assert
 
   assert.ok(emailLog)
   assert.equal(emailLog.status, 'failed')
+})
+
+test('JobService dispatch menyimpan karakter 4-byte sebagai JSON escape', async ({ assert }) => {
+  const marker = String.fromCodePoint(0x1f64c)
+  const text = `Halo ${marker}`
+
+  await JobService.dispatch('App/Jobs/SendEmailJob', {
+    smtpHost: 'localhost',
+    smtpPort: 25,
+    smtpSecure: false,
+    smtpUser: 'noreply@test.local',
+    smtpPass: 'dummy',
+    mailFrom: 'noreply@test.local',
+    to: `queue.${uniqueId('emoji')}@test.local`,
+    subject: 'Queue payload',
+    text
+  })
+
+  const row = await Database.table('jobs').orderBy('id', 'desc').first()
+  assert.ok(row)
+  assert.equal(String(row.payload).indexOf(marker), -1)
+  assert.ok(String(row.payload).indexOf('\\ud83d\\ude4c') >= 0)
+  assert.equal(JSON.parse(row.payload).data.text, text)
+})
+
+test('send/payslip menerima recipient object dan body 4-byte', async ({ client, assert }) => {
+  const marker = String.fromCodePoint(0x1f64c)
+  const stamp = uniqueId('single_send_object')
+  const toEmail = `single.${stamp}@test.local`
+  const ccEmail = `single.cc.${stamp}@test.local`
+  const token = await loginAndGetToken(client, seed.credentials.user)
+
+  const response = await client
+    .post('/api/v1/send/payslip')
+    .header('Authorization', `Bearer ${token}`)
+    .send({
+      to: { email: toEmail },
+      cc: [{ email: ccEmail }],
+      bcc: [],
+      subject: 'TEMA - Payslip April 2026',
+      body: `Halo ${marker}`,
+      data: {
+        employeeId: `EMP${stamp}`,
+        employeeName: 'Single Recipient',
+        position: 'Staff',
+        period: '2026-04'
+      }
+    })
+    .end()
+
+  response.assertStatus(202)
+
+  const row = await Database.table('jobs').orderBy('id', 'desc').first()
+  assert.ok(row)
+  assert.equal(String(row.payload).indexOf(marker), -1)
+
+  const payload = JSON.parse(row.payload)
+  assert.equal(payload.data.to, toEmail)
+  assert.equal(payload.data.cc[0], ccEmail)
+  assert.equal(payload.data.text, `Halo ${marker}`)
 })
 
 test('Dashboard summary default scope konsisten dengan generated-pdfs per role', async ({ client, assert }) => {
