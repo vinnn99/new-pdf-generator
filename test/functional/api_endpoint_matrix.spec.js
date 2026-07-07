@@ -36,7 +36,8 @@ const BULK_ENDPOINTS = [
   '/api/v1/bulk/ba-takeout',
   '/api/v1/bulk/ba-terminated',
   '/api/v1/bulk/ba-cancel-join',
-  '/api/v1/bulk/ba-resign'
+  '/api/v1/bulk/ba-resign',
+  '/api/v1/bulk/cooperation_agreement'
 ]
 
 const seed = {
@@ -1362,6 +1363,7 @@ async function resetSchema() {
     'contacts',
     'ba_preview_files',
     'company_signature_urls',
+    'company_pkm_numbering_counters',
     'company_ba_numbering_counters',
     'company_ba_numbering_settings',
     'dynamic_templates',
@@ -1489,6 +1491,18 @@ async function resetSchema() {
     table.integer('company_id').unsigned().notNullable().references('company_id').inTable('companies').onDelete('CASCADE')
     table.string('template', 100).notNullable()
     table.integer('last_seq').notNullable().defaultTo(0)
+    table.timestamps()
+    table.unique(['company_id', 'template'])
+    table.index(['company_id'])
+    table.index(['template'])
+  })
+
+  await Database.schema.createTable('company_pkm_numbering_counters', (table) => {
+    table.increments()
+    table.integer('company_id').unsigned().notNullable().references('company_id').inTable('companies').onDelete('CASCADE')
+    table.string('template', 100).notNullable()
+    table.integer('last_seq').notNullable().defaultTo(0)
+    table.integer('created_by').unsigned().nullable().references('id').inTable('users').onDelete('SET NULL')
     table.timestamps()
     table.unique(['company_id', 'template'])
     table.index(['company_id'])

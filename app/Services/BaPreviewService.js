@@ -11,6 +11,7 @@ const TemplateResolver = use('App/Services/TemplateResolver')
 const BaTemplateService = use('App/Services/BaTemplateService')
 const CompanyCodeService = use('App/Services/CompanyCodeService')
 const SlipPayloadNormalizer = use('App/Services/SlipPayloadNormalizer')
+const CooperationAgreementService = use('App/Services/CooperationAgreementService')
 
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000
 const ROMAN_MONTH = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
@@ -62,7 +63,7 @@ class BaPreviewService {
     }
 
     const sourceData = data && typeof data === 'object' ? { ...data } : {}
-    const payloadData = SlipPayloadNormalizer.normalize({
+    let payloadData = SlipPayloadNormalizer.normalize({
       template: normalizedTemplate,
       data: sourceData
     })
@@ -72,6 +73,11 @@ class BaPreviewService {
         companyCode: company.code || company.name,
         template: normalizedTemplate
       })
+    }
+    if (CooperationAgreementService.isTemplate(normalizedTemplate)) {
+      payloadData = CooperationAgreementService.normalizeData(payloadData)
+      payloadData.companyName = payloadData.companyName || CooperationAgreementService.DEFAULT_COMPANY_NAME
+      payloadData.letterNo = CooperationAgreementService.buildPreviewLetterNo()
     }
 
     const resolvedTemplate = await TemplateResolver.resolve(normalizedTemplate, {
@@ -251,6 +257,7 @@ function buildPreviewFilename (template, payloadData) {
       payloadData.mdsName ||
       payloadData.employeeName ||
       payloadData.clientName ||
+      payloadData.partnerName ||
       payloadData.nama
     ),
     'preview'
@@ -289,10 +296,13 @@ function resolveBaseUrl () {
 async function enrichSignatureImages (payloadData) {
   if (!payloadData || typeof payloadData !== 'object') return
 
-  const { signatureLeftUrl, signatureRightUrl } = payloadData
+  const signatureLeftUrl = payloadData.signatureLeftUrl || payloadData.directorSignatureUrl
+  const signatureRightUrl = payloadData.signatureRightUrl || payloadData.partnerSignatureUrl
+  const logoUrl = payloadData.logoUrl || payloadData.companyLogoUrl
   if (isHttpUrl(signatureLeftUrl)) {
     try {
       payloadData.signatureLeftImage = await fetchImageAsDataUrl(signatureLeftUrl)
+      if (!payloadData.directorSignatureImage) payloadData.directorSignatureImage = payloadData.signatureLeftImage
     } catch (error) {
       console.warn('[preview.signature] gagal fetch signatureLeftUrl:', error.message)
     }
@@ -301,8 +311,18 @@ async function enrichSignatureImages (payloadData) {
   if (isHttpUrl(signatureRightUrl)) {
     try {
       payloadData.signatureRightImage = await fetchImageAsDataUrl(signatureRightUrl)
+      if (!payloadData.partnerSignatureImage) payloadData.partnerSignatureImage = payloadData.signatureRightImage
     } catch (error) {
       console.warn('[preview.signature] gagal fetch signatureRightUrl:', error.message)
+    }
+  }
+
+  if (isHttpUrl(logoUrl)) {
+    try {
+      payloadData.logoImage = await fetchImageAsDataUrl(logoUrl)
+      if (!payloadData.companyLogoImage) payloadData.companyLogoImage = payloadData.logoImage
+    } catch (error) {
+      console.warn('[preview.logo] gagal fetch logoUrl:', error.message)
     }
   }
 }

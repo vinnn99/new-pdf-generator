@@ -5,6 +5,8 @@ const Database = use('Database')
 const GeneratePdfJob = use('App/Jobs/GeneratePdfJob')
 const BaTemplateService = use('App/Services/BaTemplateService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
+const CooperationAgreementService = use('App/Services/CooperationAgreementService')
+const CooperationAgreementLetterNoService = use('App/Services/CooperationAgreementLetterNoService')
 const SignatureUrlHistoryService = use('App/Services/SignatureUrlHistoryService')
 const EmailLogService = use('App/Services/EmailLogService')
 const ContactService = use('App/Services/ContactService')
@@ -47,6 +49,9 @@ class SingleEmailController {
   }
   async sendBaResign(ctx) {
     return this._send(ctx, cfgBa('ba-resign'))
+  }
+  async sendCooperationAgreement(ctx) {
+    return this._send(ctx, cfgCooperationAgreement())
   }
 
   /**
@@ -91,7 +96,7 @@ class SingleEmailController {
       const primaryTo = toParsed.valid[0] || ''
       const cc = ccParsed.valid
       const bcc = bccParsed.valid
-      const data = bodyJson.data && typeof bodyJson.data === 'object' && !Array.isArray(bodyJson.data)
+      let data = bodyJson.data && typeof bodyJson.data === 'object' && !Array.isArray(bodyJson.data)
         ? bodyJson.data
         : {}
 
@@ -107,6 +112,17 @@ class SingleEmailController {
       }
 
       const normalizedTemplate = BaTemplateService.normalizeTemplate(cfg.template)
+      if (CooperationAgreementService.isTemplate(normalizedTemplate)) {
+        try {
+          data = CooperationAgreementService.normalizeData(data)
+        } catch (err) {
+          return response.status(422).json({
+            status: 'validation_failed',
+            message: err.message
+          })
+        }
+      }
+
       if (BaTemplateService.isBaTemplate(normalizedTemplate)) {
         try {
           const numbering = await BaLetterNoService.nextLetterNo({
@@ -130,6 +146,29 @@ class SingleEmailController {
           status: 'validation_failed',
           message: `Field data.${missing.join(', ')} wajib diisi`
         })
+      }
+
+      if (CooperationAgreementService.isTemplate(normalizedTemplate)) {
+        const validationErrors = CooperationAgreementService.validateData(data)
+        if (validationErrors.length) {
+          return response.status(422).json({
+            status: 'validation_failed',
+            message: validationErrors.join('; ')
+          })
+        }
+
+        try {
+          const numbering = await CooperationAgreementLetterNoService.nextLetterNo({
+            companyId: company.company_id,
+            createdBy: user.id
+          })
+          data.letterNo = numbering.letterNo
+        } catch (err) {
+          return response.status(422).json({
+            status: 'validation_failed',
+            message: `Gagal generate nomor PKM: ${err.message}`
+          })
+        }
       }
 
       // Sisipkan companyName bila belum ada
@@ -370,6 +409,31 @@ function cfgBa(template) {
   }
 }
 
+function cfgCooperationAgreement() {
+  return {
+    template: CooperationAgreementService.TEMPLATE,
+    required: requiredFields(CooperationAgreementService.TEMPLATE),
+    subject: (f) => {
+      const who = f.partnerName || f.letterNo || ''
+      return who ? `Cooperation Agreement - ${who}` : 'Cooperation Agreement'
+    },
+    body: (f, company) => {
+      const lines = [
+        `Yth. ${f.partnerName || 'Bapak/Ibu'},`,
+        '',
+        'Berikut terlampir dokumen Perjanjian Kerjasama Kemitraan.',
+        f.brand ? `Brand: ${f.brand}` : null,
+        f.placementArea ? `Wilayah Penempatan: ${f.placementArea}` : null,
+        f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
+        '',
+        company && company.name ? company.name : CooperationAgreementService.DEFAULT_COMPANY_NAME,
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ]
+      return lines.filter(Boolean).join('\n')
+    }
+  }
+}
+
 async function markDispatchFailed(emailLogId, error) {
   if (!emailLogId) return
   try {
@@ -423,7 +487,8 @@ function requiredFields(template) {
     'ba-takeout': ['region', 'takeoutDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
     'ba-terminated': ['region', 'terminateDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
     'ba-cancel-join': ['region', 'cancelJoinDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
-    'ba-resign': ['region', 'mdsName', 'mdsCode', 'nik', 'effectiveResignDate', 'status', 'mdsCategory', 'outletFrom']
+    'ba-resign': ['region', 'mdsName', 'mdsCode', 'nik', 'effectiveResignDate', 'status', 'mdsCategory', 'outletFrom'],
+    cooperation_agreement: CooperationAgreementService.requiredFields()
   }
   return map[template] || []
 }

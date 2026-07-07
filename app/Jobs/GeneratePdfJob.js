@@ -9,6 +9,7 @@ const https = require('https')
 const WebhookSender = require('../Services/WebhookSender')
 const TemplateResolver = require('../Services/TemplateResolver')
 const SlipPayloadNormalizer = use('App/Services/SlipPayloadNormalizer')
+const CooperationAgreementService = use('App/Services/CooperationAgreementService')
 
 // Server-side font paths for pdfmake v0.2
 const fontsDir = path.join(__dirname, '../Fonts')
@@ -184,6 +185,11 @@ class GeneratePdfJob {
         const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
         const safeLetter = safe(letterNo.replace(/\//g, '-'))
         filename = `ba-resign.${safe(mdsName)}.${safe(region)}.${safeLetter}.${uniqueId}.pdf`
+      } else if (template === CooperationAgreementService.TEMPLATE) {
+        const partnerName = payloadData && payloadData.partnerName ? String(payloadData.partnerName) : 'MITRA'
+        const letterNo = payloadData && payloadData.letterNo ? String(payloadData.letterNo) : 'LETTERNO'
+        const safeLetter = safe(letterNo.replace(/\//g, '-'))
+        filename = `cooperation_agreement.${safe(partnerName)}.${safeLetter}.${uniqueId}.pdf`
       } else {
         filename  = `${template}_${uniqueId}.pdf`
       }
@@ -434,11 +440,14 @@ module.exports = GeneratePdfJob
 async function enrichSignatureImages(payloadData) {
   if (!payloadData || typeof payloadData !== 'object') return
 
-  const { signatureLeftUrl, signatureRightUrl } = payloadData
+  const signatureLeftUrl = payloadData.signatureLeftUrl || payloadData.directorSignatureUrl
+  const signatureRightUrl = payloadData.signatureRightUrl || payloadData.partnerSignatureUrl
+  const logoUrl = payloadData.logoUrl || payloadData.companyLogoUrl
 
   if (isHttpUrl(signatureLeftUrl)) {
     try {
       payloadData.signatureLeftImage = await fetchImageAsDataUrl(signatureLeftUrl)
+      if (!payloadData.directorSignatureImage) payloadData.directorSignatureImage = payloadData.signatureLeftImage
     } catch (err) {
       console.warn('[Signature] gagal fetch signatureLeftUrl:', err.message)
     }
@@ -447,8 +456,18 @@ async function enrichSignatureImages(payloadData) {
   if (isHttpUrl(signatureRightUrl)) {
     try {
       payloadData.signatureRightImage = await fetchImageAsDataUrl(signatureRightUrl)
+      if (!payloadData.partnerSignatureImage) payloadData.partnerSignatureImage = payloadData.signatureRightImage
     } catch (err) {
       console.warn('[Signature] gagal fetch signatureRightUrl:', err.message)
+    }
+  }
+
+  if (isHttpUrl(logoUrl)) {
+    try {
+      payloadData.logoImage = await fetchImageAsDataUrl(logoUrl)
+      if (!payloadData.companyLogoImage) payloadData.companyLogoImage = payloadData.logoImage
+    } catch (err) {
+      console.warn('[Logo] gagal fetch logoUrl:', err.message)
     }
   }
 }

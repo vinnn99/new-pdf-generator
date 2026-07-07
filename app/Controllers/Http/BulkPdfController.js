@@ -8,6 +8,8 @@ const Database = use('Database')
 const JobService = require('../../Services/JobService')
 const BaTemplateService = use('App/Services/BaTemplateService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
+const CooperationAgreementService = use('App/Services/CooperationAgreementService')
+const CooperationAgreementLetterNoService = use('App/Services/CooperationAgreementLetterNoService')
 
 class BulkPdfController {
   async payslipFromExcel(ctx) {
@@ -56,6 +58,10 @@ class BulkPdfController {
 
   async baResignFromExcel(ctx) {
     return this._handleExcel(ctx, 'ba-resign')
+  }
+
+  async cooperationAgreementFromExcel(ctx) {
+    return this._handleExcel(ctx, CooperationAgreementService.TEMPLATE)
   }
 
   /**
@@ -108,7 +114,9 @@ class BulkPdfController {
       }
 
       const isBaMode = BaTemplateService.isBaTemplate(mode)
-      const batchId = isBaMode && !opts.dryRun ? createBatchId() : null
+      const isCooperationAgreementMode = CooperationAgreementService.isTemplate(mode)
+      const isLetteredBatchMode = isBaMode || isCooperationAgreementMode
+      const batchId = isLetteredBatchMode && !opts.dryRun ? createBatchId() : null
 
       const results = []
       let queued = 0
@@ -159,7 +167,7 @@ class BulkPdfController {
             payload.filenameTemplate = mode
           }
 
-          if (isBaMode) {
+          if (isLetteredBatchMode) {
             payload.data = payload.data || {}
             // Tambahan: URL tanda tangan kiri/kanan (opsional)
             const sigLeft = lower.signaturelefturl || lower['signature_left_url'] || lower['signature left url']
@@ -167,9 +175,8 @@ class BulkPdfController {
             if (sigLeft) payload.data.signatureLeftUrl = sigLeft
             if (sigRight) payload.data.signatureRightUrl = sigRight
 
-            const matchFields = BaTemplateService.extractMatchFieldsFromRow(mode, lower)
-            const matchKey = BaTemplateService.buildMatchKey(mode, matchFields)
-            const requiredMatchFields = BaTemplateService.getRequiredMatchFields(mode)
+            const matchKey = buildBatchMatchKey(mode, lower, payload.data)
+            const requiredMatchFields = getRequiredBatchMatchFields(mode)
             if (!matchKey && requiredMatchFields.length > 0) {
               throw new Error(`Kolom kunci pencarian lampiran kosong: ${requiredMatchFields.join(', ')}`)
             }
@@ -177,11 +184,16 @@ class BulkPdfController {
             if (opts.dryRun) {
               payload.data.letterNo = '[AUTO_GENERATED_ON_EXECUTION]'
             } else {
-              const numbering = await BaLetterNoService.nextLetterNo({
-                companyId: company.company_id,
-                template: mode,
-                createdBy: user.id
-              })
+              const numbering = isBaMode
+                ? await BaLetterNoService.nextLetterNo({
+                  companyId: company.company_id,
+                  template: mode,
+                  createdBy: user.id
+                })
+                : await CooperationAgreementLetterNoService.nextLetterNo({
+                  companyId: company.company_id,
+                  createdBy: user.id
+                })
               payload.data.letterNo = numbering.letterNo
 
               const insertedBatchItem = await Database.table('generation_batch_items').insert({
@@ -224,7 +236,7 @@ class BulkPdfController {
             row: i + 1,
             email,
             status: 'queued',
-            ...(isBaMode ? { letterNo: payload && payload.data ? payload.data.letterNo : null } : {})
+            ...(isLetteredBatchMode ? { letterNo: payload && payload.data ? payload.data.letterNo : null } : {})
           })
           queued++
         } catch (err) {
@@ -242,8 +254,7 @@ class BulkPdfController {
                 })
             } else {
               const lower = normalizeRow(row)
-              const fields = BaTemplateService.extractMatchFieldsFromRow(mode, lower)
-              const matchKey = BaTemplateService.buildMatchKey(mode, fields)
+              const matchKey = buildBatchMatchKey(mode, lower, payload && payload.data)
               await Database.table('generation_batch_items').insert({
                 batch_id: batchId,
                 company_id: company.company_id,
@@ -435,6 +446,7 @@ function parseExcelDate(val) {
 function buildPayloadForMode(lower, mode, opts) {
   if (mode === 'insentif') return buildInsentifPayload(lower, opts)
   if (mode === 'thr') return buildThrPayload(lower, opts)
+  if (mode === CooperationAgreementService.TEMPLATE) return buildCooperationAgreementPayload(lower, opts)
   if (mode === 'ba-penempatan') return buildBaPenempatanPayload(lower, opts)
   if (mode === 'ba-request-id') return buildBaRequestIdPayload(lower, opts)
   if (mode === 'ba-hold') return buildBaHoldPayload(lower, opts)
@@ -888,6 +900,83 @@ function buildBaResignPayload(lower, opts) {
   if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
 
   return payload
+}
+
+function buildCooperationAgreementPayload(lower, opts) {
+  const payload = basePayload(lower, opts)
+  payload.template = CooperationAgreementService.TEMPLATE
+  const pick = (keys) => pickFromLower(lower, keys)
+
+  payload.data = {
+    ...payload.data,
+    companyName: pick(['companyname', 'company name', 'company_name', 'namaperusahaan', 'nama perusahaan']) || CooperationAgreementService.DEFAULT_COMPANY_NAME,
+    logoUrl: pick(['logourl', 'logo url', 'logo_url', 'logofile', 'logo file', 'logo_file', 'companylogourl', 'company logo url', 'company_logo_url']),
+    logoPath: pick(['logopath', 'logo path', 'logo_path', 'logofilepath', 'logo file path', 'logo_file_path', 'companylogopath', 'company logo path', 'company_logo_path']),
+    letterNo: pick(['letterno', 'letter no', 'no surat', 'letter_number', 'letter number']),
+    letterDate: parseExcelDate(pick(['letterdate', 'letter date', 'tanggal surat'])),
+    location: pick(['location', 'lokasi']),
+    firstPartyName: pick(['firstpartyname', 'first party name', 'first_party_name', 'pihak1nama', 'pihak 1 nama']),
+    firstPartyTitle: pick(['firstpartytitle', 'first party title', 'first_party_title', 'pihak1jabatan', 'pihak 1 jabatan']),
+    partnerName: pick(['partnername', 'partner name', 'partner_name', 'mitranama', 'mitra nama']),
+    partnerNationality: pick(['partnernationality', 'partner nationality', 'partner_nationality', 'mitrawarganegara', 'mitra warga negara']),
+    partnerIdentityNumber: pick(['partneridentitynumber', 'partner identity number', 'partner_identity_number', 'mitraid', 'mitra id', 'mitra id/ktp/sim', 'ktp', 'sim']),
+    partnerBirthPlace: pick(['partnerbirthplace', 'partner birth place', 'partner_birth_place', 'mitratempatlahir', 'mitra tempat lahir']),
+    partnerBirthDate: parseExcelDate(pick(['partnerbirthdate', 'partner birth date', 'partner_birth_date', 'mitratanggallahir', 'mitra tanggal lahir', 'tanggal lahir'])),
+    partnerAddress: pick(['partneraddress', 'partner address', 'partner_address', 'mitraalamat', 'mitra alamat', 'alamat mitra']),
+    partnerPhone: pick(['partnerphone', 'partner phone', 'partner_phone', 'mitraphone', 'mitra phone', 'mitra no telp/hp', 'no telp', 'no hp']),
+    partnerEmail: pick(['partneremail', 'partner email', 'partner_email', 'mitraemail', 'mitra email']),
+    brand: pick(['brand']),
+    salary: pick(['salary', 'salary/gaji', 'gaji']),
+    transportAllowance: pick(['transportallowance', 'transport allowance', 'transport_allowance', 'tunjangantransport', 'tunjangan transport']),
+    mealAllowance: pick(['mealallowance', 'meal allowance', 'meal_allowance', 'tunjanganmakan', 'tunjangan makan']),
+    phoneAllowance: pick(['phoneallowance', 'phone allowance', 'phone_allowance', 'tunjanganpulsa', 'tunjangan pulsa']),
+    partnerBankAccountNumber: pick(['partnerbankaccountnumber', 'partner bank account number', 'partner_bank_account_number', 'nomorrekeningmitra', 'nomor rekening mitra']),
+    partnerBankAccountName: pick(['partnerbankaccountname', 'partner bank account name', 'partner_bank_account_name', 'namarekeningmitra', 'nama rekening mitra']),
+    partnerBankName: pick(['partnerbankname', 'partner bank name', 'partner_bank_name', 'namabankmitra', 'nama bank mitra']),
+    agreementDuration: pick(['agreementduration', 'agreement duration', 'agreement_duration', 'lamaperjanjian', 'lama perjanjian']),
+    workHoursPerDay: pick(['workhoursperday', 'work hours per day', 'work_hours_per_day', 'jamkerjaperhari', 'jam kerja per hari']),
+    placementArea: pick(['placementarea', 'placement area', 'placement_area', 'wilayahpenempatan', 'wilayah penempatan']),
+    picName: pick(['picname', 'pic name', 'pic_name', 'namapic', 'nama pic']),
+    picTitle: pick(['pictitle', 'pic title', 'pic_title', 'jabatanpic', 'jabatan pic']),
+    picEmail: pick(['picemail', 'pic email', 'pic_email', 'emailpic', 'email pic']),
+    picAddress: pick(['picaddress', 'pic address', 'pic_address', 'alamatpic', 'alamat pic']),
+    directorSignatureUrl: pick(['directorsignatureurl', 'director signature url', 'director_signature_url', 'signaturedirectorurl', 'signature director url', 'signature direktur', 'signaturelefturl', 'signature_left_url', 'signature left url']),
+    partnerSignatureUrl: pick(['partnersignatureurl', 'partner signature url', 'partner_signature_url', 'signaturemitraurl', 'signature mitra url', 'signature mitra', 'signaturerighturl', 'signature_right_url', 'signature right url'])
+  }
+
+  payload.data = CooperationAgreementService.normalizeData(payload.data)
+  const errors = CooperationAgreementService.validateData(payload.data)
+  if (errors.length) {
+    throw new Error(errors.join('; '))
+  }
+
+  return payload
+}
+
+function buildBatchMatchKey(mode, lower, payloadData) {
+  if (BaTemplateService.isBaTemplate(mode)) {
+    const fields = BaTemplateService.extractMatchFieldsFromRow(mode, lower)
+    return BaTemplateService.buildMatchKey(mode, fields)
+  }
+
+  if (CooperationAgreementService.isTemplate(mode)) {
+    const data = payloadData && typeof payloadData === 'object'
+      ? payloadData
+      : {
+          partnerName: pickFromLower(lower, ['partnername', 'partner name', 'partner_name', 'mitranama', 'mitra nama']),
+          partnerEmail: pickFromLower(lower, ['partneremail', 'partner email', 'partner_email', 'mitraemail', 'mitra email']),
+          partnerIdentityNumber: pickFromLower(lower, ['partneridentitynumber', 'partner identity number', 'partner_identity_number', 'mitraid', 'mitra id', 'ktp', 'sim'])
+        }
+    return CooperationAgreementService.buildMatchKey(data)
+  }
+
+  return ''
+}
+
+function getRequiredBatchMatchFields(mode) {
+  if (BaTemplateService.isBaTemplate(mode)) return BaTemplateService.getRequiredMatchFields(mode)
+  if (CooperationAgreementService.isTemplate(mode)) return ['partnerName', 'partnerEmail/partnerIdentityNumber']
+  return []
 }
 
 function pickFromLower(lower, keys) {

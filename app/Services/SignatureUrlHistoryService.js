@@ -81,6 +81,16 @@ class SignatureUrlHistoryService {
         url: payloadData.signatureRightUrl,
         name: payloadData.signerRightName,
         title: payloadData.signerRightTitle
+      },
+      {
+        url: payloadData.directorSignatureUrl || payloadData.signatureLeftUrl,
+        name: payloadData.firstPartyName || payloadData.signerLeftName,
+        title: payloadData.firstPartyTitle || payloadData.signerLeftTitle
+      },
+      {
+        url: payloadData.partnerSignatureUrl || payloadData.signatureRightUrl,
+        name: payloadData.partnerName || payloadData.signerRightName,
+        title: payloadData.signerRightTitle
       }
     ]
   }

@@ -5,6 +5,8 @@ const TemplateResolver = require('../../Services/TemplateResolver')
 const SlipPayloadNormalizer = use('App/Services/SlipPayloadNormalizer')
 const BaTemplateService = use('App/Services/BaTemplateService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
+const CooperationAgreementService = use('App/Services/CooperationAgreementService')
+const CooperationAgreementLetterNoService = use('App/Services/CooperationAgreementLetterNoService')
 const SignatureUrlHistoryService = use('App/Services/SignatureUrlHistoryService')
 const path = require('path')
 const fs = require('fs')
@@ -35,6 +37,13 @@ class PdfController {
           template: normalizedTemplate,
           data: payload.data
         })
+        if (CooperationAgreementService.isTemplate(normalizedTemplate)) {
+          try {
+            payload.data = CooperationAgreementService.normalizeData(payload.data)
+          } catch (err) {
+            errors.push(err.message)
+          }
+        }
       }
 
       if (BaTemplateService.isBaTemplate(normalizedTemplate) && payload.data && typeof payload.data === 'object') {
@@ -99,6 +108,27 @@ class PdfController {
         }
       }
 
+      if (CooperationAgreementService.isTemplate(normalizedTemplate) && payload.data && typeof payload.data === 'object') {
+        if (!company || !company.company_id) {
+          return response.status(422).json({
+            status: 'validation_failed',
+            message: 'Company tidak valid untuk generate nomor PKM'
+          })
+        }
+        try {
+          const numbering = await CooperationAgreementLetterNoService.nextLetterNo({
+            companyId: company.company_id,
+            createdBy: user ? user.id : null
+          })
+          payload.data.letterNo = numbering.letterNo
+        } catch (err) {
+          return response.status(422).json({
+            status: 'validation_failed',
+            message: `Gagal generate nomor PKM: ${err.message}`
+          })
+        }
+      }
+
       // Sisipkan companyName dari hasil middleware (API key)
       if (company) {
         payload.companyName = company.name
@@ -111,7 +141,7 @@ class PdfController {
       payload.userId = user ? user.id : null
       payload.companyId = company ? company.company_id : null
 
-      if (BaTemplateService.isBaTemplate(normalizedTemplate) && payload.data && typeof payload.data === 'object') {
+      if ((BaTemplateService.isBaTemplate(normalizedTemplate) || CooperationAgreementService.isTemplate(normalizedTemplate)) && payload.data && typeof payload.data === 'object') {
         try {
           await SignatureUrlHistoryService.recordFromPayload({
             companyId: payload.companyId,
