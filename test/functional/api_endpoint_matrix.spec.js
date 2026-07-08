@@ -17,6 +17,7 @@ const Helpers = use('Helpers')
 const ContactService = use('App/Services/ContactService')
 const SignatureUrlHistoryService = use('App/Services/SignatureUrlHistoryService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
+const CooperationAgreementService = use('App/Services/CooperationAgreementService')
 const JobService = use('App/Services/JobService')
 const SendEmailJob = use('App/Jobs/SendEmailJob')
 const GeneratePdfJob = use('App/Jobs/GeneratePdfJob')
@@ -744,6 +745,12 @@ const endpointCases = [
     expected: { user: 403, admin: 403, superadmin: 200 }
   },
   {
+    method: 'post',
+    url: () => '/api/v1/send-cooperation-agreement-emails',
+    auth: 'jwt',
+    expected: { user: 422, admin: 422, superadmin: 401 }
+  },
+  {
     method: 'get',
     url: () => `/download/${encodeURIComponent(seed.download.company)}/${encodeURIComponent(seed.download.email)}/${encodeURIComponent(seed.download.filename)}`,
     auth: 'jwt',
@@ -1292,6 +1299,115 @@ test('send-slip-emails menemukan PDF hasil generate bulk walau periode pakai nam
   }
 })
 
+test('send-cooperation-agreement-emails memakai lampiran dari batch berdasarkan match key', async ({ client, assert }) => {
+  const stamp = uniqueId('coop_bulk_email')
+  const batchId = uniqueSlug('coop-email-batch').slice(0, 60)
+  const partnerName = `Mitra ${stamp}`
+  const partnerEmail = `mitra.${stamp}@example.test`
+  const toEmail = `recipient.${stamp}@test.local`
+  const matchKey = CooperationAgreementService.buildMatchKey({ partnerName, partnerEmail })
+  const filename = `cooperation_agreement.${stamp}.pdf`
+  const pdfDir = path.join(Helpers.publicPath(), 'download', 'test-cooperation-agreement')
+  const pdfPath = path.join(pdfDir, filename)
+  const savedPath = path.relative(process.cwd(), pdfPath).replace(/\\/g, '/')
+  const xlsxPath = path.join(Helpers.tmpPath(), `send-cooperation-agreement-${stamp}.xlsx`)
+  const now = new Date()
+
+  fs.mkdirSync(pdfDir, { recursive: true })
+  fs.writeFileSync(pdfPath, '%PDF-1.4\n% cooperation agreement test\n')
+
+  await Database.table('generation_batches').insert({
+    batch_id: batchId,
+    company_id: seed.companyAId,
+    template: 'cooperation_agreement',
+    created_by: seed.userMainId,
+    total_rows: 1,
+    queued: 1,
+    failed: 0,
+    status: 'completed',
+    created_at: now,
+    updated_at: now
+  })
+
+  await Database.table('generation_batch_items').insert({
+    batch_id: batchId,
+    company_id: seed.companyAId,
+    template: 'cooperation_agreement',
+    row_no: 1,
+    match_key: matchKey,
+    letter_no: '1/HRD-OMI/PKM/VII/2026',
+    filename,
+    saved_path: savedPath,
+    status: 'completed',
+    row_data: JSON.stringify({ partnerName, partnerEmail }),
+    created_at: now,
+    updated_at: now
+  })
+
+  const workbook = XLSX.utils.book_new()
+  const sheet = XLSX.utils.json_to_sheet([
+    {
+      sentTo: toEmail,
+      partnerName,
+      partnerEmail
+    }
+  ])
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Sheet1')
+  XLSX.writeFile(workbook, xlsxPath)
+
+  try {
+    const token = await loginAndGetToken(client, seed.credentials.user)
+    const response = await client
+      .post('/api/v1/send-cooperation-agreement-emails')
+      .header('Authorization', `Bearer ${token}`)
+      .field('batch_id', batchId)
+      .attach('file', xlsxPath)
+      .end()
+
+    response.assertStatus(200)
+    assert.equal(response.body.status, 'ok')
+    assert.equal(Number(response.body.queued), 1)
+    assert.equal(Number(response.body.failed), 0)
+    assert.equal(Number(response.body.skipped), 0)
+    assert.equal(response.body.results[0].status, 'queued')
+    assert.equal(response.body.results[0].attachment, filename)
+
+    const emailLog = await Database.table('email_logs')
+      .where('to_email', toEmail)
+      .where('context', 'bulk-cooperation-agreement')
+      .orderBy('id', 'desc')
+      .first()
+
+    assert.ok(emailLog)
+    assert.equal(emailLog.template, 'cooperation_agreement')
+    assert.equal(emailLog.status, 'queued')
+    assert.equal(String(emailLog.attachments || '').includes(filename), true)
+
+    const job = await Database.table('jobs')
+      .where('payload', 'like', `%${toEmail}%`)
+      .orderBy('id', 'desc')
+      .first()
+
+    assert.ok(job)
+    const payload = JSON.parse(job.payload)
+    assert.equal(payload.job, 'App/Jobs/SendEmailJob')
+    assert.equal(payload.data.template, 'cooperation_agreement')
+    assert.equal(payload.data.context, 'bulk-cooperation-agreement')
+    assert.equal(payload.data.attachments[0].filename, filename)
+  } finally {
+    try {
+      fs.unlinkSync(xlsxPath)
+    } catch (e) {
+      // ignore
+    }
+    try {
+      fs.unlinkSync(pdfPath)
+    } catch (e) {
+      // ignore
+    }
+  }
+})
+
 test('Preview BA tidak menambah counter letterNo final', async ({ client, assert }) => {
   const token = await loginAndGetToken(client, seed.credentials.user)
 
@@ -1366,6 +1482,8 @@ async function resetSchema() {
     'company_pkm_numbering_counters',
     'company_ba_numbering_counters',
     'company_ba_numbering_settings',
+    'generation_batch_items',
+    'generation_batches',
     'dynamic_templates',
     'email_logs',
     'generated_pdfs',
@@ -1495,6 +1613,45 @@ async function resetSchema() {
     table.unique(['company_id', 'template'])
     table.index(['company_id'])
     table.index(['template'])
+  })
+
+  await Database.schema.createTable('generation_batches', (table) => {
+    table.increments()
+    table.string('batch_id', 64).notNullable().unique()
+    table.integer('company_id').unsigned().notNullable().references('company_id').inTable('companies').onDelete('CASCADE')
+    table.string('template', 100).notNullable()
+    table.integer('created_by').unsigned().nullable().references('id').inTable('users').onDelete('SET NULL')
+    table.integer('total_rows').notNullable().defaultTo(0)
+    table.integer('queued').notNullable().defaultTo(0)
+    table.integer('failed').notNullable().defaultTo(0)
+    table.string('status', 50).notNullable().defaultTo('created')
+    table.timestamps()
+    table.index(['company_id'])
+    table.index(['template'])
+    table.index(['created_by'])
+  })
+
+  await Database.schema.createTable('generation_batch_items', (table) => {
+    table.increments()
+    table.string('batch_id', 64).notNullable()
+    table.foreign('batch_id').references('batch_id').inTable('generation_batches').onDelete('CASCADE')
+    table.integer('company_id').unsigned().notNullable().references('company_id').inTable('companies').onDelete('CASCADE')
+    table.string('template', 100).notNullable()
+    table.integer('row_no').notNullable()
+    table.string('match_key', 255).nullable()
+    table.string('letter_no', 191).nullable()
+    table.string('filename', 191).nullable()
+    table.string('saved_path', 500).nullable()
+    table.integer('generated_pdf_id').unsigned().nullable().references('id').inTable('generated_pdfs').onDelete('SET NULL')
+    table.string('status', 50).notNullable().defaultTo('queued')
+    table.text('error').nullable()
+    table.text('row_data').nullable()
+    table.timestamps()
+    table.index(['batch_id'])
+    table.index(['company_id'])
+    table.index(['template'])
+    table.index(['match_key'])
+    table.index(['status'])
   })
 
   await Database.schema.createTable('company_pkm_numbering_counters', (table) => {

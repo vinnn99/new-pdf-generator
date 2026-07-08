@@ -8,6 +8,7 @@ const path = require('path')
 const JobService = require('../../Services/JobService')
 const Database = use('Database')
 const BaTemplateService = use('App/Services/BaTemplateService')
+const CooperationAgreementService = use('App/Services/CooperationAgreementService')
 const EmailLogService = use('App/Services/EmailLogService')
 
 const LOG_DIR = path.join(Helpers.appRoot(), 'logs')
@@ -308,11 +309,41 @@ class BulkEmailController {
     return this._sendBaTemplate({ request, response, auth }, cfg)
   }
 
+  async sendCooperationAgreement({ request, response, auth }) {
+    const cfg = {
+      template: CooperationAgreementService.TEMPLATE,
+      label: 'Cooperation Agreement',
+      context: 'bulk-cooperation-agreement',
+      extractFields: extractCooperationAgreementMatchFields,
+      buildMatchKey: (fields) => CooperationAgreementService.buildMatchKey(fields),
+      validateFields: (fields) => {
+        const missing = []
+        if (!hasValue(fields.partnerName)) missing.push('partnerName')
+        if (!hasValue(fields.partnerEmail) && !hasValue(fields.partnerIdentityNumber)) {
+          missing.push('partnerEmail/partnerIdentityNumber')
+        }
+        return missing
+      },
+      subject: (f, _company, item) => `Cooperation Agreement - ${f.partnerName || (item && item.letter_no) || ''}`,
+      body: (f, company, item) => [
+        `Yth. ${f.partnerName || 'Bapak/Ibu'},`,
+        '',
+        'Berikut terlampir dokumen Cooperation Agreement.',
+        item && item.letter_no ? `Nomor Surat: ${item.letter_no}` : null,
+        '',
+        company && company.name ? company.name : '',
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ].filter(Boolean).join('\n')
+    }
+    return this._sendBaTemplate({ request, response, auth }, cfg)
+  }
+
   /**
-   * Generic sender for BA templates with lookup via generation batch metadata.
+   * Generic sender for batch-based letter templates with lookup via generation batch metadata.
    * cfg: {
    *   template: 'ba-request-id',
    *   required: ['mdsName', 'area'],
+   *   context: 'bulk-ba',
    *   subject: (fields, company, batchItem) => string,
    *   body: (fields, company, batchItem) => string
    * }
@@ -396,17 +427,25 @@ class BulkEmailController {
       let queuedCount = 0
       let failedCount = 0
       let skippedCount = 0
+      const context = cfg.context || 'bulk-ba'
+      const label = cfg.label || cfg.template
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i]
         const norm = normalizeRow(row)
         const to = norm.sentto || norm.email
 
-        const fields = BaTemplateService.extractMatchFieldsFromRow(cfg.template, norm)
-        const matchKey = BaTemplateService.buildMatchKey(cfg.template, fields)
+        const fields = typeof cfg.extractFields === 'function'
+          ? cfg.extractFields(norm, row)
+          : BaTemplateService.extractMatchFieldsFromRow(cfg.template, norm)
+        const matchKey = typeof cfg.buildMatchKey === 'function'
+          ? cfg.buildMatchKey(fields, norm, row)
+          : BaTemplateService.buildMatchKey(cfg.template, fields)
 
         // Required check
-        const missing = (cfg.required || []).filter((k) => !fields[k])
+        const missing = typeof cfg.validateFields === 'function'
+          ? cfg.validateFields(fields, norm, row)
+          : (cfg.required || []).filter((k) => !fields[k])
         if (!to) {
           results.push({ row: i + 1, status: 'skipped', message: 'sentTo/email kosong' })
           appendLog({ row: i + 1, status: 'skipped', reason: 'no_recipient', template: cfg.template, batchId, matchKey })
@@ -423,7 +462,7 @@ class BulkEmailController {
         const candidates = attachmentsByMatchKey[matchKey] || []
         const batchAttachment = pickLatestBatchAttachment(candidates)
         if (!batchAttachment) {
-          results.push({ row: i + 1, status: 'skipped', to, message: `Lampiran ${cfg.template} tidak ditemukan` })
+          results.push({ row: i + 1, status: 'skipped', to, message: `Lampiran ${label} tidak ditemukan` })
           appendLog({ row: i + 1, to, status: 'skipped', reason: 'no_attachments', template: cfg.template, batchId, matchKey })
           skippedCount++
           continue
@@ -441,7 +480,7 @@ class BulkEmailController {
             userId: user.id,
             companyId: company.company_id,
             template: cfg.template,
-            context: 'bulk-ba',
+            context,
             to,
             cc,
             bcc,
@@ -456,11 +495,11 @@ class BulkEmailController {
             to, cc, bcc, subject, text: body,
             attachments: jobAttachments,
             requireAttachments: true,
-            employeeName: fields.mdsName,
+            employeeName: fields.mdsName || fields.partnerName,
             userId: user.id,
             companyId: company.company_id,
             template: cfg.template,
-            context: 'bulk-ba',
+            context,
             emailLogId
           }, { attempts: 3, timeout: 120000 })
           results.push({ row: i + 1, status: 'queued', to, attachment: batchAttachment.filename })
@@ -657,6 +696,52 @@ class BulkEmailController {
     }
     return this._sendBaTemplate({ request, response, auth }, cfg)
   }
+}
+
+function extractCooperationAgreementMatchFields(norm) {
+  return {
+    partnerName: pickRowValue(norm, [
+      'partnername',
+      'partner name',
+      'partner_name',
+      'mitranama',
+      'mitra nama',
+      'mitra_nama'
+    ]),
+    partnerEmail: pickRowValue(norm, [
+      'partneremail',
+      'partner email',
+      'partner_email',
+      'mitraemail',
+      'mitra email',
+      'mitra_email'
+    ]),
+    partnerIdentityNumber: pickRowValue(norm, [
+      'partneridentitynumber',
+      'partner identity number',
+      'partner_identity_number',
+      'mitraid',
+      'mitra id',
+      'mitra_id',
+      'mitra ktp',
+      'mitra_ktp',
+      'ktp',
+      'sim',
+      'id/ktp/sim'
+    ])
+  }
+}
+
+function pickRowValue(row, keys) {
+  for (const key of keys) {
+    const value = row[key]
+    if (hasValue(value)) return value
+  }
+  return ''
+}
+
+function hasValue(value) {
+  return !(value === undefined || value === null || (typeof value === 'string' && value.trim() === ''))
 }
 
 function findSlipAttachmentCandidates({ bases, periodPrefix, slipTemplate, employeeId, employeeName }) {
