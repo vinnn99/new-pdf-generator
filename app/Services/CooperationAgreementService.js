@@ -3,7 +3,7 @@
 const NumberFormatService = use('App/Services/NumberFormatService')
 
 const TEMPLATE = 'cooperation_agreement'
-const DEFAULT_COMPANY_NAME = 'PT. ORIGIN MAGNA INOVASI'
+const DEFAULT_COMPANY_NAME = 'PT. ORIGIN MAGDA INOVASI'
 const ROMAN_MONTH = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
 
 const REQUIRED_FIELDS = Object.freeze([

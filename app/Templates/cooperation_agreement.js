@@ -5,6 +5,10 @@ const fs = require('fs')
 const NumberFormatService = use('App/Services/NumberFormatService')
 const CooperationAgreementService = use('App/Services/CooperationAgreementService')
 
+const INDENTED_MARGIN_LEFT = 14
+const INDENTED_NUMBER_WIDTH = 30
+const INDENTED_CONTENT_MARGIN_LEFT = INDENTED_MARGIN_LEFT + INDENTED_NUMBER_WIDTH
+
 module.exports = function cooperationAgreementTemplate(payloadData = {}) {
   const data = CooperationAgreementService.normalizeData(payloadData)
   const companyName = val(data.companyName, CooperationAgreementService.DEFAULT_COMPANY_NAME)
@@ -68,7 +72,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
             absolutePosition: { x: pw - 54 - logoWidth, y: 28 }
           }]
         : [{
-          text: 'ORIGIN MAGNA INOVASI',
+          text: 'ORIGIN MAGDA INOVASI',
           width: logoWidth,
           alignment: 'right',
           absolutePosition: { x: pw - 54 - logoWidth, y: 30 },
@@ -157,7 +161,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
           ['Nomor Rekening MITRA', val(data.partnerBankAccountNumber)],
           ['Nama Rekening MITRA', val(data.partnerBankAccountName)],
           ['Nama Bank', val(data.partnerBankName)]
-        ], [170, '*']),
+        ], [170, '*'], { marginLeft: INDENTED_CONTENT_MARGIN_LEFT }),
         indented([
           '3.5 MITRA berhak mendapatkan upah yang dimaksud pasal di atas pada tanggal yang sudah disepakati.',
           '3.6 MITRA melaksanakan kemitraan sesuai jasa keterampilan yang dimiliki secara patuh dan efisien.'
@@ -192,6 +196,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
       ])),
       article('Pasal 6', 'BERAKHIRNYA KEMITRAAN', numbered([
         `Perjanjian ini berakhir ketika program dengan PRINCIPAL dan/atau BRAND berakhir dan dengan berakhirnya Perjanjian tersebut maka segala hak dan kewajiban MITRA kepada ${upper(companyName)} akan berakhir pada tanggal berakhirnya Perjanjian ini.`,
+        `MITRA mendapatkan teguran sebanyak tiga (3) kali berturut - turut dan/atau telah melakukan pelanggaran berulang terhadap kepatuhan dan pelaksanaan pekerjaan yang mengakibatkan hasil evaluasi kinerja tidak baik. Maka Perjanjian ini dapat berkahir sebelum tenggat waktu.`,
         'Sehubungan dengan pengakhiran Perjanjian ini, Para Pihak sepakat mengesampingkan keberlakuan ketentuan Pasal 1266 KUHPerdata sepanjang mengenai keharusan adanya putusan Pengadilan untuk mengakhiri Perjanjian.'
       ])),
       article('Pasal 7', 'PERPANJANGAN MASA WAKTU KEMITRAAN', numbered([
@@ -204,7 +209,8 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
         'Apabila penyelesaian tidak berhasil, maka Para Pihak sepakat menyelesaikan perselisihan melalui Badan Arbitrase Nasional Indonesia (BANI) di Jakarta dengan menggunakan Prosedur BANI dan menunjuk Arbiter Tunggal.'
       ])),
       article('Pasal 9', 'SANKSI, MANGKIR DAN DENDA', numbered([
-        `${upper(companyName)} berwenang memberikan teguran atau peringatan baik lisan maupun tulisan kepada MITRA apabila MITRA tidak memenuhi kewajiban-kewajiban dalam Perjanjian ini.`
+        `${upper(companyName)} berwenang memberikan teguran atau peringatan baik lisan maupun tulisan kepada MITRA apabila MITRA tidak memenuhi kewajiban-kewajiban dalam Perjanjian ini.`,
+        `Sesuai dengan ketentuan mekanisme program yang berlaku, PT Origin Magda Inovasi berwenang untuk melakukan pemotongan terhadap biaya upah bulanan dan/atau insentif (jikalau ada).`
       ])),
       article('Pasal 10', 'PEMBERITAHUAN KORESPONDENSI', [
         p('1. Setiap pemberitahuan yang timbul sehubungan dengan Perjanjian ini disampaikan secara tertulis dengan tanda terima dan/atau email kepada alamat berikut:'),
@@ -214,6 +220,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
           ['Jabatan', val(data.picTitle)],
           ['Email', val(data.picEmail)],
           ['Alamat', val(data.picAddress)],
+          [''],
           ['MITRA', ''],
           ['Nama', partnerName],
           ['No. HP/Tlp', val(data.partnerPhone)],
@@ -250,7 +257,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
         'Perjanjian ini dapat ditandatangani dalam sejumlah salinan dan disampaikan dengan transmisi faksimile atau lainnya. Lampiran-lampiran dalam Perjanjian ini merupakan satu kesatuan yang tidak terpisahkan.'
       ])),
       {
-        pageBreak: 'before',
+        
         stack: [
           p('Demikianlah Perjanjian ini dibuat oleh Para Pihak dalam keadaan bermeterai cukup dan 2 (dua) rangkap. Para Pihak saat menandatangani Perjanjian ini dalam keadaan sehat jasmani dan rohani tanpa adanya paksaan ataupun tekanan dari pihak mana pun.'),
           signatureSection({
@@ -333,11 +340,31 @@ function lettered(items) {
 }
 
 function indented(items) {
-  return items.map((text) => ({
-    text,
-    margin: [20, 0, 0, 6],
-    alignment: 'justify'
-  }))
+  const marginLeft = INDENTED_MARGIN_LEFT
+  const numberWidth = INDENTED_NUMBER_WIDTH
+  let previousItemHasNumber = false
+
+  return items.map((value) => {
+    const text = String(value)
+    const match = text.match(/^(\d+(?:\.\d+)+)\s+(.+)$/)
+
+    if (match) {
+      previousItemHasNumber = true
+      return {
+        columns: [
+          { width: numberWidth, text: match[1] },
+          { width: '*', text: match[2], alignment: 'justify' }
+        ],
+        margin: [marginLeft, 0, 0, 6]
+      }
+    }
+
+    return {
+      text,
+      margin: [previousItemHasNumber ? marginLeft + numberWidth : marginLeft, 0, 0, 6],
+      alignment: 'justify'
+    }
+  })
 }
 
 function article(no, title, body) {
@@ -383,7 +410,9 @@ function articleId(value) {
     .replace(/^-|-$/g, '') || 'section'
 }
 
-function tableRows(rows, widths) {
+function tableRows(rows, widths, options = {}) {
+  const marginLeft = options.marginLeft === undefined ? 20 : options.marginLeft
+
   return {
     table: {
       widths,
@@ -393,7 +422,7 @@ function tableRows(rows, widths) {
       ])
     },
     layout: 'noBorders',
-    margin: [20, 0, 0, 8]
+    margin: [marginLeft, 0, 0, 8]
   }
 }
 
