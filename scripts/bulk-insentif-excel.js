@@ -30,6 +30,7 @@
 const fs = require('fs')
 const path = require('path')
 const XLSX = require('xlsx')
+const ExcelDateService = require('../app/Services/ExcelDateService')
 
 const args = process.argv.slice(2)
 
@@ -123,6 +124,19 @@ function normalizeRow(row) {
   }, {})
 }
 
+function pickFromLower(lower, keys) {
+  for (const key of keys) {
+    if (lower[key] === undefined || lower[key] === null) continue
+    if (typeof lower[key] === 'string' && lower[key].trim() === '') continue
+    return lower[key]
+  }
+  return undefined
+}
+
+function parseSlipJoinDate(lower) {
+  return ExcelDateService.parse(pickFromLower(lower, ['joindate', 'join date', 'join_date', 'tanggal masuk', 'tgl masuk']))
+}
+
 function buildPayloadFromRow(row, opts) {
   const lower = normalizeRow(row)
 
@@ -167,7 +181,7 @@ function buildPayloadFromRow(row, opts) {
       position: lower.position,
       department: lower.department || lower.departement || lower.departemen,
       period: lower.period || lower.periode,
-      joinDate: lower.joindate,
+      joinDate: parseSlipJoinDate(lower),
       ptkp: lower.ptkp,
       targetHK: lower.targethk,
       attendance: lower.attendance,

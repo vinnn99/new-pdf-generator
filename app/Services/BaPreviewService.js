@@ -11,6 +11,7 @@ const TemplateResolver = use('App/Services/TemplateResolver')
 const BaTemplateService = use('App/Services/BaTemplateService')
 const CompanyCodeService = use('App/Services/CompanyCodeService')
 const SlipPayloadNormalizer = use('App/Services/SlipPayloadNormalizer')
+const PayloadDateNormalizer = use('App/Services/PayloadDateNormalizer')
 const CooperationAgreementService = use('App/Services/CooperationAgreementService')
 
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000
@@ -67,6 +68,10 @@ class BaPreviewService {
       template: normalizedTemplate,
       data: sourceData
     })
+    payloadData = PayloadDateNormalizer.normalize({
+      template: normalizedTemplate,
+      data: payloadData
+    })
     payloadData.companyName = payloadData.companyName || company.name
     if (BaTemplateService.isBaTemplate(normalizedTemplate)) {
       payloadData.letterNo = this.buildPreviewLetterNo({
@@ -76,6 +81,10 @@ class BaPreviewService {
     }
     if (CooperationAgreementService.isTemplate(normalizedTemplate)) {
       payloadData = CooperationAgreementService.normalizeData(payloadData)
+      payloadData = PayloadDateNormalizer.normalize({
+        template: normalizedTemplate,
+        data: payloadData
+      })
       payloadData.companyName = payloadData.companyName || CooperationAgreementService.DEFAULT_COMPANY_NAME
       payloadData.letterNo = CooperationAgreementService.buildPreviewLetterNo()
     }

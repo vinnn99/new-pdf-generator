@@ -9,6 +9,7 @@ const https = require('https')
 const WebhookSender = require('../Services/WebhookSender')
 const TemplateResolver = require('../Services/TemplateResolver')
 const SlipPayloadNormalizer = use('App/Services/SlipPayloadNormalizer')
+const PayloadDateNormalizer = use('App/Services/PayloadDateNormalizer')
 const CooperationAgreementService = use('App/Services/CooperationAgreementService')
 
 // Server-side font paths for pdfmake v0.2
@@ -57,9 +58,13 @@ class GeneratePdfJob {
       if (!template || typeof template !== 'string') {
         throw new Error('Invalid template name')
       }
-      const payloadData = SlipPayloadNormalizer.normalize({
+      let payloadData = SlipPayloadNormalizer.normalize({
         template,
         data: rawPayloadData
+      })
+      payloadData = PayloadDateNormalizer.normalize({
+        template,
+        data: payloadData
       })
 
       // Siapkan resource tanda tangan (opsional) bila diberikan sebagai URL

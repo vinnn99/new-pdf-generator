@@ -1,5 +1,7 @@
 'use strict'
 
+const ExcelDateService = require('./ExcelDateService')
+
 class SlipPayloadNormalizer {
   static normalize ({ template, data } = {}) {
     const normalizedTemplate = String(template || '').trim().toLowerCase()
@@ -17,6 +19,7 @@ class SlipPayloadNormalizer {
     assignAlias(out, 'employeeId', ['employeeId', 'employee_id', 'nip'])
     assignAlias(out, 'position', ['position', 'jabatan'])
     assignAlias(out, 'joinDate', ['joinDate', 'join_date', 'tanggalMasuk', 'tglMasuk'])
+    normalizeDate(out, 'joinDate')
     assignAlias(out, 'targetHK', ['targetHK', 'target_hk'])
     assignAlias(out, 'attendance', ['attendance', 'kehadiran'])
     assignAlias(out, 'ptkp', ['ptkp', 'PTKP'])
@@ -30,6 +33,7 @@ class SlipPayloadNormalizer {
       assignAlias(out, 'slipTitle', ['slipTitle', 'slip_title', 'title', 'judul'])
       if (isMissing(out.slipTitle)) out.slipTitle = 'Payslip THR'
       assignAlias(out, 'payoutDate', ['payoutDate', 'payout_date', 'tanggalPembayaran', 'tanggalBayar'])
+      normalizeDate(out, 'payoutDate')
     }
 
     const baseSalaryValue = pickFirstValue(out, ['baseSalary', 'base_salary', 'gajiPokok', 'gaji_pokok', 'gaji pokok'])
@@ -126,6 +130,11 @@ function assignAlias (obj, targetKey, aliases) {
   if (!isMissing(obj[targetKey])) return
   const picked = pickFirstValue(obj, aliases)
   if (!isMissing(picked)) obj[targetKey] = picked
+}
+
+function normalizeDate (obj, key) {
+  if (isMissing(obj[key])) return
+  obj[key] = ExcelDateService.parse(obj[key])
 }
 
 function normalizeMoneyList (input) {
