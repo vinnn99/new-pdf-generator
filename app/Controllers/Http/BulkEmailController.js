@@ -38,17 +38,12 @@ class BulkEmailController {
       if (!company) {
         return response.status(401).json({ status: 'error', message: 'Perusahaan user tidak ditemukan' })
       }
-      const smtpHost = Env.get('SMTP_HOST')
-      const smtpPort = Env.get('SMTP_PORT')
-      const smtpUser = Env.get('SMTP_USER')
-      const smtpPass = Env.get('SMTP_PASS')
-      const smtpSecure = Env.get('SMTP_SECURE', 'false') === 'true'
-      const mailFrom = Env.get('MAIL_FROM') || smtpUser
+      const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, mailFrom } = pickSmtpConfig(company)
 
-      if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+      if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !mailFrom) {
         return response.status(500).json({
           status: 'error',
-          message: 'Konfigurasi SMTP tidak lengkap di .env'
+          message: 'Konfigurasi SMTP belum lengkap di perusahaan atau .env. MAIL_FROM/mail_from wajib diisi sebagai pengirim email.'
         })
       }
 
@@ -360,10 +355,10 @@ class BulkEmailController {
       }
 
       const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, mailFrom } = pickSmtpConfig(company)
-      if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+      if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !mailFrom) {
         return response.status(500).json({
           status: 'error',
-          message: 'Konfigurasi SMTP belum lengkap di perusahaan atau .env'
+          message: 'Konfigurasi SMTP belum lengkap di perusahaan atau .env. MAIL_FROM/mail_from wajib diisi sebagai pengirim email.'
         })
       }
 
@@ -1266,7 +1261,7 @@ function pickSmtpConfig(company) {
   const envUser = Env.get('SMTP_USER')
   const envPass = Env.get('SMTP_PASS')
   const envSecure = Env.get('SMTP_SECURE', 'false')
-  const envFrom = Env.get('MAIL_FROM') || envUser
+  const envFrom = Env.get('MAIL_FROM')
 
   const companyComplete = company &&
     company.smtp_host &&
@@ -1283,11 +1278,17 @@ function pickSmtpConfig(company) {
   const smtpSecure = useCompany
     ? truthy(company.smtp_secure)
     : truthy(envSecure)
-  const mailFrom = useCompany
-    ? (company.mail_from || company.smtp_user)
-    : (envFrom || envUser)
+  const mailFrom = firstConfigValue(envFrom, company && company.mail_from)
 
   return { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, mailFrom }
+}
+
+function firstConfigValue(...values) {
+  for (const value of values) {
+    const normalized = String(value || '').trim()
+    if (normalized) return normalized
+  }
+  return ''
 }
 
 module.exports = BulkEmailController

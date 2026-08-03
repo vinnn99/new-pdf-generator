@@ -1145,7 +1145,7 @@ Perilaku:
 - Jika ada lebih dari satu kandidat lampiran yang cocok (beda `kodeUnique`), sistem memilih file terbaru.
 - Satu lampiran dikirim per baris email.
 - Log tercatat di `logs/bulk-email.log`.
-- SMTP: jika semua field SMTP di tabel `companies` terisi (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, opsional `smtp_secure`, `mail_from`) maka dipakai; jika tidak lengkap, fallback ke `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `MAIL_FROM`).
+- SMTP: jika semua field SMTP di tabel `companies` terisi (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, opsional `smtp_secure`, `mail_from`) maka konfigurasi auth SMTP company dipakai; jika tidak lengkap, fallback ke `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`). `SMTP_USER` hanya dipakai untuk autentikasi SMTP, sedangkan pengirim email (`from`) wajib dari `MAIL_FROM` atau fallback `companies.mail_from`.
 
 ## Bulk Kirim Email BA Penempatan
 

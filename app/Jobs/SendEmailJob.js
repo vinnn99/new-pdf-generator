@@ -43,8 +43,12 @@ class SendEmailJob {
         auth: { user: smtpUser, pass: smtpPass }
       })
 
+      if (!mailFrom) {
+        throw new Error('MAIL_FROM/mail_from wajib diisi sebagai pengirim email. SMTP_USER hanya dipakai untuk autentikasi SMTP.')
+      }
+
       await transporter.sendMail({
-        from: mailFrom || smtpUser,
+        from: mailFrom,
         to,
         cc,
         bcc,

@@ -12,6 +12,7 @@ suite.timeout(0)
 const { test, trait, before, after } = suite
 
 const Database = use('Database')
+const Env = use('Env')
 const User = use('App/Models/User')
 const Helpers = use('Helpers')
 const ContactService = use('App/Services/ContactService')
@@ -1016,6 +1017,8 @@ test('send/payslip menerima recipient object dan body 4-byte', async ({ client, 
   const payload = JSON.parse(row.payload)
   assert.equal(payload.data.to, toEmail)
   assert.equal(payload.data.cc[0], ccEmail)
+  assert.equal(payload.data.smtpUser, Env.get('SMTP_USER'))
+  assert.equal(payload.data.mailFrom, Env.get('MAIL_FROM'))
   assert.equal(payload.data.text, `Halo ${marker}`)
 })
 
@@ -1072,8 +1075,14 @@ test('SendEmailJob update row queued email_logs saat emailLogId tersedia', async
   const emailLogId = Array.isArray(inserted) ? inserted[0] : inserted
 
   const originalCreateTransport = nodemailer.createTransport
-  nodemailer.createTransport = () => ({
-    sendMail: async () => ({ accepted: [toEmail], messageId: 'mock-message-id' })
+  let transportOptions = null
+  let mailOptions = null
+  nodemailer.createTransport = (options) => ({
+    sendMail: async (message) => {
+      transportOptions = options
+      mailOptions = message
+      return { accepted: [toEmail], messageId: 'mock-message-id' }
+    }
   })
 
   try {
@@ -1081,9 +1090,9 @@ test('SendEmailJob update row queued email_logs saat emailLogId tersedia', async
       smtpHost: 'localhost',
       smtpPort: 25,
       smtpSecure: false,
-      smtpUser: 'noreply@test.local',
+      smtpUser: 'smtp-auth@test.local',
       smtpPass: 'dummy',
-      mailFrom: 'noreply@test.local',
+      mailFrom: 'alias@test.local',
       to: toEmail,
       cc: [],
       bcc: [],
@@ -1108,6 +1117,8 @@ test('SendEmailJob update row queued email_logs saat emailLogId tersedia', async
   assert.equal(Number(rows[0].id), Number(emailLogId))
   assert.equal(rows[0].status, 'sent')
   assert.equal(rows[0].subject, 'Updated Subject')
+  assert.equal(transportOptions.auth.user, 'smtp-auth@test.local')
+  assert.equal(mailOptions.from, 'alias@test.local')
 })
 
 test('SendEmailJob gagal jelas saat attachment wajib hilang', async ({ assert }) => {
@@ -1285,6 +1296,16 @@ test('send-slip-emails menemukan PDF hasil generate bulk walau periode pakai nam
     assert.equal(Number(response.body.skipped), 0)
     assert.equal(response.body.results[0].status, 'queued')
     assert.equal(response.body.results[0].attachments[0], pdfMeta.filename)
+
+    const job = await Database.table('jobs')
+      .where('payload', 'like', `%${toEmail}%`)
+      .orderBy('id', 'desc')
+      .first()
+
+    assert.ok(job)
+    const payload = JSON.parse(job.payload)
+    assert.equal(payload.data.smtpUser, Env.get('SMTP_USER'))
+    assert.equal(payload.data.mailFrom, Env.get('MAIL_FROM'))
   } finally {
     try {
       fs.unlinkSync(xlsxPath)
@@ -1394,6 +1415,8 @@ test('send-cooperation-agreement-emails memakai lampiran dari batch berdasarkan 
     assert.equal(payload.data.template, 'cooperation_agreement')
     assert.equal(payload.data.context, 'bulk-cooperation-agreement')
     assert.equal(payload.data.attachments[0].filename, filename)
+    assert.equal(payload.data.smtpUser, Env.get('SMTP_USER'))
+    assert.equal(payload.data.mailFrom, Env.get('MAIL_FROM'))
   } finally {
     try {
       fs.unlinkSync(xlsxPath)
