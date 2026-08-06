@@ -462,6 +462,7 @@ function buildPayslipPayload(lower, opts) {
   addEarn('Tunjangan Komunikasi', 'tunjangan komunikasi')
   addEarn('Tunjangan Komunikasi', 'yunjangan komunikasi') // handle typo umum
   addEarn('Tunjangan Jabatan', 'tunjangan jabatan')
+  addEarn('Tunjangan BPJS Ketenagakerjaan', 'tunjangan bpjs ketenagakerjaan')
 
   addDed('BPJS Ketenagakerjaan', 'bpjs ketenagakerjaan')
   addDed('PPh21', 'pph 21')

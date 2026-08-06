@@ -53,6 +53,7 @@ class SlipPayloadNormalizer {
     appendAliasMoney(earnings, out, 'Tunjangan Transport', ['tunjanganTransport', 'tunjangan_transport', 'tunjangan transport'])
     appendAliasMoney(earnings, out, 'Tunjangan Komunikasi', ['tunjanganKomunikasi', 'tunjangan_komunikasi', 'tunjangan komunikasi', 'yunjangan komunikasi'])
     appendAliasMoney(earnings, out, 'Tunjangan Jabatan', ['tunjanganJabatan', 'tunjangan_jabatan', 'tunjangan jabatan'])
+    appendAliasMoney(earnings, out, 'Tunjangan BPJS Ketenagakerjaan', ['tunjanganBpjsKetenagakerjaan', 'tunjanganBPJSKetenagakerjaan', 'tunjangan_bpjs_ketenagakerjaan', 'tunjangan bpjs ketenagakerjaan', 'tunjanganBpjs', 'tunjanganBPJS', 'tunjangan_bpjs', 'tunjangan bpjs'])
     appendAliasMoney(earnings, out, 'INSENTIF SAMPLING', ['insentifSampling', 'insentif_sampling', 'insentif sampling'])
     appendAliasMoney(earnings, out, 'INSENTIF SELLOUT', ['insentifSellout', 'insentif_sellout', 'insentif sellout', 'insentif  sellout'])
     appendAliasMoney(earnings, out, 'INSENTIF KERAJINAN', ['insentifKerajinan', 'insentif_kerajinan', 'insentif kerajinan'])

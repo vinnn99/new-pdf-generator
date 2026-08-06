@@ -35,6 +35,7 @@ const TEMPLATE_DEFINITIONS = {
       'Tunjangan Transport',
       'Tunjangan Komunikasi',
       'Tunjangan Jabatan',
+      'Tunjangan BPJS Ketenagakerjaan',
       'BPJS Ketenagakerjaan',
       'PPH 21',
       'email'
@@ -54,6 +55,7 @@ const TEMPLATE_DEFINITIONS = {
       1000000,
       800000,
       800000,
+      300000,
       300000,
       250000,
       'user@example.com'

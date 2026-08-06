@@ -22,6 +22,25 @@ test('menormalisasi joinDate slip dari serial Excel', async ({ assert }) => {
   assert.equal(payload.joinDate, '2026-07-30')
 })
 
+test('menormalisasi Tunjangan BPJS Ketenagakerjaan sebagai earning', async ({ assert }) => {
+  const payload = SlipPayloadNormalizer.normalize({
+    template: 'payslip',
+    data: {
+      employeeName: 'Budi',
+      position: 'Staff',
+      period: 'Juni 2026',
+      tunjanganBpjsKetenagakerjaan: '300000',
+      bpjsKetenagakerjaan: '150000'
+    }
+  })
+
+  const earning = payload.earnings.find((item) => item.label === 'Tunjangan BPJS Ketenagakerjaan')
+  const deduction = payload.deductions.find((item) => item.label === 'BPJS Ketenagakerjaan')
+
+  assert.equal(earning && earning.amount, 300000)
+  assert.equal(deduction && deduction.amount, 150000)
+})
+
 test('menormalisasi field tanggal BA dari serial Excel', async ({ assert }) => {
   const payload = PayloadDateNormalizer.normalize({
     template: 'ba-request-id',

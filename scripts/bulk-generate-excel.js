@@ -22,7 +22,7 @@
  * Format header contoh (baris pertama) yang otomatis dipetakan ke earnings/deductions:
  *   employeeID | employeeName | position | departement | ptkp | periode | joinDate | departemen | targetHK | attendance |
  *   Gaji Pokok | Tunjangan makan | Tunjangan Transport | Tunjangan Komunikasi | Tunjangan Jabatan |
- *   BPJS Ketenagakerjaan | PPH 21
+ *   Tunjangan BPJS Ketenagakerjaan | BPJS Ketenagakerjaan | PPH 21
  *
  * Nilai numerik di kolom-kolom tunjangan/potongan akan dikonversi ke earnings/deductions otomatis.
  *
@@ -196,6 +196,7 @@ function buildPayloadFromRow(row, opts = {}) {
     addEarn('Tunjangan Komunikasi', 'tunjangan komunikasi')
     addEarn('Tunjangan Komunikasi', 'yunjangan komunikasi') // handle typo
     addEarn('Tunjangan Jabatan', 'tunjangan jabatan')
+    addEarn('Tunjangan BPJS Ketenagakerjaan', 'tunjangan bpjs ketenagakerjaan')
 
     addDed('BPJS Ketenagakerjaan', 'bpjs ketenagakerjaan')
     addDed('PPh21', 'pph 21')

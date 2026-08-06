@@ -1051,10 +1051,10 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
 ### Endpoint
 - `POST /api/v1/bulk/payslip`  
   - Minimal kolom: `employeeName`, `position`, `period/periode`. Kolom `email` boleh ditambahkan jika penerima berbeda dari akun login.  
-  - Earnings otomatis jika ada: `Gaji Pokok`, `Tunjangan makan`, `Tunjangan Transport`, `Tunjangan Komunikasi`, `Tunjangan Jabatan`, atau kolom bebas `earnings`.  
+  - Earnings otomatis jika ada: `Gaji Pokok`, `Tunjangan makan`, `Tunjangan Transport`, `Tunjangan Komunikasi`, `Tunjangan Jabatan`, `Tunjangan BPJS Ketenagakerjaan`, atau kolom bebas `earnings`.  
   - Deductions: `BPJS Ketenagakerjaan`, `PPH 21`/`PPH21`, atau kolom bebas `deductions`.  
   - Format Excel contoh tersedia di `resources/templates/*.xlsx` (buat/refresh via `node scripts/create-bulk-template.js --all`). Header kolom:  
-    `employeeID | employeeName | position | departement | ptkp | periode | joinDate | targetHK | attendance | Gaji Pokok | Tunjangan makan | Tunjangan Transport | Tunjangan Komunikasi | Tunjangan Jabatan | BPJS Ketenagakerjaan | PPH 21 | email (opsional)`
+    `employeeID | employeeName | position | departement | ptkp | periode | joinDate | targetHK | attendance | Gaji Pokok | Tunjangan makan | Tunjangan Transport | Tunjangan Komunikasi | Tunjangan Jabatan | Tunjangan BPJS Ketenagakerjaan | BPJS Ketenagakerjaan | PPH 21 | email (opsional)`
 
 - `POST /api/v1/bulk/insentif`  
   - Minimal: `employeeName`, `position`, `period/periode`. Kolom `email` opsional jika penerima bukan akun login.  
