@@ -1,6 +1,7 @@
 'use strict'
 
 const ExcelDateService = require('./ExcelDateService')
+const SlipPeriodService = require('./SlipPeriodService')
 
 class SlipPayloadNormalizer {
   static normalize ({ template, data } = {}) {
@@ -16,6 +17,7 @@ class SlipPayloadNormalizer {
 
     assignAlias(out, 'department', ['department', 'departement', 'departemen'])
     assignAlias(out, 'period', ['period', 'periode'])
+    if (!isMissing(out.period)) out.period = SlipPeriodService.normalize(out.period)
     assignAlias(out, 'employeeId', ['employeeId', 'employee_id', 'nip'])
     assignAlias(out, 'position', ['position', 'jabatan'])
     assignAlias(out, 'joinDate', ['joinDate', 'join_date', 'tanggalMasuk', 'tglMasuk'])

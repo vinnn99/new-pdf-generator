@@ -1051,6 +1051,7 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
 ### Endpoint
 - `POST /api/v1/bulk/payslip`  
   - Minimal kolom: `employeeName`, `position`, `period/periode`. Kolom `email` boleh ditambahkan jika penerima berbeda dari akun login.  
+  - `period/periode` boleh berupa teks (`Oktober 2025`, `2025-10`) atau cell tanggal Excel; serial tanggal Excel akan dinormalisasi menjadi bulan-tahun.  
   - Earnings otomatis jika ada: `Gaji Pokok`, `Tunjangan makan`, `Tunjangan Transport`, `Tunjangan Komunikasi`, `Tunjangan Jabatan`, `Tunjangan BPJS Ketenagakerjaan`, atau kolom bebas `earnings`.  
   - Deductions: `BPJS Ketenagakerjaan`, `PPH 21`/`PPH21`, atau kolom bebas `deductions`.  
   - Format Excel contoh tersedia di `resources/templates/*.xlsx` (buat/refresh via `node scripts/create-bulk-template.js --all`). Header kolom:  
@@ -1058,6 +1059,7 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
 
 - `POST /api/v1/bulk/insentif`  
   - Minimal: `employeeName`, `position`, `period/periode`. Kolom `email` opsional jika penerima bukan akun login.  
+  - `period/periode` boleh berupa teks (`Oktober 2025`, `2025-10`) atau cell tanggal Excel; serial tanggal Excel akan dinormalisasi menjadi bulan-tahun.  
   - Earnings otomatis: `INSENTIF SAMPLING`, `INSENTIF SELLOUT` (dua ejaan), `INSENTIF KERAJINAN`, `INSENTIF TL`, plus `earnings` bebas.  
   - Deductions: `PPH21`/`PPH 21`, atau `deductions` bebas.  
   - `slip_title` default: "Payslip Insentif".
@@ -1066,6 +1068,7 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
 
 - `POST /api/v1/bulk/thr`  
   - Minimal: `employeeName`, `position`, `period/periode`. Kolom `email` opsional jika penerima bukan akun login.  
+  - `period/periode` boleh berupa teks (`Oktober 2025`, `2025-10`) atau cell tanggal Excel; serial tanggal Excel akan dinormalisasi menjadi bulan-tahun.  
   - Earnings: kolom `THR` otomatis jadi earning "THR", plus `earnings` bebas.  
   - Deductions: `deductions` bebas.  
   - `slip_title` default: "Payslip THR"; `note` default: "Biaya Admin jika Beda Bank ( TEMA BCA )".

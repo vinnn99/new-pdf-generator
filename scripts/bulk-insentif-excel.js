@@ -31,6 +31,7 @@ const fs = require('fs')
 const path = require('path')
 const XLSX = require('xlsx')
 const ExcelDateService = require('../app/Services/ExcelDateService')
+const SlipPeriodService = require('../app/Services/SlipPeriodService')
 
 const args = process.argv.slice(2)
 
@@ -137,6 +138,10 @@ function parseSlipJoinDate(lower) {
   return ExcelDateService.parse(pickFromLower(lower, ['joindate', 'join date', 'join_date', 'tanggal masuk', 'tgl masuk']))
 }
 
+function parseSlipPeriod(lower) {
+  return SlipPeriodService.normalize(pickFromLower(lower, ['period', 'periode']))
+}
+
 function buildPayloadFromRow(row, opts) {
   const lower = normalizeRow(row)
 
@@ -180,7 +185,7 @@ function buildPayloadFromRow(row, opts) {
       employeeId: lower.employeeid,
       position: lower.position,
       department: lower.department || lower.departement || lower.departemen,
-      period: lower.period || lower.periode,
+      period: parseSlipPeriod(lower),
       joinDate: parseSlipJoinDate(lower),
       ptkp: lower.ptkp,
       targetHK: lower.targethk,

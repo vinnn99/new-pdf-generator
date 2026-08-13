@@ -5,6 +5,7 @@ const { test } = suite
 
 const ExcelDateService = use('App/Services/ExcelDateService')
 const SlipPayloadNormalizer = use('App/Services/SlipPayloadNormalizer')
+const SlipPeriodService = use('App/Services/SlipPeriodService')
 const PayloadDateNormalizer = use('App/Services/PayloadDateNormalizer')
 
 test('mengubah serial tanggal Excel menjadi YYYY-MM-DD', async ({ assert }) => {
@@ -19,6 +20,20 @@ test('menormalisasi joinDate slip dari serial Excel', async ({ assert }) => {
     data: { employeeName: 'Budi', position: 'Staff', period: 'Juni 2026', joinDate: 46233 }
   })
 
+  assert.equal(payload.joinDate, '2026-07-30')
+})
+
+test('menormalisasi periode slip dari serial Excel menjadi bulan tahun', async ({ assert }) => {
+  assert.equal(SlipPeriodService.normalize(45945), 'Oktober 2025')
+  assert.equal(SlipPeriodService.normalize('45945'), 'Oktober 2025')
+  assert.equal(SlipPeriodService.normalize('2026-04'), '2026-04')
+
+  const payload = SlipPayloadNormalizer.normalize({
+    template: 'payslip',
+    data: { employeeName: 'Budi', position: 'Staff', period: 45945, joinDate: 46233 }
+  })
+
+  assert.equal(payload.period, 'Oktober 2025')
   assert.equal(payload.joinDate, '2026-07-30')
 })
 

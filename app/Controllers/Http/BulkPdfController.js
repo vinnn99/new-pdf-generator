@@ -7,6 +7,7 @@ const path = require('path')
 const Database = use('Database')
 const JobService = require('../../Services/JobService')
 const ExcelDateService = require('../../Services/ExcelDateService')
+const SlipPeriodService = require('../../Services/SlipPeriodService')
 const BaTemplateService = use('App/Services/BaTemplateService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
 const CooperationAgreementService = use('App/Services/CooperationAgreementService')
@@ -441,6 +442,7 @@ function basePayload(lower, opts) {
 function buildPayslipPayload(lower, opts) {
   const payload = basePayload(lower, opts)
   const joinDate = parseSlipJoinDate(lower)
+  const period = parseSlipPeriod(lower)
 
   const earnings = parseMoneyList(lower.earnings)
   const deductions = parseMoneyList(lower.deductions)
@@ -478,7 +480,7 @@ function buildPayslipPayload(lower, opts) {
     employeeId: lower.employeeid,
     position: lower.position,
     department: lower.department || lower.departement || lower.departemen,
-    period: lower.period || lower.periode,
+    period,
     joinDate,
     ptkp: lower.ptkp,
     targetHK: lower.targethk,
@@ -495,6 +497,7 @@ function buildPayslipPayload(lower, opts) {
 function buildInsentifPayload(lower, opts) {
   const payload = basePayload(lower, opts)
   const joinDate = parseSlipJoinDate(lower)
+  const period = parseSlipPeriod(lower)
 
   const earnings = []
   const deductions = []
@@ -530,7 +533,7 @@ function buildInsentifPayload(lower, opts) {
     employeeId: lower.employeeid,
     position: lower.position,
     department: lower.department || lower.departement || lower.departemen,
-    period: lower.period || lower.periode,
+    period,
     joinDate,
     ptkp: lower.ptkp,
     targetHK: lower.targethk,
@@ -546,6 +549,7 @@ function buildInsentifPayload(lower, opts) {
 function buildThrPayload(lower, opts) {
   const payload = basePayload(lower, opts)
   const joinDate = parseSlipJoinDate(lower)
+  const period = parseSlipPeriod(lower)
 
   const earnings = []
   if (lower.thr !== undefined && lower.thr !== '') {
@@ -563,7 +567,7 @@ function buildThrPayload(lower, opts) {
     employeeId: lower.employeeid,
     position: lower.position,
     department: lower.department || lower.departement || lower.departemen,
-    period: lower.period || lower.periode,
+    period,
     joinDate,
     ptkp: lower.ptkp,
     targetHK: lower.targethk,
@@ -954,6 +958,10 @@ function pickFromLower(lower, keys) {
 
 function parseSlipJoinDate(lower) {
   return parseExcelDate(pickFromLower(lower, ['joindate', 'join date', 'join_date', 'tanggal masuk', 'tgl masuk']))
+}
+
+function parseSlipPeriod(lower) {
+  return SlipPeriodService.normalize(pickFromLower(lower, ['period', 'periode']))
 }
 
 function isSlipMode(mode) {

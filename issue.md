@@ -1,224 +1,179 @@
-# Issue Plan: Bulk Send Email `cooperation_agreement`
+# Issue Planning: Perbaikan Tunjangan Pasal 2 Template `cooperation_agreement`
 
-## Ringkasan
-Tambahkan fitur bulk send email untuk template `cooperation_agreement` pada halaman frontend `/send-emails`.
+## Status
+Draft perencanaan untuk diimplementasikan oleh junior programmer atau AI model biaya rendah.
 
-Flow pengiriman harus mengikuti pola bulk BA existing:
-
-1. User generate PDF lebih dulu lewat bulk generate `cooperation_agreement`.
-2. Backend membuat `generation_batches` dan `generation_batch_items`.
-3. User masuk ke `/send-emails`, memilih jenis pengiriman `Cooperation Agreement`.
-4. User memilih `batch_id` hasil generate bulk.
-5. User upload Excel penerima email.
-6. Backend mencari lampiran PDF dari batch berdasarkan `batch_id`, `template`, dan `match_key`.
-7. Email dikirim dengan attachment PDF yang sesuai.
-
-Dokumen ini dibuat sebagai panduan implementasi untuk junior programmer atau AI model yang lebih murah.
-
-## Informasi Repo
+## Informasi Umum
 - Backend: `core.pdf-generator.indinesia.id`
 - Frontend: `ui-pdf-generator`
+- Perubahan utama ada di backend karena layout dan isi PDF `cooperation_agreement` dibuat dari template backend.
+- Frontend hanya perlu disentuh jika ada field, template Excel, preview, atau dokumentasi UI yang perlu menyesuaikan informasi tunjangan.
 
-## Scope Utama
-- Tambahkan mode bulk email `cooperation_agreement`.
-- Jangan membuat pola lookup attachment baru yang berbeda dari BA.
-- Reuse tabel batch:
-  - `generation_batches`
-  - `generation_batch_items`
-- Reuse attachment yang sudah dibuat oleh endpoint bulk generate:
-  - `POST /api/v1/bulk/cooperation_agreement`
-- Tambahkan endpoint bulk email baru untuk Cooperation Agreement.
-- Tambahkan opsi dan UI pendukung di frontend `/send-emails`.
+## Latar Belakang
+Issue ini terkait template PDF `cooperation_agreement`.
 
-## Keputusan Implementasi
-- Nama template tetap `cooperation_agreement`.
-- Label frontend: `Cooperation Agreement`.
-- Endpoint backend disarankan:
-  - `POST /api/v1/send-cooperation-agreement-emails`
-- Field upload tetap multipart form-data:
-  - `file`: Excel penerima email
-  - `batch_id`: batch hasil bulk generate `cooperation_agreement`
-- Lampiran tidak dicari dari folder secara manual. Lampiran harus diambil dari metadata `generation_batch_items.saved_path`, sama seperti bulk BA.
-- Context email log boleh dibuat khusus, misalnya `bulk-cooperation-agreement`, agar mudah dibedakan dari `bulk-ba`.
-- Jika `allowed_templates` company aktif, mode ini hanya muncul dan bisa dipakai saat company mengizinkan `cooperation_agreement`.
+Pada Pasal 2, nomor `3.3` adalah bagian kesepakatan upah dengan tunjangan. Saat ini sub item tunjangan terdiri dari:
+- `3.3.1` Tunjangan transport
+- `3.3.2` Tunjangan makan
+- `3.3.3` Tunjangan pulsa
 
-## Match Key Attachment
-Bulk generate `cooperation_agreement` sudah membuat match key melalui data mitra.
+Template perlu dibuat dinamis agar tunjangan bernilai `0` tidak ditampilkan, dan nomor berikutnya tetap tersusun rapi.
 
-Gunakan aturan yang sama saat bulk send email:
+Template utama:
+- `app/Templates/cooperation_agreement.js`
 
-- Wajib ada `partnerName`.
-- Wajib ada salah satu:
-  - `partnerEmail`
-  - `partnerIdentityNumber`
+File berikut hanya re-export template utama:
+- `resources/pdf-templates/cooperation_agreement.js`
 
-Match key harus sama dengan `CooperationAgreementService.buildMatchKey(...)`.
+## Scope Perubahan
+1. Jika salah satu atau lebih tunjangan bernilai `0`, sub item tunjangan tersebut tidak perlu ditampilkan.
+2. Urutan nomor sub item tunjangan harus mengikuti jumlah tunjangan yang ditampilkan.
+3. Jika ketiga tunjangan bernilai `0`, maka nomor `3.3` tentang tunjangan dihilangkan.
+4. Jika nomor `3.3` dihilangkan, nomor berikutnya harus naik:
+   - `3.4` menjadi `3.3`
+   - `3.5` menjadi `3.4`
+   - `3.6` menjadi `3.5`
+   - dan seterusnya
+5. Setelah implementasi, buat contoh PDF hasil generate untuk memvalidasi output.
 
-Contoh kolom Excel send email:
+## Rencana Implementasi Backend
 
-| Kolom | Wajib | Catatan |
-| --- | --- | --- |
-| `sentTo` | Ya | Email tujuan pengiriman |
-| `partnerName` | Ya | Harus sama dengan data saat bulk generate |
-| `partnerEmail` | Salah satu | Dipakai untuk lookup attachment |
-| `partnerIdentityNumber` | Salah satu | Alternatif lookup jika tidak memakai email mitra |
-| `subject` | Tidak | Override subject default |
-| `body` | Tidak | Override body default |
-| `cc` | Tidak | Pisahkan multi email dengan `;` |
-| `bcc` | Tidak | Pisahkan multi email dengan `;` |
+### 1. Identifikasi Field Tunjangan
+Gunakan field existing pada payload `cooperation_agreement`:
+- `transportAllowance`
+- `mealAllowance`
+- `phoneAllowance`
 
-Catatan:
-- Jika Excel bulk generate memakai alias Indonesia seperti `mitra nama`, `mitra email`, atau `mitra id`, bulk send email boleh mendukung alias yang sama.
-- Implementer harus memastikan normalisasi match key di bulk send email sama dengan bulk generate.
+Pastikan nilai dianggap `0` jika:
+- angka `0`
+- string `"0"`
+- string format rupiah/numeric yang setelah dinormalisasi bernilai `0`
+- kosong atau null hanya jika flow existing memang menormalisasi field tersebut menjadi `0`
 
-## Scope Backend
-1. Tambah route
-- Tambahkan route di `start/routes.js`:
-  - `POST /api/v1/send-cooperation-agreement-emails`
-- Gunakan middleware auth yang sama dengan bulk email BA existing.
+Jangan mengubah nama field payload kecuali benar-benar diperlukan.
 
-2. Tambah handler di `BulkEmailController`
-- Tambahkan method seperti:
-  - `sendCooperationAgreement(...)`
-- Handler ini harus memakai pola batch seperti `_sendBaTemplate`.
-- Jika memungkinkan, refactor nama helper generic supaya tidak terlalu BA-specific, misalnya:
-  - `_sendLetteredBatchTemplate(...)`
-- Jangan merusak endpoint BA yang sudah ada.
+### 2. Buat Helper Daftar Tunjangan Aktif
+Tambahkan helper kecil di `app/Templates/cooperation_agreement.js` untuk membentuk daftar tunjangan yang nilainya lebih dari `0`.
 
-3. Validasi request
-- `batch_id` wajib.
-- `file` wajib dan hanya menerima `.xls` / `.xlsx`.
-- Batch harus milik company user login.
-- Batch harus memiliki `template = 'cooperation_agreement'`.
-- Jika batch tidak ditemukan, return error yang jelas.
+Contoh hasil helper:
 
-4. Lookup attachment
-- Ambil item dari `generation_batch_items`.
-- Filter:
-  - `batch_id`
-  - `company_id`
-  - `template = 'cooperation_agreement'`
-  - `saved_path` tidak null
-- Group berdasarkan `match_key`.
-- Untuk setiap row Excel, build match key dari `partnerName` + `partnerEmail` atau `partnerIdentityNumber`.
-- Ambil attachment terbaru jika ada lebih dari satu kandidat, mengikuti pola `pickLatestBatchAttachment`.
+```js
+[
+  { label: 'Tunjangan makan', amount: data.mealAllowance, fieldName: 'tunjangan makan' },
+  { label: 'Tunjangan pulsa', amount: data.phoneAllowance, fieldName: 'tunjangan pulsa' }
+]
+```
 
-5. Dispatch email
-- Buat email log sebelum dispatch job, sama seperti bulk BA.
-- Dispatch `SendEmailJob` dengan:
-  - SMTP company
-  - `to`, `cc`, `bcc`
-  - `subject`
-  - `body`
-  - attachment dari batch item
-  - `requireAttachments: true`
-  - `template: 'cooperation_agreement'`
-  - context khusus bulk cooperation agreement
-- Response harus mengembalikan ringkasan:
-  - `total`
-  - `queued`
-  - `failed`
-  - `skipped`
-  - `batch_id`
-  - `results`
+Helper ini dipakai untuk menentukan apakah bagian `3.3` perlu ditampilkan atau tidak.
 
-6. Subject/body default
-- Jika Excel tidak mengisi `subject`, gunakan default yang jelas, contoh:
-  - `Cooperation Agreement - {partnerName}`
-- Jika Excel tidak mengisi `body`, gunakan default yang menyebut lampiran dokumen Cooperation Agreement.
-- Jika batch item punya `letter_no`, boleh masukkan nomor surat ke body default.
+### 3. Aturan Jika Sebagian Tunjangan Bernilai 0
+Jika hanya sebagian tunjangan yang bernilai lebih dari `0`, tampilkan hanya tunjangan tersebut.
 
-7. Logging
-- Gunakan pola log bulk email existing.
-- Log minimal:
-  - row
-  - to
-  - status
-  - template
-  - batchId
-  - matchKey
-  - attachment
-  - letterNo jika ada
+Contoh:
+- Tunjangan transport = `0`
+- Tunjangan makan = `300000`
+- Tunjangan pulsa = `100000`
 
-## Scope Frontend
-1. Tambah opsi mode di `/send-emails`
-- Update `src/components/forms/SendEmailsForm.jsx`.
-- Tambahkan mode:
-  - value: `cooperation_agreement`
-  - label: `Cooperation Agreement`
-  - endpoint: `/api/v1/send-cooperation-agreement-emails`
+Maka output harus menjadi:
 
-2. Update API helper
-- Update `src/api/bulkApi.js`.
-- Tambahkan mapping endpoint `cooperation_agreement`.
-- Nama helper boleh tetap `sendBaEmails` jika hanya diperluas, tetapi lebih baik rename/alias menjadi generic seperti `sendBatchAttachmentEmails`.
-- Pastikan perubahan tidak memutus pengiriman BA existing.
+```text
+3.3. MITRA sepakat mendapatkan upah dengan tunjangan sebagai berikut:
+     3.3.1 Tunjangan makan sebesar ...
+     3.3.2 Tunjangan pulsa sebesar ...
+```
 
-3. Batch history
-- Reuse batch list/detail yang sudah dipakai BA.
-- Query batch history harus bisa menerima `template = cooperation_agreement`.
-- UI "Pakai Batch" tetap bekerja untuk batch Cooperation Agreement.
-- Label error jangan menyebut BA secara spesifik untuk mode ini. Gunakan istilah umum seperti "Batch ID wajib diisi untuk pengiriman dokumen".
+Nomor sub item harus dibuat berdasarkan urutan tunjangan aktif, bukan berdasarkan posisi field asli.
 
-4. Template Excel
-- Tambahkan file contoh:
-  - `public/templates/send-cooperation-agreement-emails.xlsx`
-- Tambahkan mapping download di `SendEmailsForm.jsx`.
-- Kolom minimal:
-  - `sentTo`
-  - `partnerName`
-  - `partnerEmail`
-  - `partnerIdentityNumber`
-  - `subject`
-  - `body`
-  - `cc`
-  - `bcc`
-- `partnerEmail` dan `partnerIdentityNumber` tidak harus dua-duanya wajib, tetapi minimal salah satu harus terisi.
+Urutan field tetap:
+1. Tunjangan transport
+2. Tunjangan makan
+3. Tunjangan pulsa
 
-5. Column hints
-- Tambahkan hint kolom untuk mode `cooperation_agreement`.
-- Jelaskan bahwa `partnerName` dan `partnerEmail`/`partnerIdentityNumber` harus sama dengan data yang dipakai saat bulk generate.
-- Jelaskan bahwa `batch_id` berasal dari hasil bulk generate Cooperation Agreement.
+### 4. Aturan Jika Semua Tunjangan Bernilai 0
+Jika `transportAllowance`, `mealAllowance`, dan `phoneAllowance` semuanya bernilai `0`, hilangkan seluruh bagian:
+- `3.3 MITRA sepakat mendapatkan upah dengan tunjangan sebagai berikut:`
+- semua sub item `3.3.x`
 
-6. Allowed templates
-- Pastikan mode `cooperation_agreement` mengikuti filter `allowed_templates`.
-- Jika company tidak mengizinkan template ini, mode tidak muncul.
+Setelah bagian tersebut dihilangkan, renumber poin berikutnya:
+- bagian rekening yang sebelumnya `3.4` menjadi `3.3`
+- hak mendapatkan upah yang sebelumnya `3.5` menjadi `3.4`
+- pelaksanaan kemitraan yang sebelumnya `3.6` menjadi `3.5`
+
+Pastikan referensi nomor pada teks atau helper tidak hardcoded secara berlebihan.
+
+### 5. Perbaikan Struktur Nomor 3.x
+Disarankan buat array item untuk seluruh bagian nomor `3.x`, lalu render berdasarkan array tersebut.
+
+Pendekatan yang disarankan:
+- Buat variabel counter untuk nomor level `3.x`.
+- Tambahkan item `3.1` dan `3.2` seperti biasa.
+- Tambahkan item tunjangan hanya jika daftar tunjangan aktif tidak kosong.
+- Tambahkan item rekening setelahnya memakai nomor counter terbaru.
+- Tambahkan item lanjutan setelah tabel rekening memakai nomor counter terbaru.
+
+Tujuannya agar implementor tidak perlu mengganti banyak string hardcoded setiap kali ada kondisi tunjangan berbeda.
+
+### 6. Tabel Rekening
+Tabel rekening MITRA tetap tampil seperti sekarang.
+
+Jika semua tunjangan bernilai `0`, tabel rekening harus mengikuti nomor baru yang benar. Contoh:
+
+```text
+3.3. Para Pihak sepakat seluruh pembayaran atas gaji hanya dengan menggunakan mata uang rupiah ...
+```
+
+Lalu tabel rekening muncul setelah item tersebut.
+
+### 7. Buat Contoh PDF
+Setelah implementasi selesai, buat contoh PDF hasil generate dari template terbaru.
+
+Minimal buat satu contoh PDF untuk case:
+- `transportAllowance = 0`
+- `mealAllowance = 300000`
+- `phoneAllowance = 100000`
+
+Output file yang disarankan:
+- `output/cooperation_agreement.allowance-sample.pdf`
+
+Jika memungkinkan, buat juga contoh tambahan untuk case semua tunjangan `0`:
+- `output/cooperation_agreement.no-allowance-sample.pdf`
+
+Contoh PDF cukup dipakai untuk validasi manual. Tidak wajib dijadikan fixture test permanen jika repo tidak biasa menyimpan generated output.
+
+## Rencana Implementasi Frontend
+- Tidak ada perubahan frontend wajib jika field tunjangan tetap sama.
+- Jika frontend punya template Excel atau hint kolom untuk `cooperation_agreement`, pastikan field berikut tetap tersedia:
+  - `transportAllowance`
+  - `mealAllowance`
+  - `phoneAllowance`
+- Jika ada keterangan UI yang menyatakan ketiga tunjangan selalu muncul di PDF, ubah agar sesuai perilaku baru.
 
 ## File Yang Kemungkinan Disentuh
 Backend:
-- `start/routes.js`
-- `app/Controllers/Http/BulkEmailController.js`
-- `app/Services/CooperationAgreementService.js` jika perlu expose helper match field/alias
-- `test/functional/api_endpoint_matrix.spec.js`
+- `app/Templates/cooperation_agreement.js`
+- `test/unit/cooperation_agreement_template.spec.js` jika test template sudah tersedia
+- file test terkait template/PDF jika implementor memilih menambah coverage ringan
 
-Frontend:
-- `src/components/forms/SendEmailsForm.jsx`
-- `src/api/bulkApi.js`
-- `src/components/forms/SendEmailsForm.test.jsx`
-- `public/templates/send-cooperation-agreement-emails.xlsx`
-- `dist/` jika repo masih menyimpan hasil build
+Frontend, hanya jika diperlukan:
+- `src/utils/templateFields.js`
+- komponen form atau hint template `cooperation_agreement`
+- template Excel public untuk `cooperation_agreement`
 
 ## Skenario Test
-- Mode `Cooperation Agreement` muncul di `/send-emails` saat `allowed_templates` mengizinkan `cooperation_agreement`.
-- Mode tidak muncul saat company tidak mengizinkan template tersebut.
-- Frontend mengirim request ke endpoint bulk email Cooperation Agreement dengan `file` dan `batch_id`.
-- Backend menolak request tanpa `batch_id`.
-- Backend menolak request tanpa file Excel.
-- Backend menolak batch yang bukan milik company user.
-- Backend menolak batch dengan template selain `cooperation_agreement`.
-- Backend menemukan attachment PDF dari `generation_batch_items` berdasarkan match key.
-- Row Excel dengan match key tidak ditemukan menghasilkan status skipped atau failed yang jelas.
-- Row Excel valid menghasilkan email log queued dan dispatch `SendEmailJob` dengan attachment.
-- Subject/body default terpakai saat Excel tidak mengisi subject/body.
-- Subject/body dari Excel mengoverride default.
-- Pengiriman BA existing tetap berjalan setelah helper dibuat generic/refactor.
+- Generate PDF dengan semua tunjangan lebih dari `0`, pastikan `3.3.1`, `3.3.2`, dan `3.3.3` tampil.
+- Generate PDF dengan Tunjangan Transport = `0`, Tunjangan Makan dan Pulsa lebih dari `0`, pastikan hanya Makan dan Pulsa tampil sebagai `3.3.1` dan `3.3.2`.
+- Generate PDF dengan hanya satu tunjangan lebih dari `0`, pastikan hanya satu sub item `3.3.1` tampil.
+- Generate PDF dengan semua tunjangan `0`, pastikan bagian `3.3` tunjangan hilang.
+- Pada case semua tunjangan `0`, pastikan poin rekening yang sebelumnya `3.4` berubah menjadi `3.3`.
+- Pastikan tabel rekening tetap tampil dan posisinya sesuai setelah renumber.
+- Pastikan generate PDF tetap berhasil untuk payload existing.
+- Pastikan perubahan tidak merusak template PDF lain.
 
 ## Acceptance Criteria
-- `/send-emails` memiliki pilihan `Cooperation Agreement`.
-- User bisa memilih batch hasil bulk generate `cooperation_agreement`.
-- User bisa upload Excel penerima email Cooperation Agreement.
-- Backend mengirim email dengan attachment PDF dari batch yang sesuai.
-- Lookup attachment memakai pola batch seperti bulk BA, bukan pencarian manual baru.
-- Response bulk email menampilkan jumlah queued, failed, skipped, dan detail per row.
-- File contoh Excel pengiriman tersedia dari frontend.
-- Perubahan tidak merusak bulk send email BA existing.
+- Tunjangan bernilai `0` tidak muncul di Pasal 2 nomor `3.3`.
+- Nomor sub tunjangan otomatis menyesuaikan jumlah tunjangan yang tampil.
+- Jika semua tunjangan `0`, bagian `3.3` tunjangan dihilangkan seluruhnya.
+- Jika bagian tunjangan hilang, nomor `3.4`, `3.5`, dan seterusnya otomatis naik.
+- Tabel rekening tetap tampil dengan nomor pengantar yang benar.
+- Contoh PDF hasil generate tersedia untuk validasi manual.
+- Detail unit test tidak perlu terlalu rinci di dokumen ini; implementor cukup menurunkan test dari skenario high-level di atas.

@@ -5,9 +5,12 @@ const fs = require('fs')
 const NumberFormatService = use('App/Services/NumberFormatService')
 const CooperationAgreementService = use('App/Services/CooperationAgreementService')
 
-const INDENTED_MARGIN_LEFT = 14
-const INDENTED_NUMBER_WIDTH = 30
-const INDENTED_CONTENT_MARGIN_LEFT = INDENTED_MARGIN_LEFT + INDENTED_NUMBER_WIDTH
+const NUMERIC_LIST_LEVELS = Object.freeze({
+  1: { marginLeft: 0, numberWidth: 20 },
+  2: { marginLeft: 18, numberWidth: 34 },
+  3: { marginLeft: 52, numberWidth: 44 }
+})
+const INDENTED_CONTENT_MARGIN_LEFT = contentMarginForNumber('1.1')
 
 module.exports = function cooperationAgreementTemplate(payloadData = {}) {
   const data = CooperationAgreementService.normalizeData(payloadData)
@@ -15,6 +18,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
   const partnerName = val(data.partnerName)
   const firstPartyName = val(data.firstPartyName)
   const firstPartyTitle = val(data.firstPartyTitle)
+  const styleText = createTextStyler(companyName)
   const letterDate = data.letterDate || data.agreementDate || new Date().toISOString()
   const brand = val(data.brand)
   const agreementDuration = NumberFormatService.formatNumberWithWords(data.agreementDuration, {
@@ -26,6 +30,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
     suffix: 'per hari',
     fieldName: 'jam kerja per hari'
   })
+  const paymentItems = requirementPaymentItems(data, companyName)
 
   const directorSignature = firstRenderableImage(
     data.directorSignatureImage,
@@ -55,7 +60,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
   const pageWidth = 595.28
   const pageHeight = 841.89
 
-  return {
+  const docDefinition = {
     pageSize: 'A4',
     pageMargins: [54, 88, 54, 78],
     defaultStyle: { font: 'Roboto', fontSize: 10.5, color: '#111111', lineHeight: 1.18 },
@@ -146,27 +151,15 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
           `Dilarang memanfaatkan kemitraan untuk memanipulasi pembayaran, melaksanakan hubungan kemitraan di luar kepentingan ${upper(companyName)} untuk kepentingan pribadi dengan pihak ketiga lainnya; dan`,
           `MITRA wajib menaati tata tertib lainnya sesuai dengan operasional ${upper(companyName)} yang berlaku dan ketentuan lainnya yang dikeluarkan oleh pimpinan ${upper(companyName)}.`
         ]),
-        p('3. Dalam Perjanjian ini MITRA bersepakat dan menyetujui beberapa persyaratan, yakni sebagai berikut:'),
-        indented([
-          `3.1 Dalam melakukan kemitraan ini, MITRA berhak mendapat nilai upah dasar dari ${upper(companyName)} sebesar ${NumberFormatService.formatRupiahWithWords(data.salary, 'salary/gaji')}, sesuai dengan UMP 2026, tidak termasuk pajak untuk setiap bulannya.`,
-          '3.2 Para Pihak sepakat tidak mengubah pasal tersebut di atas selama Masa Waktu Perjanjian ini masih berlaku.',
-          '3.3 MITRA sepakat mendapatkan upah dengan tunjangan sebagai berikut:',
-          `3.3.1 Tunjangan transport sebesar ${NumberFormatService.formatRupiahWithWords(data.transportAllowance, 'tunjangan transport')}.`,
-          `3.3.2 Tunjangan makan sebesar ${NumberFormatService.formatRupiahWithWords(data.mealAllowance, 'tunjangan makan')}.`,
-          `3.3.3 Tunjangan pulsa sebesar ${NumberFormatService.formatRupiahWithWords(data.phoneAllowance, 'tunjangan pulsa')}.`,
-          `Seluruh pembayaran tersebut dilakukan setiap bulan dan dapat dilakukan pemotongan oleh ${upper(companyName)} untuk BPJS Ketenagakerjaan sesuai dengan aturan yang berlaku, jika MITRA mendapatkan Tunjangan BPJS dari pihak Principal dan/atau Brand.`,
-          '3.4 Para Pihak sepakat seluruh pembayaran atas gaji hanya dengan menggunakan mata uang rupiah dan dilakukan melalui transfer antar rekening yang telah ditentukan dalam Perjanjian, yakni sebagai berikut:'
-        ]),
+        ...numbered(['Dalam Perjanjian ini MITRA bersepakat dan menyetujui beberapa persyaratan, yakni sebagai berikut:'], 3),
+        indented(paymentItems.beforeBankTable),
         tableRows([
           ['Nomor Rekening MITRA', val(data.partnerBankAccountNumber)],
           ['Nama Rekening MITRA', val(data.partnerBankAccountName)],
           ['Nama Bank', val(data.partnerBankName)]
         ], [170, '*'], { marginLeft: INDENTED_CONTENT_MARGIN_LEFT }),
-        indented([
-          '3.5 MITRA berhak mendapatkan upah yang dimaksud pasal di atas pada tanggal yang sudah disepakati.',
-          '3.6 MITRA melaksanakan kemitraan sesuai jasa keterampilan yang dimiliki secara patuh dan efisien.'
-        ]),
-        p('4. Dalam Perjanjian ini MITRA bersedia untuk melaksanakan kewajiban-kewajiban yakni sebagai berikut:'),
+        indented(paymentItems.afterBankTable),
+        ...numbered(['Dalam Perjanjian ini MITRA bersedia untuk melaksanakan kewajiban-kewajiban yakni sebagai berikut:'], 4),
         indented([
           `4.1 Menaati segala peraturan dan/atau tata tertib yang diberikan oleh ${upper(companyName)} selama Masa Waktu Perjanjian ini berlaku.`,
           `4.2 Merahasiakan semua informasi mengenai ${upper(companyName)} yang diterima atau diketahui olehnya selama berlakunya Masa Waktu Perjanjian maupun setelah Perjanjian ini berakhir.`,
@@ -213,20 +206,19 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
         `Sesuai dengan ketentuan mekanisme program yang berlaku, PT Origin Magda Inovasi berwenang untuk melakukan pemotongan terhadap biaya upah bulanan dan/atau insentif (jikalau ada).`
       ])),
       article('Pasal 10', 'PEMBERITAHUAN KORESPONDENSI', [
-        p('1. Setiap pemberitahuan yang timbul sehubungan dengan Perjanjian ini disampaikan secara tertulis dengan tanda terima dan/atau email kepada alamat berikut:'),
-        tableRows([
-          [upper(companyName), ''],
+        ...numbered(['Setiap pemberitahuan yang timbul sehubungan dengan Perjanjian ini disampaikan secara tertulis dengan tanda terima dan/atau email kepada alamat berikut:']),
+        correspondenceBlock(upper(companyName), [
           ['PIC', val(data.picName)],
           ['Jabatan', val(data.picTitle)],
           ['Email', val(data.picEmail)],
-          ['Alamat', val(data.picAddress)],
-          [''],
-          ['MITRA', ''],
+          ['Alamat', val(data.picAddress)]
+        ]),
+        correspondenceBlock('MITRA', [
           ['Nama', partnerName],
-          ['No. HP/Tlp', val(data.partnerPhone)],
+          ['Nomor KTP', val(data.partnerIdentityNumber)],
           ['Email', val(data.partnerEmail)],
           ['Alamat', val(data.partnerAddress)]
-        ], [130, '*']),
+        ]),
         ...numbered([
           'Setiap perubahan informasi korespondensi wajib diberitahukan kepada masing-masing pihak secara tertulis selambat-lambatnya 14 (empat belas) hari kerja sejak perubahan tersebut dilakukan.',
           'Segala risiko yang timbul akibat perubahan korespondensi yang tidak diberitahukan secara tertulis menjadi tanggung jawab masing-masing pihak yang melakukan perubahan.'
@@ -259,7 +251,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
       {
         
         stack: [
-          p('Demikianlah Perjanjian ini dibuat oleh Para Pihak dalam keadaan bermeterai cukup dan 2 (dua) rangkap. Para Pihak saat menandatangani Perjanjian ini dalam keadaan sehat jasmani dan rohani tanpa adanya paksaan ataupun tekanan dari pihak mana pun.'),
+          unbreakableParagraph('Demikianlah Perjanjian ini dibuat oleh Para Pihak dalam keadaan bermeterai cukup dan 2 (dua) rangkap. Para Pihak saat menandatangani Perjanjian ini dalam keadaan sehat jasmani dan rohani tanpa adanya paksaan ataupun tekanan dari pihak mana pun.'),
           signatureSection({
             companyName,
             partnerName,
@@ -282,6 +274,8 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
       tableCell: { margin: [0, 2, 0, 2] }
     }
   }
+
+  return stylizeDocDefinition(docDefinition, styleText)
 }
 
 function val(value, fallback = '-') {
@@ -296,6 +290,60 @@ function upper(value) {
 
 function p(text) {
   return { text, style: 'paragraph' }
+}
+
+function unbreakableParagraph(text) {
+  return {
+    unbreakable: true,
+    stack: [p(text)]
+  }
+}
+
+function requirementPaymentItems(data, companyName) {
+  const beforeBankTable = [
+    `3.1 Dalam melakukan kemitraan ini, MITRA berhak mendapat nilai upah dasar dari ${upper(companyName)} sebesar ${NumberFormatService.formatRupiahWithWords(data.salary, 'salary/gaji')}, sesuai dengan UMP 2026, tidak termasuk pajak untuk setiap bulannya.`,
+    '3.2 Para Pihak sepakat tidak mengubah pasal tersebut di atas selama Masa Waktu Perjanjian ini masih berlaku.'
+  ]
+  const allowanceItems = activeAllowanceItems(data)
+  let nextSubNumber = 3
+
+  if (allowanceItems.length) {
+    const allowanceNumber = `3.${nextSubNumber}`
+    beforeBankTable.push(`${allowanceNumber} MITRA sepakat mendapatkan upah dengan tunjangan sebagai berikut:`)
+    allowanceItems.forEach((item, index) => {
+      beforeBankTable.push(`${allowanceNumber}.${index + 1} ${item.label} sebesar ${NumberFormatService.formatRupiahWithWords(item.amount, item.fieldName)}.`)
+    })
+    beforeBankTable.push(continuationOf(allowanceNumber, `Seluruh pembayaran tersebut dilakukan setiap bulan dan dapat dilakukan pemotongan oleh ${upper(companyName)} untuk BPJS Ketenagakerjaan sesuai dengan aturan yang berlaku, jika MITRA mendapatkan Tunjangan BPJS dari pihak Principal dan/atau Brand.`))
+    nextSubNumber += 1
+  }
+
+  beforeBankTable.push(`3.${nextSubNumber} Para Pihak sepakat seluruh pembayaran atas gaji hanya dengan menggunakan mata uang rupiah dan dilakukan melalui transfer antar rekening yang telah ditentukan dalam Perjanjian, yakni sebagai berikut:`)
+
+  return {
+    beforeBankTable,
+    afterBankTable: [
+      `3.${nextSubNumber + 1} MITRA berhak mendapatkan upah yang dimaksud pasal di atas pada tanggal yang sudah disepakati.`,
+      `3.${nextSubNumber + 2} MITRA melaksanakan kemitraan sesuai jasa keterampilan yang dimiliki secara patuh dan efisien.`
+    ]
+  }
+}
+
+function activeAllowanceItems(data) {
+  return [
+    { label: 'Tunjangan transport', amount: allowanceAmount(data.transportAllowance, 'tunjangan transport'), fieldName: 'tunjangan transport' },
+    { label: 'Tunjangan makan', amount: allowanceAmount(data.mealAllowance, 'tunjangan makan'), fieldName: 'tunjangan makan' },
+    { label: 'Tunjangan pulsa', amount: allowanceAmount(data.phoneAllowance, 'tunjangan pulsa'), fieldName: 'tunjangan pulsa' }
+  ].filter((item) => item.amount > 0)
+}
+
+function allowanceAmount(value, fieldName) {
+  if (value === undefined || value === null) return 0
+  if (typeof value === 'string' && !value.trim()) return 0
+  return NumberFormatService.parseInteger(value, { fieldName })
+}
+
+function continuationOf(number, text) {
+  return { continuationOf: number, text }
 }
 
 function partyBlock(prefix, rows) {
@@ -320,13 +368,7 @@ function partyBlock(prefix, rows) {
 }
 
 function numbered(items, start = 1) {
-  return items.map((text, idx) => ({
-    columns: [
-      { width: 20, text: `${idx + start}.` },
-      { width: '*', text, alignment: 'justify' }
-    ],
-    margin: [0, 0, 0, 6]
-  }))
+  return items.map((text, idx) => numberedItem(`${idx + start}`, text))
 }
 
 function lettered(items) {
@@ -340,31 +382,70 @@ function lettered(items) {
 }
 
 function indented(items) {
-  const marginLeft = INDENTED_MARGIN_LEFT
-  const numberWidth = INDENTED_NUMBER_WIDTH
-  let previousItemHasNumber = false
+  let previousNumber = ''
 
   return items.map((value) => {
+    if (value && typeof value === 'object' && !Array.isArray(value) && value.continuationOf) {
+      previousNumber = normalizeListNumber(value.continuationOf)
+      return {
+        text: value.text,
+        margin: [contentMarginForNumber(previousNumber), 0, 0, 6],
+        alignment: 'justify'
+      }
+    }
+
     const text = String(value)
-    const match = text.match(/^(\d+(?:\.\d+)+)\s+(.+)$/)
+    const match = text.match(/^(\d+(?:\.\d+)+)\.?\s+(.+)$/)
 
     if (match) {
-      previousItemHasNumber = true
-      return {
-        columns: [
-          { width: numberWidth, text: match[1] },
-          { width: '*', text: match[2], alignment: 'justify' }
-        ],
-        margin: [marginLeft, 0, 0, 6]
-      }
+      previousNumber = match[1]
+      return numberedItem(match[1], match[2])
     }
 
     return {
       text,
-      margin: [previousItemHasNumber ? marginLeft + numberWidth : marginLeft, 0, 0, 6],
+      margin: [previousNumber ? contentMarginForNumber(previousNumber) : INDENTED_CONTENT_MARGIN_LEFT, 0, 0, 6],
       alignment: 'justify'
     }
   })
+}
+
+function numberedItem(number, text) {
+  const layout = numericListLayout(number)
+
+  return {
+    columns: [
+      { width: layout.numberWidth, text: displayListNumber(number) },
+      { width: '*', text, alignment: 'justify' }
+    ],
+    margin: [layout.marginLeft, 0, 0, 6]
+  }
+}
+
+function numericListLayout(number) {
+  return NUMERIC_LIST_LEVELS[numericListLevel(number)] || NUMERIC_LIST_LEVELS[3]
+}
+
+function numericListLevel(number) {
+  const normalized = normalizeListNumber(number)
+  if (!normalized) return 1
+  return Math.min(normalized.split('.').length, 3)
+}
+
+function normalizeListNumber(number) {
+  return String(number || '').trim().replace(/\.$/, '')
+}
+
+function displayListNumber(number) {
+  const normalized = normalizeListNumber(number)
+  const level = numericListLevel(normalized)
+  if (!normalized) return ''
+  return level <= 2 ? `${normalized}.` : normalized
+}
+
+function contentMarginForNumber(number) {
+  const layout = numericListLayout(number)
+  return layout.marginLeft + layout.numberWidth
 }
 
 function article(no, title, body) {
@@ -423,6 +504,27 @@ function tableRows(rows, widths, options = {}) {
     },
     layout: 'noBorders',
     margin: [marginLeft, 0, 0, 8]
+  }
+}
+
+function correspondenceBlock(title, rows) {
+  return {
+    unbreakable: true,
+    table: {
+      widths: [130, '*'],
+      body: [
+        [
+          { text: val(title), style: ['tableCell', 'label'], colSpan: 2 },
+          {}
+        ],
+        ...rows.map(([label, value]) => [
+          { text: label, style: 'tableCell' },
+          { text: `: ${val(value)}`, style: 'tableCell' }
+        ])
+      ]
+    },
+    layout: 'noBorders',
+    margin: [20, 0, 0, 6]
   }
 }
 
@@ -491,4 +593,127 @@ function formatDateLong(value) {
   if (Number.isNaN(date.getTime())) return String(value)
   const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
   return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`
+}
+
+function stylizeDocDefinition(node, styleText) {
+  if (!node || typeof node !== 'object') return node
+
+  if (Array.isArray(node)) {
+    for (let idx = 0; idx < node.length; idx++) {
+      node[idx] = stylizeDocDefinition(node[idx], styleText)
+    }
+    return node
+  }
+
+  for (const key of Object.keys(node)) {
+    const value = node[key]
+    if (key === 'text' && typeof value === 'string') {
+      node[key] = styleText(value)
+      continue
+    }
+    if (value && typeof value === 'object') {
+      node[key] = stylizeDocDefinition(value, styleText)
+    }
+  }
+
+  return node
+}
+
+function createTextStyler(companyName) {
+  const terms = buildBoldTerms(companyName)
+
+  return function styleText(text) {
+    const source = String(text)
+    const ranges = collectBoldRanges(source, terms)
+    if (!ranges.length) return text
+
+    const fragments = []
+    let cursor = 0
+
+    for (const range of ranges) {
+      if (range.start > cursor) fragments.push({ text: source.slice(cursor, range.start) })
+      fragments.push({ text: source.slice(range.start, range.end), bold: true })
+      cursor = range.end
+    }
+
+    if (cursor < source.length) fragments.push({ text: source.slice(cursor) })
+    return fragments
+  }
+}
+
+function buildBoldTerms(companyName) {
+  const terms = []
+  const add = (text, caseSensitive = false) => {
+    const value = String(text || '').replace(/\s+/g, ' ').trim()
+    if (value.length < 3) return
+    terms.push({ text: value, caseSensitive })
+  }
+
+  for (const variant of companyNameVariants(companyName)) add(variant)
+  for (const variant of companyNameVariants(CooperationAgreementService.DEFAULT_COMPANY_NAME)) add(variant)
+  add('PT Origin Magda Inovasi')
+  add('PT. Origin Magda Inovasi')
+  add('ORIGIN MAGDA INOVASI')
+  add('TEMA Agency')
+  add('MITRA', true)
+
+  const seen = new Set()
+  return terms
+    .filter((term) => {
+      const key = `${term.caseSensitive ? 'cs' : 'ci'}:${term.caseSensitive ? term.text : term.text.toLowerCase()}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .sort((left, right) => right.text.length - left.text.length)
+}
+
+function companyNameVariants(value) {
+  const raw = String(value || '').replace(/\s+/g, ' ').trim()
+  if (!raw) return []
+
+  const variants = [raw]
+  if (/^PT\.\s*/i.test(raw)) variants.push(raw.replace(/^PT\.\s*/i, 'PT '))
+  if (/^PT\s+/i.test(raw)) variants.push(raw.replace(/^PT\s+/i, 'PT. '))
+
+  const withoutPt = raw.replace(/^PT\.?\s*/i, '').trim()
+  if (withoutPt && withoutPt !== raw) variants.push(withoutPt)
+
+  return variants
+}
+
+function collectBoldRanges(text, terms) {
+  const ranges = []
+
+  for (const term of terms) {
+    const flags = term.caseSensitive ? 'g' : 'gi'
+    const regex = new RegExp(`(^|[^A-Za-z0-9_])(${escapeRegExp(term.text)})(?=$|[^A-Za-z0-9_])`, flags)
+    let match
+
+    while ((match = regex.exec(text)) !== null) {
+      const start = match.index + match[1].length
+      const end = start + match[2].length
+      ranges.push({ start, end })
+      if (match.index === regex.lastIndex) regex.lastIndex++
+    }
+  }
+
+  ranges.sort((left, right) => {
+    if (left.start !== right.start) return left.start - right.start
+    return (right.end - right.start) - (left.end - left.start)
+  })
+
+  const selected = []
+  let lastEnd = 0
+  for (const range of ranges) {
+    if (range.start < lastEnd) continue
+    selected.push(range)
+    lastEnd = range.end
+  }
+
+  return selected
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
