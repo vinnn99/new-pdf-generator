@@ -1,4 +1,4 @@
-# Issue Planning: Perbaikan Tunjangan Pasal 2 Template `cooperation_agreement`
+# Issue Planning: Template `event_weekly_payslip`
 
 ## Status
 Draft perencanaan untuk diimplementasikan oleh junior programmer atau AI model biaya rendah.
@@ -6,174 +6,343 @@ Draft perencanaan untuk diimplementasikan oleh junior programmer atau AI model b
 ## Informasi Umum
 - Backend: `core.pdf-generator.indinesia.id`
 - Frontend: `ui-pdf-generator`
-- Perubahan utama ada di backend karena layout dan isi PDF `cooperation_agreement` dibuat dari template backend.
-- Frontend hanya perlu disentuh jika ada field, template Excel, preview, atau dokumentasi UI yang perlu menyesuaikan informasi tunjangan.
+- Template baru: `event_weekly_payslip`
+- Basis tampilan: mirip template `payslip` existing.
+- Logo wajib: `core.pdf-generator.indinesia.id/resources/images/exel-logo.png`
+- Default nama perusahaan: `PT. EXEL INTEGRASI SOLUSINDO`
 
-## Latar Belakang
-Issue ini terkait template PDF `cooperation_agreement`.
+## Tujuan
+Membuat template PDF slip gaji mingguan event dengan komponen pendapatan harian selama 7 hari kerja, komponen potongan khusus event, dan dukungan penuh di flow generate PDF single, bulk generate, send single email, dan bulk send email.
 
-Pada Pasal 2, nomor `3.3` adalah bagian kesepakatan upah dengan tunjangan. Saat ini sub item tunjangan terdiri dari:
-- `3.3.1` Tunjangan transport
-- `3.3.2` Tunjangan makan
-- `3.3.3` Tunjangan pulsa
+## Scope Backend
 
-Template perlu dibuat dinamis agar tunjangan bernilai `0` tidak ditampilkan, dan nomor berikutnya tetap tersusun rapi.
+### 1. Template PDF Baru
+Buat template baru:
+- `app/Templates/event_weekly_payslip.js`
+- `resources/pdf-templates/event_weekly_payslip.js`
 
-Template utama:
-- `app/Templates/cooperation_agreement.js`
+Gunakan `app/Templates/payslip.js` sebagai referensi awal, tetapi sesuaikan kebutuhan berikut:
+- Gunakan logo `resources/images/exel-logo.png`.
+- Default `companyName` menjadi `PT. EXEL INTEGRASI SOLUSINDO`.
+- Teks judul slip di bawah nama perusahaan harus `SLIP GAJI`.
+- Di bawah periode, tampilkan field `description` atau alias `deskripsi`.
+- Bagian `PENDAPATAN` berisi tanggal kunjungan sebagai komponen penambah.
+- Bagian `POTONGAN` berisi:
+  - `ADJ/DEDUCTION`
+  - `PO TELAT`
+  - `KASBON`
 
-File berikut hanya re-export template utama:
-- `resources/pdf-templates/cooperation_agreement.js`
-
-## Scope Perubahan
-1. Jika salah satu atau lebih tunjangan bernilai `0`, sub item tunjangan tersebut tidak perlu ditampilkan.
-2. Urutan nomor sub item tunjangan harus mengikuti jumlah tunjangan yang ditampilkan.
-3. Jika ketiga tunjangan bernilai `0`, maka nomor `3.3` tentang tunjangan dihilangkan.
-4. Jika nomor `3.3` dihilangkan, nomor berikutnya harus naik:
-   - `3.4` menjadi `3.3`
-   - `3.5` menjadi `3.4`
-   - `3.6` menjadi `3.5`
-   - dan seterusnya
-5. Setelah implementasi, buat contoh PDF hasil generate untuk memvalidasi output.
-
-## Rencana Implementasi Backend
-
-### 1. Identifikasi Field Tunjangan
-Gunakan field existing pada payload `cooperation_agreement`:
-- `transportAllowance`
-- `mealAllowance`
-- `phoneAllowance`
-
-Pastikan nilai dianggap `0` jika:
-- angka `0`
-- string `"0"`
-- string format rupiah/numeric yang setelah dinormalisasi bernilai `0`
-- kosong atau null hanya jika flow existing memang menormalisasi field tersebut menjadi `0`
-
-Jangan mengubah nama field payload kecuali benar-benar diperlukan.
-
-### 2. Buat Helper Daftar Tunjangan Aktif
-Tambahkan helper kecil di `app/Templates/cooperation_agreement.js` untuk membentuk daftar tunjangan yang nilainya lebih dari `0`.
-
-Contoh hasil helper:
-
-```js
-[
-  { label: 'Tunjangan makan', amount: data.mealAllowance, fieldName: 'tunjangan makan' },
-  { label: 'Tunjangan pulsa', amount: data.phoneAllowance, fieldName: 'tunjangan pulsa' }
-]
-```
-
-Helper ini dipakai untuk menentukan apakah bagian `3.3` perlu ditampilkan atau tidak.
-
-### 3. Aturan Jika Sebagian Tunjangan Bernilai 0
-Jika hanya sebagian tunjangan yang bernilai lebih dari `0`, tampilkan hanya tunjangan tersebut.
-
-Contoh:
-- Tunjangan transport = `0`
-- Tunjangan makan = `300000`
-- Tunjangan pulsa = `100000`
-
-Maka output harus menjadi:
+Contoh tampilan bagian `PENDAPATAN`:
 
 ```text
-3.3. MITRA sepakat mendapatkan upah dengan tunjangan sebagai berikut:
-     3.3.1 Tunjangan makan sebesar ...
-     3.3.2 Tunjangan pulsa sebesar ...
+25/07/2026 : 0
+26/07/2026 : 0
+27/07/2026 : 295.000
+28/07/2026 : 295.000
+...
+sebanyak 7 hari kerja
 ```
 
-Nomor sub item harus dibuat berdasarkan urutan tunjangan aktif, bukan berdasarkan posisi field asli.
+Catatan implementasi:
+- Gunakan format rupiah yang konsisten dengan payslip existing.
+- Untuk input single/manual, tanggal kunjungan direpresentasikan sebagai array `visitEarnings`.
+- Setiap item `visitEarnings` memakai field `tgl_date` dan `tgl_value`.
+- Field datar seperti `tgl1`, `tgl2`, sampai `tgl7` hanya dipakai untuk parsing bulk Excel bila masih dibutuhkan sebagai kompatibilitas.
+- Template tetap harus menghitung total pendapatan, total potongan, dan net pay.
 
-Urutan field tetap:
-1. Tunjangan transport
-2. Tunjangan makan
-3. Tunjangan pulsa
+### 2. Payload yang Disarankan
+Payload single/template:
 
-### 4. Aturan Jika Semua Tunjangan Bernilai 0
-Jika `transportAllowance`, `mealAllowance`, dan `phoneAllowance` semuanya bernilai `0`, hilangkan seluruh bagian:
-- `3.3 MITRA sepakat mendapatkan upah dengan tunjangan sebagai berikut:`
-- semua sub item `3.3.x`
+```json
+{
+  "template": "event_weekly_payslip",
+  "email": "user@example.com",
+  "data": {
+    "companyName": "PT. EXEL INTEGRASI SOLUSINDO",
+    "employeeName": "Nama Karyawan",
+    "employeeId": "NIK",
+    "status": "STATUS",
+    "area": "AREA",
+    "position": "JABATAN",
+    "npwp": "NPWP",
+    "jumlahHK": 7,
+    "period": "25/07/2026 - 31/07/2026",
+    "description": "Deskripsi event",
+    "visitEarnings": [
+      { "tgl_date": "2026-07-25", "tgl_value": 0 },
+      { "tgl_date": "2026-07-26", "tgl_value": 0 },
+      { "tgl_date": "2026-07-27", "tgl_value": 295000 }
+    ],
+    "adjustment": 0,
+    "poTelat": 0,
+    "kasbon": 0
+  }
+}
+```
 
-Setelah bagian tersebut dihilangkan, renumber poin berikutnya:
-- bagian rekening yang sebelumnya `3.4` menjadi `3.3`
-- hak mendapatkan upah yang sebelumnya `3.5` menjadi `3.4`
-- pelaksanaan kemitraan yang sebelumnya `3.6` menjadi `3.5`
+Field penting:
+- `employeeName` untuk nama karyawan, wajib.
+- `employeeId` atau `nik` untuk NIK.
+- `status`, `area`, `position` atau `jabatan`, `npwp`.
+- `jumlahHK` untuk jumlah hari kerja.
+- `period` atau `periode`.
+- `description` atau `deskripsi`.
+- `visitEarnings` untuk daftar 7 tanggal kunjungan dan nominalnya.
+- `adjustment`, `poTelat`, `kasbon` untuk potongan.
 
-Pastikan referensi nomor pada teks atau helper tidak hardcoded secara berlebihan.
+### 3. Normalisasi Payload
+Cek dan sesuaikan service berikut:
+- `app/Services/SlipPayloadNormalizer.js`
+- `app/Services/PayloadDateNormalizer.js`
+- `app/Services/TemplateResolver.js`
 
-### 5. Perbaikan Struktur Nomor 3.x
-Disarankan buat array item untuk seluruh bagian nomor `3.x`, lalu render berdasarkan array tersebut.
+Rencana:
+- Tambahkan `event_weekly_payslip` sebagai slip-like template.
+- Normalisasi alias umum:
+  - `nik` -> `employeeId`
+  - `jabatan` -> `position`
+  - `periode` -> `period`
+  - `deskripsi` -> `description`
+  - `jumlah hk` atau `jumlah_hk` -> `jumlahHK`
+  - `adjustment`, `adj/deduction`, `adj deduction` -> `adjustment`
+  - `pot telat`, `po telat` -> `poTelat`
+  - `kasbon` -> `kasbon`
+- Pastikan angka dari Excel dapat dibaca meski berformat teks atau rupiah.
+- Pastikan header tanggal Excel untuk kolom pendapatan tidak bergeser karena timezone.
 
-Pendekatan yang disarankan:
-- Buat variabel counter untuk nomor level `3.x`.
-- Tambahkan item `3.1` dan `3.2` seperti biasa.
-- Tambahkan item tunjangan hanya jika daftar tunjangan aktif tidak kosong.
-- Tambahkan item rekening setelahnya memakai nomor counter terbaru.
-- Tambahkan item lanjutan setelah tabel rekening memakai nomor counter terbaru.
+### 4. Bulk Generate Excel
+Tambahkan endpoint bulk baru:
+- `POST /api/v1/bulk/event_weekly_payslip`
 
-Tujuannya agar implementor tidak perlu mengganti banyak string hardcoded setiap kali ada kondisi tunjangan berbeda.
+File yang kemungkinan disentuh:
+- `start/routes.js`
+- `app/Controllers/Http/BulkPdfController.js`
+- `scripts/create-bulk-template.js` jika template Excel dibuat lewat script
+- `resources/templates/*` jika backend menyimpan contoh template bulk
 
-### 6. Tabel Rekening
-Tabel rekening MITRA tetap tampil seperti sekarang.
-
-Jika semua tunjangan bernilai `0`, tabel rekening harus mengikuti nomor baru yang benar. Contoh:
+Header Excel yang diminta:
 
 ```text
-3.3. Para Pihak sepakat seluruh pembayaran atas gaji hanya dengan menggunakan mata uang rupiah ...
+| NIK | STATUS | AREA | JABATAN | NPWP | JUMLAH HK | PENDAPATAN                                      | POTONGAN                   |
+|     |        |      |         |      |           | 25/07/2026 | 26/07/2026 | ... | 31/07/2026 | ADJUSTMENT | POT TELAT | KASBON |
+| {{Row Data}} |
 ```
 
-Lalu tabel rekening muncul setelah item tersebut.
+Catatan implementasi:
+- Karena `xlsx.sheet_to_json` biasanya membaca header satu baris, implementor perlu menentukan strategi parsing header bertingkat.
+- Opsi yang disarankan: buat template Excel dengan header teknis satu baris yang mudah dibaca backend, lalu beri baris visual/group header di atasnya jika diperlukan.
+- Header teknis yang disarankan untuk parsing:
+  - `NIK`
+  - `STATUS`
+  - `AREA`
+  - `JABATAN`
+  - `NPWP`
+  - `JUMLAH HK`
+  - `25/07/2026`
+  - `26/07/2026`
+  - `27/07/2026`
+  - `28/07/2026`
+  - `29/07/2026`
+  - `30/07/2026`
+  - `31/07/2026`
+  - `ADJUSTMENT`
+  - `POT TELAT`
+  - `KASBON`
+- Kolom pendapatan memakai tanggal sebagai header; nilai barisnya adalah nominal pendapatan pada tanggal tersebut.
+- Pastikan hasil parsing menjadi `visitEarnings` berisi 7 item.
 
-### 7. Buat Contoh PDF
-Setelah implementasi selesai, buat contoh PDF hasil generate dari template terbaru.
+### 5. Generate PDF Single
+Pastikan template bisa dipakai dari endpoint existing:
+- `POST /api/v1/generate-pdf`
+- `POST /api/v1/preview/event_weekly_payslip` jika preview mendukung static template seperti payslip.
 
-Minimal buat satu contoh PDF untuk case:
-- `transportAllowance = 0`
-- `mealAllowance = 300000`
-- `phoneAllowance = 100000`
+Perlu dicek:
+- `TemplateResolver` dapat menemukan file `resources/pdf-templates/event_weekly_payslip.js`.
+- `allowed_templates` company bisa mengizinkan `event_weekly_payslip`.
+- Nama file hasil generate memakai format slip-like agar mudah ditemukan untuk pengiriman email bulk.
 
-Output file yang disarankan:
-- `output/cooperation_agreement.allowance-sample.pdf`
+### 6. Send Single Email
+Tambahkan endpoint kirim single email:
+- `POST /api/v1/send/event_weekly_payslip`
 
-Jika memungkinkan, buat juga contoh tambahan untuk case semua tunjangan `0`:
-- `output/cooperation_agreement.no-allowance-sample.pdf`
+File yang kemungkinan disentuh:
+- `start/routes.js`
+- `app/Controllers/Http/SingleEmailController.js`
 
-Contoh PDF cukup dipakai untuk validasi manual. Tidak wajib dijadikan fixture test permanen jika repo tidak biasa menyimpan generated output.
+Rencana:
+- Gunakan pola `cfgSlip` existing.
+- Subject default dapat berupa `SLIP GAJI - {employeeName}`.
+- Body default mirip payslip, tetapi menyebut slip gaji mingguan/event.
+- Required field minimal mengikuti kebutuhan template, jangan terlalu ketat agar masih bisa dipakai lewat `data_json`.
 
-## Rencana Implementasi Frontend
-- Tidak ada perubahan frontend wajib jika field tunjangan tetap sama.
-- Jika frontend punya template Excel atau hint kolom untuk `cooperation_agreement`, pastikan field berikut tetap tersedia:
-  - `transportAllowance`
-  - `mealAllowance`
-  - `phoneAllowance`
-- Jika ada keterangan UI yang menyatakan ketiga tunjangan selalu muncul di PDF, ubah agar sesuai perilaku baru.
+### 7. Bulk Send Email
+Tambahkan dukungan bulk send email untuk attachment `event_weekly_payslip`.
 
-## File Yang Kemungkinan Disentuh
-Backend:
-- `app/Templates/cooperation_agreement.js`
-- `test/unit/cooperation_agreement_template.spec.js` jika test template sudah tersedia
-- file test terkait template/PDF jika implementor memilih menambah coverage ringan
+File yang kemungkinan disentuh:
+- `app/Controllers/Http/BulkEmailController.js`
+- `start/routes.js`
+- `app/Jobs/GeneratePdfJob.js` jika pola filename slip perlu diperluas
 
-Frontend, hanya jika diperlukan:
+Rencana:
+- Tentukan apakah `event_weekly_payslip` masuk flow `send-slip-emails` existing atau dibuat mode/endpoint khusus.
+- Rekomendasi: jadikan `event_weekly_payslip` sebagai slip-like template, sehingga attachment bisa dicari bersama slip lain berdasarkan periode, template, NIK, dan nama.
+- Pastikan pencarian attachment mengenali nama file dengan template `event_weekly_payslip`.
+- Jika perlu endpoint khusus, gunakan nama yang jelas:
+  - `POST /api/v1/send-event-weekly-payslip-emails`
+
+## Scope Frontend
+
+### 1. Template Field Map
+Tambahkan template baru di:
 - `src/utils/templateFields.js`
-- komponen form atau hint template `cooperation_agreement`
-- template Excel public untuk `cooperation_agreement`
+
+Rencana field untuk Generate Single PDF dan Send Single Email:
+- `employeeName` wajib
+- `employeeId` atau `nik`
+- `status`
+- `area`
+- `position` atau `jabatan`
+- `npwp`
+- `jumlahHK`
+- `period` atau `periode`
+- `description` atau `deskripsi`
+- `visitEarnings` berupa array item `{ tgl_date, tgl_value }`
+- `adjustment`
+- `poTelat`
+- `kasbon`
+
+Pastikan label yang tampil ramah untuk user, misalnya:
+- `NIK`
+- `STATUS`
+- `AREA`
+- `JABATAN`
+- `NPWP`
+- `JUMLAH HK`
+- `PENDAPATAN`, dengan input baris tanggal kunjungan dan nominal
+- `ADJ/DEDUCTION`
+- `PO TELAT`
+- `KASBON`
+
+### 2. Bulk Generate PDF
+Tambahkan pilihan mode di:
+- `src/components/forms/BulkGenerateForm.jsx`
+
+Rencana:
+- Tambah mode `event_weekly_payslip`.
+- Tambah link template Excel:
+  - `/templates/event_weekly_payslip.xlsx`
+- Tambah column hints sesuai header Excel yang diminta.
+- Pastikan filter `allowed_templates` tetap bekerja.
+
+### 3. Generate Single PDF
+Pastikan template muncul dan bisa dipakai di:
+- `src/components/forms/GeneratePdfForm.jsx`
+
+Rencana:
+- Jika form mengambil opsi dari `templateFields`, cukup pastikan template baru masuk `templates` dan `templateFieldMap`.
+- Pastikan preview PDF tetap bekerja untuk template baru.
+- Pastikan payload yang dikirim memakai `template: "event_weekly_payslip"`.
+
+### 4. Send Single Email
+Tambahkan dukungan di:
+- `src/components/forms/SendSingleEmailForm.jsx`
+- `src/api/sendApi.js` jika ada mapping endpoint khusus
+
+Rencana:
+- Tambah pilihan template `event_weekly_payslip`.
+- Kirim ke endpoint `/v1/send/event_weekly_payslip`.
+- Pastikan data form masuk ke `data` dengan struktur yang diterima backend.
+
+### 5. Bulk Send Email
+Tambahkan dukungan di:
+- `src/components/forms/SendEmailsForm.jsx`
+- `src/api/bulkApi.js`
+
+Rencana:
+- Jika memakai mode slip existing, pastikan user bisa memilih atau mengirim template `event_weekly_payslip`.
+- Jika backend membuat endpoint khusus, tambah mode `event_weekly_payslip`, endpoint, template download, dan column hints.
+- Tambah template Excel untuk bulk send:
+  - `/templates/send-event-weekly-payslip-emails.xlsx` jika endpoint khusus dibuat.
+- Pastikan flow pencarian batch/attachment jelas bagi user.
+
+## File yang Kemungkinan Disentuh
+
+Backend:
+- `app/Templates/event_weekly_payslip.js`
+- `resources/pdf-templates/event_weekly_payslip.js`
+- `resources/images/exel-logo.png`
+- `app/Services/SlipPayloadNormalizer.js`
+- `app/Services/PayloadDateNormalizer.js`
+- `app/Services/TemplateResolver.js`
+- `app/Controllers/Http/BulkPdfController.js`
+- `app/Controllers/Http/SingleEmailController.js`
+- `app/Controllers/Http/BulkEmailController.js`
+- `app/Jobs/GeneratePdfJob.js`
+- `start/routes.js`
+- `scripts/create-bulk-template.js`
+- `resources/templates/event_weekly_payslip.xlsx`
+- `public/download/*` hanya untuk output generate manual
+
+Frontend:
+- `src/utils/templateFields.js`
+- `src/components/forms/BulkGenerateForm.jsx`
+- `src/components/forms/GeneratePdfForm.jsx`
+- `src/components/forms/SendSingleEmailForm.jsx`
+- `src/components/forms/SendEmailsForm.jsx`
+- `src/api/bulkApi.js`
+- `src/api/sendApi.js`
+- `public/templates/event_weekly_payslip.xlsx`
+- `public/templates/send-event-weekly-payslip-emails.xlsx` jika endpoint bulk send khusus dibuat
+
+## Contoh PDF
+Setelah implementasi selesai, buat contoh PDF hasil generate untuk validasi manual.
+
+Output yang disarankan:
+- `output/event_weekly_payslip.sample.pdf`
+
+Data contoh:
+- Company: `PT. EXEL INTEGRASI SOLUSINDO`
+- Judul: `SLIP GAJI`
+- Periode: `25/07/2026 - 31/07/2026`
+- Deskripsi: isi contoh bebas yang representatif
+- Tanggal pendapatan:
+  - `25/07/2026`: `0`
+  - `26/07/2026`: `0`
+  - `27/07/2026`: `295000`
+  - `28/07/2026`: `295000`
+  - lanjutkan sampai total 7 hari kerja
+- Potongan:
+  - `ADJ/DEDUCTION`
+  - `PO TELAT`
+  - `KASBON`
 
 ## Skenario Test
-- Generate PDF dengan semua tunjangan lebih dari `0`, pastikan `3.3.1`, `3.3.2`, dan `3.3.3` tampil.
-- Generate PDF dengan Tunjangan Transport = `0`, Tunjangan Makan dan Pulsa lebih dari `0`, pastikan hanya Makan dan Pulsa tampil sebagai `3.3.1` dan `3.3.2`.
-- Generate PDF dengan hanya satu tunjangan lebih dari `0`, pastikan hanya satu sub item `3.3.1` tampil.
-- Generate PDF dengan semua tunjangan `0`, pastikan bagian `3.3` tunjangan hilang.
-- Pada case semua tunjangan `0`, pastikan poin rekening yang sebelumnya `3.4` berubah menjadi `3.3`.
-- Pastikan tabel rekening tetap tampil dan posisinya sesuai setelah renumber.
-- Pastikan generate PDF tetap berhasil untuk payload existing.
-- Pastikan perubahan tidak merusak template PDF lain.
+Bagian ini sengaja hanya berisi skenario high-level. Detail mock, assertion granular, fixture, dan struktur test diserahkan ke implementor.
+
+- Generate single PDF `event_weekly_payslip` berhasil dan memakai logo Exel.
+- PDF menampilkan default company `PT. EXEL INTEGRASI SOLUSINDO` saat `companyName` tidak dikirim.
+- PDF menampilkan judul `SLIP GAJI`, periode, dan deskripsi.
+- Bagian `PENDAPATAN` menampilkan 7 tanggal kunjungan dan nominal masing-masing.
+- Bagian `POTONGAN` menampilkan `ADJ/DEDUCTION`, `PO TELAT`, dan `KASBON`.
+- Total pendapatan, total potongan, dan net pay dihitung benar.
+- Bulk generate membaca Excel event weekly payslip dan menghasilkan payload yang benar.
+- Generate bulk tetap menghormati `allowed_templates`.
+- Send single email menghasilkan PDF dan enqueue email dengan attachment.
+- Bulk send email bisa menemukan attachment hasil generate dan mengirim ke penerima.
+- Frontend menampilkan `event_weekly_payslip` di Bulk Generate PDF, Generate Single PDF, Send Single Email, dan Bulk Send Email.
+- Link download template Excel tersedia dan file-nya ada.
+- Perubahan tidak merusak template `payslip`, `insentif`, dan `thr` existing.
 
 ## Acceptance Criteria
-- Tunjangan bernilai `0` tidak muncul di Pasal 2 nomor `3.3`.
-- Nomor sub tunjangan otomatis menyesuaikan jumlah tunjangan yang tampil.
-- Jika semua tunjangan `0`, bagian `3.3` tunjangan dihilangkan seluruhnya.
-- Jika bagian tunjangan hilang, nomor `3.4`, `3.5`, dan seterusnya otomatis naik.
-- Tabel rekening tetap tampil dengan nomor pengantar yang benar.
-- Contoh PDF hasil generate tersedia untuk validasi manual.
-- Detail unit test tidak perlu terlalu rinci di dokumen ini; implementor cukup menurunkan test dari skenario high-level di atas.
+- Template `event_weekly_payslip` tersedia di backend.
+- Logo pada PDF memakai `resources/images/exel-logo.png`.
+- Default nama perusahaan adalah `PT. EXEL INTEGRASI SOLUSINDO`.
+- Judul slip tampil sebagai `SLIP GAJI`.
+- Deskripsi tampil di bawah periode.
+- Komponen pendapatan berasal dari 7 tanggal kunjungan.
+- Komponen potongan adalah `ADJ/DEDUCTION`, `PO TELAT`, dan `KASBON`.
+- Bulk generate Excel untuk `event_weekly_payslip` tersedia.
+- Hasil bulk generate `event_weekly_payslip` tersedia di halaman Batch IDs.
+- Frontend mendukung template baru di semua flow yang diminta.
+- Contoh PDF `output/event_weekly_payslip.sample.pdf` tersedia untuk validasi manual.
+- Instruksi test di dokumen ini tetap berupa skenario high-level, bukan detail implementasi unit test.

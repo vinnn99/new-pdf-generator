@@ -15,6 +15,7 @@ const LEGACY_REQUIRED_FIELDS = {
   thr: ['employeeName', 'position', 'period', 'payoutDate', 'baseSalary'],
   payslip: ['employeeName', 'position', 'period'],
   insentif: ['employeeName', 'position', 'period'],
+  event_weekly_payslip: ['employeeName', 'employeeId'],
   'ba-penempatan': ['letterNo', 'mdsName', 'nik', 'placementDate', 'outlet'],
   'ba-request-id': ['letterNo', 'mdsName', 'nik', 'joinDate'],
   'ba-hold': ['letterNo', 'region', 'holdDate', 'mdsName', 'mdsCode', 'status', 'outlet'],

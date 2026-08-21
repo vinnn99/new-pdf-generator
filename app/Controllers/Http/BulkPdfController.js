@@ -26,6 +26,10 @@ class BulkPdfController {
     return this._handleExcel(ctx, 'thr')
   }
 
+  async eventWeeklyPayslipFromExcel(ctx) {
+    return this._handleExcel(ctx, 'event_weekly_payslip')
+  }
+
   async baPenempatanFromExcel(ctx) {
     return this._handleExcel(ctx, 'ba-penempatan')
   }
@@ -118,7 +122,9 @@ class BulkPdfController {
       const isBaMode = BaTemplateService.isBaTemplate(mode)
       const isCooperationAgreementMode = CooperationAgreementService.isTemplate(mode)
       const isLetteredBatchMode = isBaMode || isCooperationAgreementMode
-      const batchId = isLetteredBatchMode && !opts.dryRun ? createBatchId() : null
+      const isEventWeeklyBatchMode = mode === 'event_weekly_payslip'
+      const isBatchTrackedMode = isLetteredBatchMode || isEventWeeklyBatchMode
+      const batchId = isBatchTrackedMode && !opts.dryRun ? createBatchId() : null
 
       const results = []
       let queued = 0
@@ -169,7 +175,7 @@ class BulkPdfController {
             payload.filenameTemplate = mode
           }
 
-          if (isLetteredBatchMode) {
+          if (isBatchTrackedMode) {
             payload.data = payload.data || {}
             // Tambahan: URL tanda tangan kiri/kanan (opsional)
             const sigLeft = lower.signaturelefturl || lower['signature_left_url'] || lower['signature left url']
@@ -184,19 +190,25 @@ class BulkPdfController {
             }
 
             if (opts.dryRun) {
-              payload.data.letterNo = '[AUTO_GENERATED_ON_EXECUTION]'
+              if (isLetteredBatchMode) {
+                payload.data.letterNo = '[AUTO_GENERATED_ON_EXECUTION]'
+              }
             } else {
-              const numbering = isBaMode
-                ? await BaLetterNoService.nextLetterNo({
-                  companyId: company.company_id,
-                  template: mode,
-                  createdBy: user.id
-                })
-                : await CooperationAgreementLetterNoService.nextLetterNo({
-                  companyId: company.company_id,
-                  createdBy: user.id
-                })
-              payload.data.letterNo = numbering.letterNo
+              let letterNo = null
+              if (isLetteredBatchMode) {
+                const numbering = isBaMode
+                  ? await BaLetterNoService.nextLetterNo({
+                    companyId: company.company_id,
+                    template: mode,
+                    createdBy: user.id
+                  })
+                  : await CooperationAgreementLetterNoService.nextLetterNo({
+                    companyId: company.company_id,
+                    createdBy: user.id
+                  })
+                letterNo = numbering.letterNo
+                payload.data.letterNo = letterNo
+              }
 
               const insertedBatchItem = await Database.table('generation_batch_items').insert({
                 batch_id: batchId,
@@ -204,7 +216,7 @@ class BulkPdfController {
                 template: mode,
                 row_no: i + 1,
                 match_key: matchKey || null,
-                letter_no: numbering.letterNo,
+                letter_no: letterNo,
                 status: 'queued',
                 row_data: JSON.stringify(row || {}),
                 created_at: new Date(),
@@ -313,6 +325,7 @@ class BulkPdfController {
 }
 
 function defaultSlipTitleForMode(mode) {
+  if (mode === 'event_weekly_payslip') return 'SLIP GAJI'
   if (mode === 'insentif') return 'Payslip Insentif'
   if (mode === 'thr') return 'Payslip THR'
   return 'Payslip'
@@ -388,7 +401,30 @@ function parseMoneyList(str) {
 }
 
 function toNumber(val) {
-  const n = Number(val)
+  if (typeof val === 'number' && Number.isFinite(val)) return val
+  if (val === undefined || val === null || val === '') return 0
+
+  let str = String(val).trim()
+  if (!str) return 0
+  str = str.replace(/\s+/g, '').replace(/[^0-9,.-]/g, '')
+
+  const commaCount = (str.match(/,/g) || []).length
+  const dotCount = (str.match(/\./g) || []).length
+  if (commaCount > 0 && dotCount > 0) {
+    if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
+      str = str.replace(/\./g, '').replace(/,/g, '.')
+    } else {
+      str = str.replace(/,/g, '')
+    }
+  } else if (commaCount > 0 && dotCount === 0) {
+    str = str.replace(/,/g, '.')
+  } else if (dotCount === 1 && /^\d{1,3}\.\d{3}$/.test(str)) {
+    str = str.replace(/\./g, '')
+  } else if (dotCount > 1) {
+    str = str.replace(/\./g, '')
+  }
+
+  const n = Number(str)
   return Number.isFinite(n) ? n : 0
 }
 
@@ -407,6 +443,7 @@ function parseExcelDate(val) {
 function buildPayloadForMode(lower, mode, opts) {
   if (mode === 'insentif') return buildInsentifPayload(lower, opts)
   if (mode === 'thr') return buildThrPayload(lower, opts)
+  if (mode === 'event_weekly_payslip') return buildEventWeeklyPayslipPayload(lower, opts)
   if (mode === CooperationAgreementService.TEMPLATE) return buildCooperationAgreementPayload(lower, opts)
   if (mode === 'ba-penempatan') return buildBaPenempatanPayload(lower, opts)
   if (mode === 'ba-request-id') return buildBaRequestIdPayload(lower, opts)
@@ -805,6 +842,92 @@ function buildBaTerminatedPayload(lower, opts) {
   return payload
 }
 
+function buildEventWeeklyPayslipPayload(lower, opts) {
+  const payload = basePayload(lower, opts)
+  const pick = (keys) => pickFromLower(lower, keys)
+  const period = pick(['period', 'periode']) || ''
+  const visitEarnings = buildEventVisitEarnings(lower, period)
+
+  payload.template = 'event_weekly_payslip'
+  payload.data = {
+    ...payload.data,
+    companyName: pick(['companyname', 'company name', 'company_name', 'nama perusahaan']) || 'PT. EXEL INTEGRASI SOLUSINDO',
+    slipTitle: pick(['sliptitle', 'slip title', 'slip_title', 'title', 'judul']) || opts.defaultSlipTitle || 'SLIP GAJI',
+    employeeName: pick(['employeename', 'employee name', 'employee_name', 'nama', 'nama karyawan']),
+    employeeId: pick(['employeeid', 'employee id', 'employee_id', 'nik']),
+    status: pick(['status']),
+    area: pick(['area', 'wilayah', 'region']),
+    position: pick(['position', 'jabatan']),
+    npwp: pick(['npwp']),
+    jumlahHK: pick(['jumlahhk', 'jumlah hk', 'jumlah_hk']),
+    period,
+    description: pick(['description', 'deskripsi']),
+    visitEarnings,
+    adjustment: toNumber(pick(['adjustment', 'adj/deduction', 'adj deduction', 'adj_deduction'])),
+    poTelat: toNumber(pick(['po telat', 'pot telat', 'po_telat', 'pot_telat'])),
+    kasbon: toNumber(pick(['kasbon'])),
+    note: pick(['note', 'catatan'])
+  }
+
+  const missing = ['employeeName', 'employeeId'].filter((key) => !payload.data[key])
+  if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
+
+  return payload
+}
+
+function buildEventVisitEarnings(lower, period) {
+  const dateKeyItems = Object.keys(lower || {})
+    .map((key) => ({ key, date: parseDateLabel(key) }))
+    .filter((item) => item.date)
+    .map((item) => ({
+      date: formatDateShort(item.date),
+      amount: toNumber(lower[item.key]),
+      sort: item.date.getTime()
+    }))
+    .sort((left, right) => left.sort - right.sort)
+
+  if (dateKeyItems.length) return fillEventVisitEarnings(dateKeyItems, period)
+
+  return fillEventVisitEarnings(Array.from({ length: 7 }).map((_, index) => {
+    const n = index + 1
+    const date = pickFromLower(lower, [
+      `tgl${n}date`,
+      `tgl${n} date`,
+      `tgl${n}_date`,
+      `tanggal${n}`,
+      `tanggal ${n}`,
+      `tanggal_${n}`
+    ])
+    const amount = pickFromLower(lower, [
+      `tgl${n}`,
+      `tgl ${n}`,
+      `tgl_${n}`,
+      `tgl${n}amount`,
+      `tgl${n} amount`,
+      `tgl${n}_amount`
+    ])
+    return {
+      date: formatDateValue(date) || eventDateForIndex(period, n),
+      amount: toNumber(amount)
+    }
+  }), period)
+}
+
+function fillEventVisitEarnings(items, period) {
+  const out = (Array.isArray(items) ? items : []).slice(0, 7)
+  const start = parsePeriodStart(period)
+  for (let i = out.length; i < 7; i++) {
+    out.push({
+      date: start ? formatDateShort(addDays(start, i)) : `TGL${i + 1}`,
+      amount: 0
+    })
+  }
+  return out.map((item, index) => ({
+    date: item.date || (start ? formatDateShort(addDays(start, index)) : `TGL${index + 1}`),
+    amount: toNumber(item.amount)
+  }))
+}
+
 function buildBaCancelJoinPayload(lower, opts) {
   const payload = basePayload(lower, opts)
   payload.template = 'ba-cancel-join'
@@ -922,6 +1045,16 @@ function buildCooperationAgreementPayload(lower, opts) {
 }
 
 function buildBatchMatchKey(mode, lower, payloadData) {
+  if (mode === 'event_weekly_payslip') {
+    const data = payloadData && typeof payloadData === 'object'
+      ? payloadData
+      : {
+          employeeId: pickFromLower(lower, ['employeeid', 'employee id', 'employee_id', 'nik']),
+          employeeName: pickFromLower(lower, ['employeename', 'employee name', 'employee_name', 'nama', 'nama karyawan'])
+        }
+    return buildEventWeeklyMatchKey(data)
+  }
+
   if (BaTemplateService.isBaTemplate(mode)) {
     const fields = BaTemplateService.extractMatchFieldsFromRow(mode, lower)
     return BaTemplateService.buildMatchKey(mode, fields)
@@ -942,9 +1075,25 @@ function buildBatchMatchKey(mode, lower, payloadData) {
 }
 
 function getRequiredBatchMatchFields(mode) {
+  if (mode === 'event_weekly_payslip') return ['employeeId', 'employeeName']
   if (BaTemplateService.isBaTemplate(mode)) return BaTemplateService.getRequiredMatchFields(mode)
   if (CooperationAgreementService.isTemplate(mode)) return ['partnerName', 'partnerEmail/partnerIdentityNumber']
   return []
+}
+
+function buildEventWeeklyMatchKey(data) {
+  const source = data && typeof data === 'object' ? data : {}
+  const employeeId = normalizeMatchPart(source.employeeId || source.nik)
+  const employeeName = normalizeMatchPart(source.employeeName || source.nama)
+  if (!employeeId || !employeeName) return ''
+  return [employeeId, employeeName].join('|')
+}
+
+function normalizeMatchPart(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
 }
 
 function pickFromLower(lower, keys) {
@@ -964,8 +1113,62 @@ function parseSlipPeriod(lower) {
   return SlipPeriodService.normalize(pickFromLower(lower, ['period', 'periode']))
 }
 
+function eventDateForIndex(period, n) {
+  const start = parsePeriodStart(period)
+  if (!start) return `TGL${n}`
+  return formatDateShort(addDays(start, n - 1))
+}
+
+function parsePeriodStart(period) {
+  const raw = String(period || '')
+  const match = raw.match(/(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{1,2}-\d{1,2})/)
+  return match ? parseDateLabel(match[1]) : null
+}
+
+function parseDateLabel(value) {
+  const raw = String(value || '').trim()
+  const local = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
+  if (local) {
+    const year = Number(local[3].length === 2 ? `20${local[3]}` : local[3])
+    const date = new Date(year, Number(local[2]) - 1, Number(local[1]))
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (iso) {
+    const date = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]))
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+
+  return null
+}
+
+function formatDateValue(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return formatDateShort(value)
+  const parsed = parseDateLabel(value)
+  if (parsed) return formatDateShort(parsed)
+  return value === undefined || value === null || value === '' ? '' : String(value)
+}
+
+function addDays(date, days) {
+  const next = new Date(date.getTime())
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function formatDateShort(date) {
+  return [
+    String(date.getDate()).padStart(2, '0'),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getFullYear())
+  ].join('/')
+}
+
 function isSlipMode(mode) {
-  return mode === 'payslip' || mode === 'insentif' || mode === 'thr'
+  return mode === 'payslip' ||
+    mode === 'insentif' ||
+    mode === 'thr' ||
+    mode === 'event_weekly_payslip'
 }
 
 function createBatchId() {

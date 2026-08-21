@@ -3,6 +3,11 @@
 const ExcelDateService = require('./ExcelDateService')
 const SlipPeriodService = require('./SlipPeriodService')
 
+const EVENT_WEEKLY_PAYSLIP_TEMPLATE = 'event_weekly_payslip'
+const EVENT_WEEKLY_DEFAULT_COMPANY = 'PT. EXEL INTEGRASI SOLUSINDO'
+const EVENT_WEEKLY_DEFAULT_TITLE = 'SLIP GAJI'
+const EVENT_WEEKLY_VISIT_DAYS = 7
+
 class SlipPayloadNormalizer {
   static normalize ({ template, data } = {}) {
     const normalizedTemplate = String(template || '').trim().toLowerCase()
@@ -18,13 +23,39 @@ class SlipPayloadNormalizer {
     assignAlias(out, 'department', ['department', 'departement', 'departemen'])
     assignAlias(out, 'period', ['period', 'periode'])
     if (!isMissing(out.period)) out.period = SlipPeriodService.normalize(out.period)
-    assignAlias(out, 'employeeId', ['employeeId', 'employee_id', 'nip'])
+    assignAlias(out, 'employeeName', ['employeeName', 'employee_name', 'nama', 'nama karyawan'])
+    assignAlias(out, 'employeeId', ['employeeId', 'employee_id', 'nip', 'nik'])
     assignAlias(out, 'position', ['position', 'jabatan'])
     assignAlias(out, 'joinDate', ['joinDate', 'join_date', 'tanggalMasuk', 'tglMasuk'])
     normalizeDate(out, 'joinDate')
     assignAlias(out, 'targetHK', ['targetHK', 'target_hk'])
     assignAlias(out, 'attendance', ['attendance', 'kehadiran'])
     assignAlias(out, 'ptkp', ['ptkp', 'PTKP'])
+
+    if (normalizedTemplate === EVENT_WEEKLY_PAYSLIP_TEMPLATE) {
+      assignAlias(out, 'status', ['status'])
+      assignAlias(out, 'area', ['area', 'wilayah', 'region'])
+      assignAlias(out, 'npwp', ['npwp', 'NPWP'])
+      assignAlias(out, 'jumlahHK', ['jumlahHK', 'jumlah_hk', 'jumlah hk', 'jumlahhk'])
+      assignAlias(out, 'description', ['description', 'deskripsi'])
+      assignAlias(out, 'slipTitle', ['slipTitle', 'slip_title', 'title', 'judul'])
+      assignAlias(out, 'companyName', ['companyName', 'company_name', 'company'])
+      if (isMissing(out.companyName)) out.companyName = EVENT_WEEKLY_DEFAULT_COMPANY
+      if (isMissing(out.slipTitle)) out.slipTitle = EVENT_WEEKLY_DEFAULT_TITLE
+
+      out.visitEarnings = normalizeEventVisitEarnings(out)
+      out.adjustment = eventAmount(pickFirstValue(out, ['adjustment', 'adjDeduction', 'adj_deduction', 'adj/deduction', 'adj deduction']))
+      out.poTelat = eventAmount(pickFirstValue(out, ['poTelat', 'po_telat', 'potTelat', 'pot_telat', 'po telat', 'pot telat']))
+      out.kasbon = eventAmount(pickFirstValue(out, ['kasbon']))
+      out.earnings = out.visitEarnings.map((item) => ({ label: item.date || item.label, amount: item.amount }))
+      out.deductions = [
+        { label: 'ADJ/DEDUCTION', amount: out.adjustment },
+        { label: 'PO TELAT', amount: out.poTelat },
+        { label: 'KASBON', amount: out.kasbon }
+      ]
+
+      return out
+    }
 
     if (normalizedTemplate === 'insentif') {
       assignAlias(out, 'slipTitle', ['slipTitle', 'slip_title', 'title', 'judul'])
@@ -108,7 +139,10 @@ class SlipPayloadNormalizer {
 }
 
 function isSlipTemplate (template) {
-  return template === 'payslip' || template === 'insentif' || template === 'thr'
+  return template === 'payslip' ||
+    template === 'insentif' ||
+    template === 'thr' ||
+    template === EVENT_WEEKLY_PAYSLIP_TEMPLATE
 }
 
 function isPlainObject (value) {
@@ -215,6 +249,8 @@ function normalizeNumberString (value) {
     }
   } else if (commaCount > 0 && dotCount === 0) {
     str = str.replace(/,/g, '.')
+  } else if (dotCount === 1 && /^\d{1,3}\.\d{3}$/.test(str)) {
+    str = str.replace(/\./g, '')
   } else if (dotCount > 1) {
     str = str.replace(/\./g, '')
   }
@@ -256,6 +292,146 @@ function sumMoneyByLabel (list, keywords) {
     if (!match) return sum
     return sum + toNumberSafe(item && item.amount)
   }, 0)
+}
+
+function normalizeEventVisitEarnings (source) {
+  const explicit = source.visitEarnings || source.visit_earnings || source.dailyEarnings || source.daily_earnings
+  if (Array.isArray(explicit) && explicit.length) {
+    return fillEventVisitEarnings(explicit.map((item, index) => normalizeEventVisitItem(item, index)), source.period)
+  }
+
+  const dateKeyItems = Object.keys(source || {})
+    .map((key) => ({ key, date: parseDateLabel(key) }))
+    .filter((item) => item.date)
+    .map((item) => ({
+      date: formatDateShort(item.date),
+      amount: eventAmount(source[item.key]),
+      sort: item.date.getTime()
+    }))
+    .sort((left, right) => left.sort - right.sort)
+
+  if (dateKeyItems.length) {
+    return fillEventVisitEarnings(dateKeyItems.slice(0, EVENT_WEEKLY_VISIT_DAYS), source.period)
+  }
+
+  return fillEventVisitEarnings(Array.from({ length: EVENT_WEEKLY_VISIT_DAYS }).map((_, index) => {
+    const n = index + 1
+    return {
+      date: eventVisitDateForIndex(source, n),
+      amount: eventAmount(pickFirstValue(source, [
+        `tgl${n}`,
+        `tgl_${n}`,
+        `tgl ${n}`,
+        `TGL${n}`,
+        `TGL ${n}`,
+        `tgl${n}Amount`,
+        `tgl${n}_amount`,
+        `tgl${n} amount`
+      ]))
+    }
+  }), source.period)
+}
+
+function normalizeEventVisitItem (item, index) {
+  if (Array.isArray(item)) {
+    return {
+      date: formatDateValue(item[0]) || `TGL${index + 1}`,
+      amount: eventAmount(item[1])
+    }
+  }
+
+  if (isPlainObject(item)) {
+    return {
+      date: formatDateValue(pickFirstValue(item, ['tgl_date', 'tglDate', 'tgl date', 'date', 'tanggal', 'label', 'name'])) || `TGL${index + 1}`,
+      amount: eventAmount(pickFirstValue(item, ['tgl_value', 'tglValue', 'tgl value', 'amount', 'value', 'nominal', 'total']))
+    }
+  }
+
+  return {
+    date: `TGL${index + 1}`,
+    amount: eventAmount(item)
+  }
+}
+
+function fillEventVisitEarnings (items, period) {
+  const list = Array.isArray(items) ? items.slice(0, EVENT_WEEKLY_VISIT_DAYS) : []
+  const start = parsePeriodStart(period)
+  for (let i = list.length; i < EVENT_WEEKLY_VISIT_DAYS; i++) {
+    list.push({
+      date: start ? formatDateShort(addDays(start, i)) : `TGL${i + 1}`,
+      amount: 0
+    })
+  }
+  return list.map((item, index) => ({
+    date: item.date || item.label || (start ? formatDateShort(addDays(start, index)) : `TGL${index + 1}`),
+    amount: eventAmount(item.amount)
+  }))
+}
+
+function eventVisitDateForIndex (source, n) {
+  const explicit = pickFirstValue(source, [
+    `tgl${n}Date`,
+    `tgl${n}_date`,
+    `tgl${n} date`,
+    `tanggal${n}`,
+    `tanggal_${n}`,
+    `tanggal ${n}`
+  ])
+  const formatted = formatDateValue(explicit)
+  if (formatted) return formatted
+
+  const start = parsePeriodStart(source.period)
+  if (start) return formatDateShort(addDays(start, n - 1))
+  return `TGL${n}`
+}
+
+function eventAmount (value) {
+  return toNumberSafe(toAmount(value))
+}
+
+function parsePeriodStart (period) {
+  const raw = String(period || '')
+  const match = raw.match(/(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{1,2}-\d{1,2})/)
+  return match ? parseDateLabel(match[1]) : null
+}
+
+function parseDateLabel (value) {
+  const raw = String(value || '').trim()
+  const local = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
+  if (local) {
+    const year = Number(local[3].length === 2 ? `20${local[3]}` : local[3])
+    const date = new Date(year, Number(local[2]) - 1, Number(local[1]))
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (iso) {
+    const date = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]))
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+
+  return null
+}
+
+function formatDateValue (value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return formatDateShort(value)
+  const parsed = parseDateLabel(value)
+  if (parsed) return formatDateShort(parsed)
+  return isMissing(value) ? '' : String(value)
+}
+
+function addDays (date, days) {
+  const next = new Date(date.getTime())
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function formatDateShort (date) {
+  return [
+    String(date.getDate()).padStart(2, '0'),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getFullYear())
+  ].join('/')
 }
 
 module.exports = SlipPayloadNormalizer

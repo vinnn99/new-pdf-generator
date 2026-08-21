@@ -1320,6 +1320,105 @@ test('send-slip-emails menemukan PDF hasil generate bulk walau periode pakai nam
   }
 })
 
+test('send-event-weekly-payslip-emails menemukan PDF event weekly hasil generate bulk', async ({ client, assert }) => {
+  const stamp = uniqueId('event_weekly_email')
+  const toEmail = `event.weekly.${stamp}@test.local`
+  const employeeId = `EVT-${stamp}`
+  const employeeName = `Budi Event ${stamp}`
+  const xlsxPath = path.join(Helpers.tmpPath(), `send-event-weekly-${stamp}.xlsx`)
+  let pdfMeta = null
+
+  const company = await Database.table('companies')
+    .where('company_id', seed.companyAId)
+    .first()
+
+  pdfMeta = await new GeneratePdfJob().handle({
+    template: 'event_weekly_payslip',
+    filenameTemplate: 'event_weekly_payslip',
+    data: {
+      employeeId,
+      employeeName,
+      status: 'ACTIVE',
+      area: 'Jakarta',
+      position: 'Event Crew',
+      npwp: '09.123.456.7-012.000',
+      jumlahHK: 7,
+      period: 'Juli 2026',
+      description: 'Event mingguan outlet Jakarta',
+      visitEarnings: [
+        { tgl_date: '2026-07-25', tgl_value: 0 },
+        { tgl_date: '2026-07-26', tgl_value: 0 },
+        { tgl_date: '2026-07-27', tgl_value: 295000 },
+        { tgl_date: '2026-07-28', tgl_value: 295000 },
+        { tgl_date: '2026-07-29', tgl_value: 295000 },
+        { tgl_date: '2026-07-30', tgl_value: 295000 },
+        { tgl_date: '2026-07-31', tgl_value: 295000 }
+      ],
+      adjustment: 0,
+      poTelat: 0,
+      kasbon: 0
+    },
+    email: seed.credentials.user.email,
+    companyName: company.name,
+    userId: seed.userMainId,
+    companyId: seed.companyAId
+  })
+
+  const workbook = XLSX.utils.book_new()
+  const sheet = XLSX.utils.json_to_sheet([
+    {
+      sentTo: toEmail,
+      NIK: employeeId,
+      employeeName,
+      periode: 'juli-2026',
+      body: 'Body'
+    }
+  ])
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Sheet1')
+  XLSX.writeFile(workbook, xlsxPath)
+
+  try {
+    assert.equal(String(pdfMeta.filename).startsWith('2026-07.event_weekly_payslip.'), true)
+
+    const token = await loginAndGetToken(client, seed.credentials.user)
+    const response = await client
+      .post('/api/v1/send-event-weekly-payslip-emails')
+      .header('Authorization', `Bearer ${token}`)
+      .field('periode', 'juli-2026')
+      .attach('file', xlsxPath)
+      .end()
+
+    response.assertStatus(200)
+    assert.equal(response.body.status, 'ok')
+    assert.equal(Number(response.body.queued), 1)
+    assert.equal(Number(response.body.skipped), 0)
+    assert.equal(response.body.results[0].status, 'queued')
+    assert.equal(response.body.results[0].attachments[0], pdfMeta.filename)
+
+    const job = await Database.table('jobs')
+      .where('payload', 'like', `%${toEmail}%`)
+      .orderBy('id', 'desc')
+      .first()
+
+    assert.ok(job)
+    const payload = JSON.parse(job.payload)
+    assert.equal(payload.data.template, 'payslip-email')
+    assert.equal(payload.data.employeeId, employeeId)
+    assert.equal(payload.data.employeeName, employeeName)
+  } finally {
+    try {
+      fs.unlinkSync(xlsxPath)
+    } catch (e) {
+      // ignore
+    }
+    try {
+      if (pdfMeta && pdfMeta.filePath) fs.unlinkSync(pdfMeta.filePath)
+    } catch (e) {
+      // ignore
+    }
+  }
+})
+
 test('send-cooperation-agreement-emails memakai lampiran dari batch berdasarkan match key', async ({ client, assert }) => {
   const stamp = uniqueId('coop_bulk_email')
   const batchId = uniqueSlug('coop-email-batch').slice(0, 60)

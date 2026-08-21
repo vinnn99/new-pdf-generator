@@ -61,6 +61,57 @@ const TEMPLATE_DEFINITIONS = {
       'user@example.com'
     ]
   },
+  event_weekly_payslip: {
+    filename: 'event_weekly_payslip-bulk-template.xlsx',
+    headers: [
+      'NIK',
+      'employeeName',
+      'STATUS',
+      'AREA',
+      'JABATAN',
+      'NPWP',
+      'JUMLAH HK',
+      'PERIODE',
+      'DESKRIPSI',
+      '25/07/2026',
+      '26/07/2026',
+      '27/07/2026',
+      '28/07/2026',
+      '29/07/2026',
+      '30/07/2026',
+      '31/07/2026',
+      'ADJUSTMENT',
+      'POT TELAT',
+      'KASBON',
+      'email',
+      'callback_url',
+      'callback_header'
+    ],
+    sample: [
+      '3171000000000001',
+      'Budi Event',
+      'ACTIVE',
+      'Jakarta',
+      'Event Crew',
+      '09.123.456.7-012.000',
+      7,
+      '25/07/2026 - 31/07/2026',
+      'Event mingguan outlet Jakarta',
+      0,
+      0,
+      295000,
+      295000,
+      295000,
+      295000,
+      295000,
+      0,
+      0,
+      0,
+      'user@example.com',
+      'https://example.com/callback',
+      '{"x-api-key":"demo"}'
+    ]
+  },
   'ba-penempatan': {
     filename: 'ba-penempatan-bulk-template.xlsx',
     headers: [

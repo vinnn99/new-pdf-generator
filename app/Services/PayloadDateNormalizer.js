@@ -6,6 +6,7 @@ const DATE_FIELDS_BY_TEMPLATE = Object.freeze({
   payslip: ['joinDate'],
   insentif: ['joinDate'],
   thr: ['joinDate', 'payoutDate'],
+  event_weekly_payslip: ['joinDate'],
   'ba-penempatan': ['birthDate', 'placementDate', 'letterDate'],
   'ba-request-id': ['birthDate', 'joinDate', 'letterDate'],
   'ba-hold': ['holdDate', 'letterDate'],

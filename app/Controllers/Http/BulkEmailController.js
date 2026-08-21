@@ -28,7 +28,15 @@ class BulkEmailController {
    *     [periode].[template].[employeeId].[nama].[kodeUnique].pdf
    *   Jika kandidat > 1 (mis. beda kodeUnique), sistem memilih file terbaru.
    */
-  async sendSlips({ request, response, auth }) {
+  async sendSlips(ctx) {
+    return this._sendSlipEmails(ctx)
+  }
+
+  async sendEventWeeklyPayslip(ctx) {
+    return this._sendSlipEmails(ctx, 'event_weekly_payslip')
+  }
+
+  async _sendSlipEmails({ request, response, auth }, forcedTemplate = '') {
     try {
       const user = await auth.getUser()
       if (!user || !user.company_id) {
@@ -65,6 +73,7 @@ class BulkEmailController {
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
       const periodPrefix = normalizePeriodPrefix(request.input('periode') || request.input('period'))
       const templateFromRequest = normalizeSlipTemplate(
+        forcedTemplate ||
         request.input('template') ||
         request.input('slipTemplate') ||
         request.input('slip_template')
@@ -87,10 +96,12 @@ class BulkEmailController {
         const row = rows[i]
         const norm = normalizeRow(row)
         const to = norm.sentto || norm.email
-        const employeeId = (norm.employeeid || '').toString().trim()
-        const employeeName = norm.employeename || ''
+        const employeeId = (norm.employeeid || norm.nik || '').toString().trim()
+        const employeeName = (norm.employeename || norm['employee name'] || norm.employee_name || norm.nama || '').toString().trim()
         const companyName = norm.companyname || ''
-        const slipTitle = norm.sliptitle || 'Slip Gaji'
+        const rowTemplate = normalizeSlipTemplate(norm.template || norm.sliptemplate || norm.slip_template)
+        const isEventWeekly = rowTemplate === 'event_weekly_payslip' || templateFromRequest === 'event_weekly_payslip'
+        const slipTitle = norm.sliptitle || (isEventWeekly ? 'SLIP GAJI' : 'Slip Gaji')
         const slipTemplate = resolveSlipTemplate(norm, templateFromRequest, slipTitle)
         const body =
           norm.body ||
@@ -143,6 +154,26 @@ class BulkEmailController {
             error
           })
           appendLog({ row: i + 1, to, status: 'failed', reason: 'missing_employee_id', error, employeeName })
+          failedCount++
+          continue
+        }
+        if (isEventWeekly && !employeeName) {
+          const error = `Row ${i + 1}: employeeName kosong. Lampiran event weekly payslip tidak dapat dicari dan email tidak dikirim.`
+          results.push({ row: i + 1, status: 'failed', to, message: 'employeeName kosong' })
+          await createEmailStatusLogSafe({
+            status: 'failed',
+            user,
+            company,
+            template: 'payslip-email',
+            context: 'bulk-slip',
+            to,
+            cc,
+            bcc,
+            subject: slipTitle,
+            body,
+            error
+          })
+          appendLog({ row: i + 1, to, status: 'failed', reason: 'missing_employee_name', error, employeeId })
           failedCount++
           continue
         }
@@ -964,6 +995,7 @@ function resolveSlipTemplate(norm, requestTemplate, slipTitle) {
 function inferSlipTemplateFromTitle(title) {
   const lower = (title || '').toString().trim().toLowerCase()
   if (!lower) return ''
+  if (lower.includes('event') || lower.includes('weekly')) return 'event_weekly_payslip'
   if (lower.includes('insentif')) return 'insentif'
   if (lower.includes('thr')) return 'thr'
   if (lower.includes('payslip') || lower.includes('slip')) return 'payslip'
@@ -972,7 +1004,7 @@ function inferSlipTemplateFromTitle(title) {
 
 function normalizeSlipTemplate(template) {
   const normalized = normalizeSlipSegment(template).toLowerCase()
-  if (['payslip', 'insentif', 'thr'].includes(normalized)) return normalized
+  if (['payslip', 'insentif', 'thr', 'event_weekly_payslip'].includes(normalized)) return normalized
   return ''
 }
 

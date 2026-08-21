@@ -3,6 +3,7 @@
 const JobService = require('../../Services/JobService')
 const Database = use('Database')
 const GeneratePdfJob = use('App/Jobs/GeneratePdfJob')
+const SlipPayloadNormalizer = use('App/Services/SlipPayloadNormalizer')
 const BaTemplateService = use('App/Services/BaTemplateService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
 const CooperationAgreementService = use('App/Services/CooperationAgreementService')
@@ -21,6 +22,9 @@ class SingleEmailController {
   }
   async sendThr(ctx) {
     return this._send(ctx, cfgSlip('thr'))
+  }
+  async sendEventWeeklyPayslip(ctx) {
+    return this._send(ctx, cfgSlip('event_weekly_payslip'))
   }
 
   async sendBaPenempatan(ctx) {
@@ -112,6 +116,10 @@ class SingleEmailController {
       }
 
       const normalizedTemplate = BaTemplateService.normalizeTemplate(cfg.template)
+      data = SlipPayloadNormalizer.normalize({
+        template: normalizedTemplate,
+        data
+      })
       if (CooperationAgreementService.isTemplate(normalizedTemplate)) {
         try {
           data = CooperationAgreementService.normalizeData(data)
@@ -455,6 +463,7 @@ function cfgSlip(template) {
     required: requiredFields(template),
     subject: (f) => {
       const base =
+        template === 'event_weekly_payslip' ? 'SLIP GAJI' :
         template === 'insentif' ? 'Slip Insentif' :
         template === 'thr' ? 'Slip THR' :
         'Slip Gaji'
@@ -465,7 +474,9 @@ function cfgSlip(template) {
       const lines = [
         `Yth. ${f.employeeName || 'Bapak/Ibu'},`,
         '',
-        template === 'insentif'
+        template === 'event_weekly_payslip'
+          ? 'Berikut terlampir slip gaji mingguan/event Anda.'
+          : template === 'insentif'
           ? 'Berikut terlampir slip insentif Anda.'
           : template === 'thr'
           ? 'Berikut terlampir slip THR Anda.'
@@ -485,6 +496,7 @@ function requiredFields(template) {
     payslip: ['employeeName', 'position', 'period'],
     insentif: ['employeeName', 'position', 'period'],
     thr: ['employeeName', 'position', 'period', 'payoutDate', 'baseSalary'],
+    event_weekly_payslip: ['employeeName', 'employeeId'],
     'ba-penempatan': ['mdsName', 'placementDate', 'outlet'],
     'ba-request-id': ['mdsName', 'nik', 'joinDate'],
     'ba-hold': ['region', 'holdDate', 'mdsName', 'mdsCode', 'status', 'outlet'],
