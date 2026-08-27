@@ -509,6 +509,37 @@ Contoh payload `ba-resign`:
   }
 }
 ```
+Contoh payload `event_weekly_payslip`:
+```json
+{
+  "template": "event_weekly_payslip",
+  "email": "user@example.com",
+  "data": {
+    "companyName": "PT. EXEL INTEGRASI SOLUSINDO",
+    "employeeId": "EIS001",
+    "employeeName": "BUDI SANTOSO",
+    "status": "ACTIVE",
+    "area": "JAKARTA",
+    "position": "EVENT CREW",
+    "npwp": "09.123.456.7-890.000",
+    "workingDays": 5,
+    "periode": "Juli 2026",
+    "description": "Periode kunjungan 25-31 Juli 2026",
+    "visitEarnings": [
+      { "tgl_date": "2026-07-25", "tgl_value": 0 },
+      { "tgl_date": "2026-07-26", "tgl_value": 0 },
+      { "tgl_date": "2026-07-27", "tgl_value": 295000 },
+      { "tgl_date": "2026-07-28", "tgl_value": 295000 },
+      { "tgl_date": "2026-07-29", "tgl_value": 295000 },
+      { "tgl_date": "2026-07-30", "tgl_value": 295000 },
+      { "tgl_date": "2026-07-31", "tgl_value": 295000 }
+    ],
+    "adjustment": 0,
+    "poTelat": 0,
+    "kasbon": 0
+  }
+}
+```
 Response 202:
 ```json
 { "status": "queued", "message": "PDF generation is being processed" }
@@ -538,6 +569,7 @@ Webhook payload (on success):
 - `musik`: `nama`, `judul`, `nik`, `address`, `pt`, `pencipta`, `asNama`, `bankName`, `npwp`, `imail`, `phone`, `norek`
 - `invoice`: `clientName`, `items`
 - `payslip`: `employeeName`, `position`, `period`
+- `event_weekly_payslip`: `employeeName`, `employeeId`
 - `thr`: `employeeName`, `position`, `period`, `payoutDate`, `baseSalary`
 - `ba-penempatan`: `mdsName`, `placementDate`, `outlet`
 - `ba-request-id`: `mdsName`, `nik`, `joinDate`
@@ -555,7 +587,7 @@ Catatan BA:
 - `data.signatureLeftUrl` dan `data.signatureRightUrl` bersifat opsional untuk override gambar tanda tangan.
 
 **Penamaan file:**
-- `payslip`/`insentif`/`thr`: `<periode>.<template>.<employeeId>.<nama>.<unik>.pdf`
+- `payslip`/`insentif`/`thr`/`event_weekly_payslip`: `<periode>.<template>.<employeeId>.<nama>.<unik>.pdf`
 - `ba-penempatan`: `ba-penempatan.<mdsName>.<outlet>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-request-id`: `ba-request-id.<mdsName>.<area>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-hold`: `ba-hold.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
@@ -607,6 +639,7 @@ Content-Type: `multipart/form-data` dengan field `file` (xls/xlsx, max 10 MB). O
 - `POST /api/v1/bulk/payslip`
 - `POST /api/v1/bulk/insentif`
 - `POST /api/v1/bulk/thr`
+- `POST /api/v1/bulk/event_weekly_payslip`
 - `POST /api/v1/bulk/ba-penempatan`
 - `POST /api/v1/bulk/ba-request-id`
 - `POST /api/v1/bulk/ba-hold`
@@ -663,12 +696,15 @@ Response 200:
   ]
 }
 ```
+Untuk `event_weekly_payslip`, response bulk juga mengembalikan `batch_id` saat `dryRun=false`. Batch ini muncul di halaman Batch IDs dan bisa dipakai untuk audit hasil generate.
 
 #### Header kolom Excel (disarankan)
 - **Payslip**: `employeeId | employeeName | position | departement | periode | joinDate | ptkp | targetHK | attendance | Gaji Pokok | Tunjangan makan | Tunjangan Transport | Tunjangan Komunikasi | Tunjangan Jabatan | Tunjangan BPJS Ketenagakerjaan | BPJS Ketenagakerjaan | PPH 21 | email (opsional)`
 - **Insentif**: `employeeId | employeeName | position | departement | periode | INSENTIF SAMPLING | INSENTIF SELLOUT | INSENTIF KERAJINAN | INSENTIF TL | earnings | deductions | email (opsional)`
 - **THR**: `employeeId | employeeName | position | departement | periode | THR | earnings | deductions | note | email (opsional)`
+- **Event Weekly Payslip**: `NIK | employeeName | STATUS | AREA | JABATAN | NPWP | JUMLAH HK | PERIODE | DESKRIPSI | 25/07/2026 | 26/07/2026 | 27/07/2026 | 28/07/2026 | 29/07/2026 | 30/07/2026 | 31/07/2026 | ADJUSTMENT | POT TELAT | KASBON | email (opsional) | callback_url | callback_header`
 - Catatan slip: `periode` boleh berupa teks (`Oktober 2025`, `2025-10`) atau cell tanggal Excel; serial tanggal Excel akan dinormalisasi menjadi bulan-tahun.
+- Catatan Event Weekly: `NIK` dipakai sebagai `employeeId`, `employeeName` wajib, kolom pendapatan memakai tanggal sebagai header, dan nilai pada kolom tanggal menjadi item `visitEarnings`.
 - **BA Penempatan**: `mdsName | nik | birthDate | placementDate | status | category | outlet | region | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
 - **BA Request ID**: `area | mdsName | nik | birthDate | joinDate | status | stores | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional)`
 - **BA HOLD**: `region | holdDate | mdsName | mdsCode | status | outlet | reason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional)`
@@ -687,16 +723,24 @@ Kolom umum: `callback_url`, `callback_header` (JSON), `data_json` (override/extr
 ---
 
 ## 5) Bulk Kirim Email Slip
-`POST /api/v1/send-slip-emails`  
+Endpoint:
+- `POST /api/v1/send-slip-emails` untuk `payslip`, `insentif`, `thr`
+- `POST /api/v1/send-event-weekly-payslip-emails` untuk `event_weekly_payslip`
+
 Auth: `Authorization: Bearer <JWT>`  
-Form-data:
+Form-data `/api/v1/send-slip-emails`:
 - `file` (xls/xlsx, max 5 MB) dengan kolom: `sentTo` (wajib) | `employeeId` (wajib) | `employeeName` | `slipTitle` | `template` (opsional: `payslip`/`insentif`/`thr`) | `body` | `cc` | `bcc`
 - `periode` (opsional, filter segmen periode pada nama file, contoh `2026-03`)
 
-Lampiran dicari hanya di `public/download/{companyName}/{email_login}/` (folder disanitasi sesuai email user login) dengan format:
+Form-data `/api/v1/send-event-weekly-payslip-emails`:
+- `file` (xls/xlsx, max 5 MB) dengan kolom: `sentTo` (wajib) | `NIK` atau `employeeId` (wajib) | `employeeName` (wajib) | `periode` | `body` | `cc` | `bcc`
+- `periode` (opsional, filter segmen periode pada nama file, contoh `2026-07`, `juli-2026`, `Juli 2026`)
+
+Untuk `/send-slip-emails`, lampiran dicari hanya di `public/download/{companyName}/{email_login}/` (folder disanitasi sesuai email user login) dengan format:
 `[periode].[template].[employeeId].[nama].[kodeUnique].pdf`.
 Pencarian menormalisasi separator periode (`2026.03`, `2026_03`, `2026/03`, `2026-03`) dan nama bulan (`april-2026`, `April 2026`, `apr-2026`) ke bentuk yang sama. Untuk format file bulk baru, kandidat diprioritaskan yang `employeeName` cocok; jika tidak ada, sistem fallback ke `employeeId` exact selama `periode` dan `template` cocok.
 Jika ditemukan lebih dari satu kandidat untuk baris yang sama, sistem memilih file paling baru (berdasarkan waktu file).
+Untuk `/send-event-weekly-payslip-emails`, lampiran dicari di folder yang sama dengan template tetap `event_weekly_payslip`, format filename sama, dan kandidat wajib cocok dengan `employeeId`/`NIK` serta `employeeName`. Endpoint ini tidak membutuhkan `batch_id`.
 SMTP: jika semua field SMTP di tabel `companies` terisi (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, opsional `smtp_secure`, `mail_from`) maka konfigurasi auth SMTP company dipakai; jika tidak lengkap, fallback ke `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`). `SMTP_USER` hanya dipakai untuk autentikasi SMTP, sedangkan pengirim email (`from`) wajib dari `MAIL_FROM` atau fallback `companies.mail_from`.
 
 Response 200:
@@ -777,9 +821,16 @@ Lookup lampiran berbasis metadata batch (`batch_id + template + match_key`).
 
 ---
 
-## 8) History Batch Generate BA
-- `GET /api/v1/batches?template=<ba-template>&page=1&perPage=10`
+## 8) History Batch Generate
+- `GET /api/v1/batches?template=<template>&page=1&perPage=10`
 - `GET /api/v1/batches/:batch_id?page=1&perPage=20`
+
+Template batch yang didukung:
+- `event_weekly_payslip`
+- semua template BA (`ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`, `ba-cancel-join`, `ba-resign`)
+- `cooperation_agreement`
+
+Catatan `event_weekly_payslip`: batch dibuat oleh `/api/v1/bulk/event_weekly_payslip`; `match_key` memakai `employeeId|employeeName`, dan `letter_no` bernilai `null`.
 
 Akses:
 - `user`/`admin`: hanya batch di company sendiri
@@ -810,7 +861,7 @@ GET http://localhost:3334/download/Contoh_Corp/user%40email.com/ba-penempatan.SA
   - `failed`: gagal enqueue job atau nodemailer error saat proses kirim.
   - `skipped`: email tidak masuk antrean karena validasi awal gagal (mis. penerima kosong atau lampiran slip tidak ditemukan).
 - Nilai `context`:
-  - `bulk-slip` untuk `/send-slip-emails`
+  - `bulk-slip` untuk `/send-slip-emails` dan `/send-event-weekly-payslip-emails`
   - `bulk-ba` untuk semua BA bulk send
   - `single-send` untuk `/send/{template}`
 - Jalankan migrasi sebelum memakai fitur ini: `node ace migration:run`
@@ -903,7 +954,7 @@ Contoh response 200:
   - `POST /api/v1/preview/ba/:template`
   - Headers: `Authorization: Bearer <JWT>`
   - Role: `user`, `admin`, `superadmin`
-  - Template didukung: semua template single yang tersedia (`payslip`, `insentif`, `thr`, semua `ba-*`, dan template dinamis aktif).
+  - Template didukung: semua template single yang tersedia (`payslip`, `insentif`, `thr`, `event_weekly_payslip`, semua `ba-*`, dan template dinamis aktif).
   - Body minimum mengikuti required fields template target.
   - Contoh body untuk `ba-penempatan`:
 ```json
@@ -1080,6 +1131,7 @@ Field update: `email`, `name`, `phone`, `notes`.
 - **musik**: surat perjanjian lisensi musik (lihat contoh di README).
 - **invoice**: invoice dengan tabel item, PPN default 11%.
 - **payslip**: slip gaji; earnings/deductions array atau kolom terpisah di Excel.
+- **event_weekly_payslip**: slip gaji mingguan event; logo Exel; pendapatan memakai `visitEarnings` array berisi `tgl_date` dan `tgl_value`; potongan memakai `adjustment`, `poTelat`, `kasbon`.
 - **insentif**: slip insentif; earnings khusus INSENTIF + custom.
 - **thr**: slip THR; earnings “THR” + custom.
 - **ba-penempatan**: berita acara penempatan MDS; header/footer otomatis, wilayah/outlet variabel.

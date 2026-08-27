@@ -6,6 +6,7 @@ const suite = use('Test/Suite')('Cooperation Agreement Template')
 const { test } = suite
 
 const template = require(path.join(process.cwd(), 'app', 'Templates', 'cooperation_agreement'))
+const CooperationAgreementService = use('App/Services/CooperationAgreementService')
 
 test('menerapkan bold, blok korespondensi, dan indent numerik', async ({ assert }) => {
   const doc = template(samplePayload())
@@ -64,6 +65,41 @@ test('menyembunyikan tunjangan bernilai 0 dan menomori ulang sub tunjangan', asy
   assert.isUndefined(paymentContinuation.columns)
 })
 
+test('menampilkan lima tunjangan aktif dengan penomoran dan indent yang sama', async ({ assert }) => {
+  const doc = template({
+    ...samplePayload(),
+    operationalCostAllowance: 250000,
+    tlAllowance: 150000
+  })
+  const allowanceItems = collectListItems(collectNodes(doc.content))
+    .filter((item) => /^3\.3\.\d+/.test(item.number))
+
+  assert.equal(allowanceItems.length, 5)
+  assert.deepEqual(allowanceItems.map((item) => item.number), ['3.3.1', '3.3.2', '3.3.3', '3.3.4', '3.3.5'])
+  assert.isTrue(allowanceItems.every((item) => item.margin === 52 && item.width === 44))
+  assert.isTrue(allowanceItems[3].text.includes('Tunjangan biaya operasional'))
+  assert.isTrue(allowanceItems[4].text.includes('Tunjangan TL'))
+})
+
+test('menyembunyikan tunjangan baru bernilai 0 atau blank dan menjaga nomor rapat', async ({ assert }) => {
+  const doc = template({
+    ...samplePayload(),
+    transportAllowance: 0,
+    mealAllowance: 300000,
+    phoneAllowance: '',
+    operationalCostAllowance: 250000,
+    tlAllowance: 0
+  })
+  const allowanceItems = collectListItems(collectNodes(doc.content))
+    .filter((item) => /^3\.3\.\d+/.test(item.number))
+
+  assert.equal(allowanceItems.length, 2)
+  assert.deepEqual(allowanceItems.map((item) => item.number), ['3.3.1', '3.3.2'])
+  assert.isTrue(allowanceItems[0].text.includes('Tunjangan makan'))
+  assert.isTrue(allowanceItems[1].text.includes('Tunjangan biaya operasional'))
+  assert.isFalse(allowanceItems.some((item) => item.text.includes('Tunjangan TL')))
+})
+
 test('menghilangkan bagian tunjangan dan menaikkan nomor berikutnya saat semua tunjangan 0', async ({ assert }) => {
   const doc = template({
     ...samplePayload(),
@@ -80,6 +116,18 @@ test('menghilangkan bagian tunjangan dan menaikkan nomor berikutnya saat semua t
   assert.isTrue(listItems.some((item) => item.number === '3.3.' && item.text.includes('seluruh pembayaran atas gaji')))
   assert.isTrue(listItems.some((item) => item.number === '3.4.' && item.text.includes('MITRA berhak mendapatkan upah')))
   assert.isTrue(listItems.some((item) => item.number === '3.5.' && item.text.includes('MITRA melaksanakan kemitraan')))
+})
+
+test('menormalisasi alias tunjangan baru dan tidak mewajibkan allowance', async ({ assert }) => {
+  const normalized = CooperationAgreementService.normalizeData({
+    ...samplePayloadWithoutAllowances(),
+    'tunjangan biaya operasional': '250.000',
+    'tunjangan TL': '150000'
+  })
+
+  assert.equal(normalized.operationalCostAllowance, 250000)
+  assert.equal(normalized.tlAllowance, 150000)
+  assert.deepEqual(CooperationAgreementService.validateData(samplePayloadWithoutAllowances()), [])
 })
 
 function samplePayload() {
@@ -112,6 +160,14 @@ function samplePayload() {
     picEmail: 'pic@example.com',
     picAddress: 'Alamat PIC'
   }
+}
+
+function samplePayloadWithoutAllowances() {
+  const data = samplePayload()
+  delete data.transportAllowance
+  delete data.mealAllowance
+  delete data.phoneAllowance
+  return data
 }
 
 function collectNodes(value, out = []) {

@@ -332,7 +332,9 @@ function activeAllowanceItems(data) {
   return [
     { label: 'Tunjangan transport', amount: allowanceAmount(data.transportAllowance, 'tunjangan transport'), fieldName: 'tunjangan transport' },
     { label: 'Tunjangan makan', amount: allowanceAmount(data.mealAllowance, 'tunjangan makan'), fieldName: 'tunjangan makan' },
-    { label: 'Tunjangan pulsa', amount: allowanceAmount(data.phoneAllowance, 'tunjangan pulsa'), fieldName: 'tunjangan pulsa' }
+    { label: 'Tunjangan pulsa', amount: allowanceAmount(data.phoneAllowance, 'tunjangan pulsa'), fieldName: 'tunjangan pulsa' },
+    { label: 'Tunjangan biaya operasional', amount: allowanceAmount(data.operationalCostAllowance, 'tunjangan biaya operasional'), fieldName: 'tunjangan biaya operasional' },
+    { label: 'Tunjangan TL', amount: allowanceAmount(data.tlAllowance, 'tunjangan TL'), fieldName: 'tunjangan TL' }
   ].filter((item) => item.amount > 0)
 }
 

@@ -3,36 +3,15 @@ informasi umum:
 1. core.pdf-generator.indinesia.id adalah backend
 2. ui-pdf-generator adalah frontend
 
+latar belakang:
+pada template cooperation_agreement saat ini 3 tunjangan (Tunjangan Transport, Tunjangan makan, dan Tunjangan pulsa)
 
 isi planning nya sebagai berikut:
-1. buatkan template baru mirip dengan payslip dengan nama event_weekly_payslip
-2. ganti logonya dengan core.pdf-generator.indinesia.id/resources/images/exel-logo.png
-3. Pada bagian "PENDAPATAN" yang menjadi komponen penambahnya adalah tanggal kunjungan, contoh:
-    25/07/2026 : 0
-    26/07/2026 : 0
-    27/07/2026 : 295.000
-    28/07/2026 : 295.000
-    ..
-    ..
-    .. sebanyak 7 hari Kerja
-
-4. Pada bagian potongan, komponen nya:
-    ADJ/DEDUCTION
-    PO TELAT
-    KASBON
-
-5. Pada bagian Nama Perusahaan, default nama nya : PT. EXEL INTEGRASI SOLUSINDO
-6. Dibawah nama Perusahaan, ganti "Slip Gaji" menjadi "SLIP GAJI"
-7. dibawah periode Tambahkan {{Deskripsi}}
-8. untuk generate bulk, header exel nya:
-    |NIK|STATUS|AREA|JABATAN|NPWP|JUMLAH HK|PENDAPATAN                         |POTONGAN                   |
-    |   |      |            |    |         |-----------------------------------|---------------------------|
-    |   |      |            |    |         | TGL1|TGL2| ... |TGL7              |ADJUSTMENT|POT TELAT|KASBON|
-    -------------------------------------------------------------------------------------------------------|
-    {{Row Data}}
-
-9. Implementasikan di frontend Bulk Generate PDF, Generate Single PDF, Send Single Email, Bulk Send Email
-
+1. tambah 2 lagi tunjangan yaitu: "Tunjangan biaya operasional" dan "Tunjangan TL"
+2. aturan sama kalau  nilainya 0/blank maka tidak di tampilkan
+3. penomoran dan indent mengikuti sebelumnya
+4. implementasikan di frontend /generate-pdf dan /bulk-generate
+5. untuk bulk generate, sesuaikan unduhan template excel nya 
 
 
 

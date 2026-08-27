@@ -1021,6 +1021,8 @@ function buildCooperationAgreementPayload(lower, opts) {
     transportAllowance: pick(['transportallowance', 'transport allowance', 'transport_allowance', 'tunjangantransport', 'tunjangan transport']),
     mealAllowance: pick(['mealallowance', 'meal allowance', 'meal_allowance', 'tunjanganmakan', 'tunjangan makan']),
     phoneAllowance: pick(['phoneallowance', 'phone allowance', 'phone_allowance', 'tunjanganpulsa', 'tunjangan pulsa']),
+    operationalCostAllowance: pick(['operationalcostallowance', 'operational cost allowance', 'operational_cost_allowance', 'tunjanganbiayaoperasional', 'tunjangan biaya operasional', 'biayaoperasionalallowance', 'biaya operasional allowance', 'biaya_operasional_allowance', 'biayaoperasional', 'biaya operasional']),
+    tlAllowance: pick(['tlallowance', 'tl allowance', 'tl_allowance', 'tunjangantl', 'tunjangan tl']),
     partnerBankAccountNumber: pick(['partnerbankaccountnumber', 'partner bank account number', 'partner_bank_account_number', 'nomorrekeningmitra', 'nomor rekening mitra']),
     partnerBankAccountName: pick(['partnerbankaccountname', 'partner bank account name', 'partner_bank_account_name', 'namarekeningmitra', 'nama rekening mitra']),
     partnerBankName: pick(['partnerbankname', 'partner bank name', 'partner_bank_name', 'namabankmitra', 'nama bank mitra']),

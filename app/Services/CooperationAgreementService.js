@@ -19,9 +19,6 @@ const REQUIRED_FIELDS = Object.freeze([
   'partnerEmail',
   'brand',
   'salary',
-  'transportAllowance',
-  'mealAllowance',
-  'phoneAllowance',
   'partnerBankAccountNumber',
   'partnerBankAccountName',
   'partnerBankName',
@@ -38,7 +35,9 @@ const MONEY_FIELDS = Object.freeze([
   ['salary', 'salary/gaji'],
   ['transportAllowance', 'tunjangan transport'],
   ['mealAllowance', 'tunjangan makan'],
-  ['phoneAllowance', 'tunjangan pulsa']
+  ['phoneAllowance', 'tunjangan pulsa'],
+  ['operationalCostAllowance', 'tunjangan biaya operasional'],
+  ['tlAllowance', 'tunjangan TL']
 ])
 
 class CooperationAgreementService {
@@ -78,6 +77,8 @@ class CooperationAgreementService {
     alias(out, 'transportAllowance', ['tunjanganTransport', 'tunjangan transport'])
     alias(out, 'mealAllowance', ['tunjanganMakan', 'tunjangan makan'])
     alias(out, 'phoneAllowance', ['tunjanganPulsa', 'tunjangan pulsa'])
+    alias(out, 'operationalCostAllowance', ['tunjanganBiayaOperasional', 'tunjangan biaya operasional', 'biayaOperasionalAllowance', 'biaya operasional'])
+    alias(out, 'tlAllowance', ['tunjanganTl', 'tunjanganTL', 'tunjangan tl', 'tunjangan TL'])
     alias(out, 'partnerBankAccountNumber', ['nomorRekeningMitra', 'nomor rekening mitra'])
     alias(out, 'partnerBankAccountName', ['namaRekeningMitra', 'nama rekening mitra'])
     alias(out, 'partnerBankName', ['namaBankMitra', 'nama bank mitra'])
