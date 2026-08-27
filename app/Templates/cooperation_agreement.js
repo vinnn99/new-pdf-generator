@@ -113,7 +113,10 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
       partyBlock('I.', [
         ['Nama', firstPartyName],
         ['Jabatan', firstPartyTitle],
-        ['Perusahaan', `${companyName} / TEMA Agency`]
+        ['Perusahaan', [
+          { text: companyName },
+          { text: ' / TEMA Agency', bold: true }
+        ]]
       ]),
       p(`Dalam hal ini bertindak mewakili secara sah untuk dan atas nama ${upper(companyName)}, yang selanjutnya disebut sebagai "${upper(companyName)}".`),
       partyBlock('II.', [
@@ -371,7 +374,7 @@ function partyBlock(prefix, rows) {
           body: rows.map(([label, value]) => [
             { text: label, style: 'tableCell' },
             { text: ':', style: 'tableCell' },
-            { text: val(value), style: 'tableCell' }
+            { text: Array.isArray(value) ? value : val(value), style: 'tableCell' }
           ])
         },
         layout: 'noBorders'
@@ -668,7 +671,7 @@ function buildBoldTerms(companyName) {
   add('PT Origin Magda Inovasi')
   add('PT. Origin Magda Inovasi')
   add('ORIGIN MAGDA INOVASI')
-  add('TEMA Agency')
+  // add('TEMA Agency')
   add('MITRA', true)
 
   const seen = new Set()
