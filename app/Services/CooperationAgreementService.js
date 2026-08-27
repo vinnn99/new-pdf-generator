@@ -79,6 +79,11 @@ class CooperationAgreementService {
     alias(out, 'phoneAllowance', ['tunjanganPulsa', 'tunjangan pulsa'])
     alias(out, 'operationalCostAllowance', ['tunjanganBiayaOperasional', 'tunjangan biaya operasional', 'biayaOperasionalAllowance', 'biaya operasional'])
     alias(out, 'tlAllowance', ['tunjanganTl', 'tunjanganTL', 'tunjangan tl', 'tunjangan TL'])
+    alias(out, 'transportAllowanceUnit', ['transportUnit', 'tunjanganTransportUnit', 'satuanTunjanganTransport', 'satuan tunjangan transport'])
+    alias(out, 'mealAllowanceUnit', ['mealUnit', 'tunjanganMakanUnit', 'satuanTunjanganMakan', 'satuan tunjangan makan'])
+    alias(out, 'phoneAllowanceUnit', ['phoneUnit', 'tunjanganPulsaUnit', 'satuanTunjanganPulsa', 'satuan tunjangan pulsa'])
+    alias(out, 'operationalCostAllowanceUnit', ['operationalCostUnit', 'tunjanganBiayaOperasionalUnit', 'satuanTunjanganBiayaOperasional', 'satuan tunjangan biaya operasional'])
+    alias(out, 'tlAllowanceUnit', ['tlUnit', 'tunjanganTlUnit', 'tunjanganTLUnit', 'satuanTunjanganTL', 'satuan tunjangan TL'])
     alias(out, 'partnerBankAccountNumber', ['nomorRekeningMitra', 'nomor rekening mitra'])
     alias(out, 'partnerBankAccountName', ['namaRekeningMitra', 'nama rekening mitra'])
     alias(out, 'partnerBankName', ['namaBankMitra', 'nama bank mitra'])
@@ -98,6 +103,16 @@ class CooperationAgreementService {
 
     for (const [field, label] of MONEY_FIELDS) {
       if (hasValue(out[field])) out[field] = NumberFormatService.parseInteger(out[field], { fieldName: label })
+    }
+
+    for (const field of [
+      'transportAllowanceUnit',
+      'mealAllowanceUnit',
+      'phoneAllowanceUnit',
+      'operationalCostAllowanceUnit',
+      'tlAllowanceUnit'
+    ]) {
+      out[field] = normalizeUnit(out[field])
     }
 
     if (hasValue(out.agreementDuration)) {
@@ -181,6 +196,11 @@ function alias(target, canonical, aliases) {
 
 function hasValue(value) {
   return !(value === undefined || value === null || (typeof value === 'string' && !value.trim()))
+}
+
+function normalizeUnit(value) {
+  if (!hasValue(value)) return ''
+  return String(value).trim().replace(/\s+/g, ' ')
 }
 
 function normalizeSegment(value) {

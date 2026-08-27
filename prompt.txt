@@ -4,18 +4,15 @@ informasi umum:
 2. ui-pdf-generator adalah frontend
 
 latar belakang:
-pada template cooperation_agreement saat ini 3 tunjangan (Tunjangan Transport, Tunjangan makan, dan Tunjangan pulsa)
+saat pada template cooperation_agreement semua tunjangan belum jelas apakah per bulan atau per hari atau per minggu atau yang lain
 
 isi planning nya sebagai berikut:
-1. tambah 2 lagi tunjangan yaitu: "Tunjangan biaya operasional" dan "Tunjangan TL"
-2. aturan sama kalau  nilainya 0/blank maka tidak di tampilkan
-3. penomoran dan indent mengikuti sebelumnya
+1. tambahkan satuan pada tiap tiap tunjangan
+2. satuan ditulis manual
+3. satuan nya menggunakan kata "per" contoh 300.000 (tiga ratus ribu) per bulan, 45.000 (Empat puluh lima ribu) per hari
 4. implementasikan di frontend /generate-pdf dan /bulk-generate
 5. untuk bulk generate, sesuaikan unduhan template excel nya 
-
-
-
-3. buatkan contoh pdf nya
+6. buatkan contoh pdf nya
 
 
 jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah

@@ -100,6 +100,54 @@ test('menyembunyikan tunjangan baru bernilai 0 atau blank dan menjaga nomor rapa
   assert.isFalse(allowanceItems.some((item) => item.text.includes('Tunjangan TL')))
 })
 
+test('menampilkan satuan tunjangan dengan format per tanpa duplikasi', async ({ assert }) => {
+  const doc = template({
+    ...samplePayload(),
+    transportAllowance: 45000,
+    transportAllowanceUnit: 'hari',
+    mealAllowance: 300000,
+    mealAllowanceUnit: 'per bulan',
+    phoneAllowance: 100000,
+    phoneAllowanceUnit: '  bulan  ',
+    operationalCostAllowance: 250000,
+    operationalCostAllowanceUnit: 'per   bulan',
+    tlAllowance: 150000,
+    tlAllowanceUnit: 'minggu'
+  })
+  const allowanceItems = collectListItems(collectNodes(doc.content))
+    .filter((item) => /^3\.3\.\d+/.test(item.number))
+
+  assert.isTrue(allowanceItems.some((item) => item.text.includes('Tunjangan transport') && item.text.includes('per hari')))
+  assert.isTrue(allowanceItems.some((item) => item.text.includes('Tunjangan makan') && item.text.includes('per bulan')))
+  assert.isTrue(allowanceItems.some((item) => item.text.includes('Tunjangan pulsa') && item.text.includes('per bulan')))
+  assert.isTrue(allowanceItems.some((item) => item.text.includes('Tunjangan biaya operasional') && item.text.includes('per bulan')))
+  assert.isTrue(allowanceItems.some((item) => item.text.includes('Tunjangan TL') && item.text.includes('per minggu')))
+  assert.isFalse(allowanceItems.some((item) => item.text.includes('per per')))
+})
+
+test('satuan kosong tidak mengubah format lama dan satuan pada nominal 0 tidak tampil', async ({ assert }) => {
+  const doc = template({
+    ...samplePayload(),
+    transportAllowance: 0,
+    transportAllowanceUnit: 'hari',
+    mealAllowance: 300000,
+    mealAllowanceUnit: '',
+    phoneAllowance: 0,
+    phoneAllowanceUnit: 'bulan',
+    operationalCostAllowance: 0,
+    operationalCostAllowanceUnit: 'per bulan',
+    tlAllowance: 0,
+    tlAllowanceUnit: 'minggu'
+  })
+  const allowanceItems = collectListItems(collectNodes(doc.content))
+    .filter((item) => /^3\.3\.\d+/.test(item.number))
+
+  assert.equal(allowanceItems.length, 1)
+  assert.isTrue(allowanceItems[0].text.includes('Tunjangan makan'))
+  assert.isFalse(allowanceItems[0].text.includes('per '))
+  assert.isFalse(allowanceItems.some((item) => item.text.includes('Tunjangan transport')))
+})
+
 test('menghilangkan bagian tunjangan dan menaikkan nomor berikutnya saat semua tunjangan 0', async ({ assert }) => {
   const doc = template({
     ...samplePayload(),
@@ -128,6 +176,23 @@ test('menormalisasi alias tunjangan baru dan tidak mewajibkan allowance', async 
   assert.equal(normalized.operationalCostAllowance, 250000)
   assert.equal(normalized.tlAllowance, 150000)
   assert.deepEqual(CooperationAgreementService.validateData(samplePayloadWithoutAllowances()), [])
+})
+
+test('menormalisasi alias satuan tunjangan', async ({ assert }) => {
+  const normalized = CooperationAgreementService.normalizeData({
+    ...samplePayload(),
+    'satuan tunjangan transport': ' hari ',
+    satuanTunjanganMakan: 'per   bulan',
+    satuanTunjanganPulsa: 'bulan',
+    satuanTunjanganBiayaOperasional: ' minggu ',
+    satuanTunjanganTL: 'per hari'
+  })
+
+  assert.equal(normalized.transportAllowanceUnit, 'hari')
+  assert.equal(normalized.mealAllowanceUnit, 'per bulan')
+  assert.equal(normalized.phoneAllowanceUnit, 'bulan')
+  assert.equal(normalized.operationalCostAllowanceUnit, 'minggu')
+  assert.equal(normalized.tlAllowanceUnit, 'per hari')
 })
 
 function samplePayload() {

@@ -1,4 +1,4 @@
-# Issue Planning: Tambah Tunjangan `cooperation_agreement`
+# Issue Planning: Satuan Tunjangan `cooperation_agreement`
 
 ## Status
 Draft perencanaan untuk diimplementasikan oleh junior programmer atau AI model biaya rendah.
@@ -9,42 +9,63 @@ Draft perencanaan untuk diimplementasikan oleh junior programmer atau AI model b
 - Template target: `cooperation_agreement`
 
 ## Latar Belakang
-Template `cooperation_agreement` saat ini memiliki 3 tunjangan:
-- `transportAllowance` / `Tunjangan Transport`
-- `mealAllowance` / `Tunjangan Makan`
-- `phoneAllowance` / `Tunjangan Pulsa`
+Pada template `cooperation_agreement`, semua tunjangan saat ini hanya menampilkan nominal. Belum jelas apakah nominal tersebut berlaku per bulan, per hari, per minggu, atau satuan lain.
 
-Perlu ditambahkan 2 tunjangan baru:
+Tunjangan yang perlu mendukung satuan:
+- `transportAllowance` / `Tunjangan transport`
+- `mealAllowance` / `Tunjangan makan`
+- `phoneAllowance` / `Tunjangan pulsa`
 - `operationalCostAllowance` / `Tunjangan biaya operasional`
 - `tlAllowance` / `Tunjangan TL`
 
-Aturan tampil mengikuti tunjangan existing: jika nominal `0`, kosong, atau tidak dikirim, item tunjangan tidak ditampilkan di PDF. Penomoran dan indent harus tetap mengikuti pola yang sudah ada.
+Satuan ditulis manual oleh user dan harus ditampilkan setelah nominal dengan pola kata `per`, contoh:
+- `Rp. 300.000 (tiga ratus ribu rupiah) per bulan`
+- `Rp. 45.000 (empat puluh lima ribu rupiah) per hari`
 
 ## Tujuan
-- Menambahkan dukungan 5 tunjangan pada template `cooperation_agreement`.
-- Memastikan PDF hanya menampilkan tunjangan dengan nominal lebih dari `0`.
-- Memastikan penomoran sub-poin tunjangan tetap berurutan untuk semua kombinasi tunjangan aktif/tidak aktif.
-- Mengimplementasikan field baru di frontend halaman `/generate-pdf` dan `/bulk-generate`.
+- Menambahkan field satuan manual untuk setiap tunjangan.
+- Menampilkan satuan di PDF setelah nominal dan terbilang.
+- Memastikan format satuan menggunakan kata `per`.
+- Mengimplementasikan input satuan di frontend `/generate-pdf`.
+- Mengimplementasikan kolom satuan di frontend `/bulk-generate`.
 - Menyesuaikan file template Excel bulk generate.
 - Membuat contoh PDF hasil implementasi untuk validasi manual.
 
+## Keputusan Field
+Gunakan field canonical berikut:
+
+- `transportAllowanceUnit`
+- `mealAllowanceUnit`
+- `phoneAllowanceUnit`
+- `operationalCostAllowanceUnit`
+- `tlAllowanceUnit`
+
+Isi field satuan adalah teks manual. Implementasi harus menerima dua gaya input:
+- User mengisi `bulan`, backend menampilkan `per bulan`.
+- User mengisi `per bulan`, backend tetap menampilkan `per bulan` dan tidak menjadi `per per bulan`.
+
+Jika satuan kosong, tampilkan nominal seperti perilaku lama tanpa tambahan satuan. Jangan gagal validasi hanya karena satuan kosong.
+
 ## Scope Backend
 
-### 1. Normalisasi dan Validasi Data
+### 1. Normalisasi Data
 File utama:
 - `app/Services/CooperationAgreementService.js`
 
 Rencana:
-- Tambahkan field canonical baru:
-  - `operationalCostAllowance`
-  - `tlAllowance`
-- Tambahkan kedua field ke daftar field uang/allowance agar diparse seperti tunjangan existing.
-- Tambahkan alias input untuk kompatibilitas API dan Excel:
-  - `operationalCostAllowance`: `tunjanganBiayaOperasional`, `tunjangan biaya operasional`, `biayaOperasionalAllowance`, `biaya operasional`
-  - `tlAllowance`: `tunjanganTl`, `tunjanganTL`, `tunjangan tl`, `tunjangan TL`
-- Pastikan nominal dari JSON dan Excel bisa berupa number atau string nominal yang sudah umum dipakai di sistem.
-- Pastikan nominal `0` valid dan tidak membuat request gagal.
-- Jika allowance existing saat ini required, tentukan apakah 2 allowance baru ikut required atau opsional. Rekomendasi: semua allowance boleh `0`, kosong, atau tidak dikirim selama rule PDF tetap benar.
+- Tambahkan normalisasi field satuan untuk 5 tunjangan.
+- Tambahkan alias agar input dari API dan Excel fleksibel.
+- Alias yang disarankan:
+  - `transportAllowanceUnit`: `transportUnit`, `tunjanganTransportUnit`, `satuanTunjanganTransport`, `satuan tunjangan transport`
+  - `mealAllowanceUnit`: `mealUnit`, `tunjanganMakanUnit`, `satuanTunjanganMakan`, `satuan tunjangan makan`
+  - `phoneAllowanceUnit`: `phoneUnit`, `tunjanganPulsaUnit`, `satuanTunjanganPulsa`, `satuan tunjangan pulsa`
+  - `operationalCostAllowanceUnit`: `operationalCostUnit`, `tunjanganBiayaOperasionalUnit`, `satuanTunjanganBiayaOperasional`, `satuan tunjangan biaya operasional`
+  - `tlAllowanceUnit`: `tlUnit`, `tunjanganTlUnit`, `tunjanganTLUnit`, `satuanTunjanganTL`, `satuan tunjangan TL`
+- Satuan tidak perlu masuk `requiredFields()`.
+- Sanitasi sederhana:
+  - trim whitespace
+  - collapse spasi ganda
+  - jika diawali `per `, jangan tambahkan `per` lagi saat render
 
 ### 2. Rendering PDF
 File utama:
@@ -52,49 +73,55 @@ File utama:
 - `resources/pdf-templates/cooperation_agreement.js`
 
 Rencana:
-- Tambahkan 2 item baru ke daftar allowance aktif.
-- Urutan tampilan allowance:
-  1. `Tunjangan transport`
-  2. `Tunjangan makan`
-  3. `Tunjangan pulsa`
-  4. `Tunjangan biaya operasional`
-  5. `Tunjangan TL`
-- Hanya allowance dengan nominal `> 0` yang ditampilkan.
-- Format nominal tetap memakai format rupiah terbilang existing.
-- Penomoran sub-poin tetap dinamis:
-  - Jika 5 tunjangan aktif, tampil `3.3.1` sampai `3.3.5`.
-  - Jika hanya sebagian aktif, nomor tetap rapat tanpa lompat.
-  - Jika semua tunjangan tidak aktif, blok tunjangan hilang dan nomor poin rekening/pembayaran naik seperti perilaku existing.
-- Indent item tunjangan baru harus sama dengan item tunjangan existing.
+- Saat allowance aktif, format teks tetap mengikuti pola existing:
+  - `{label} sebesar {nominal terbilang}.`
+- Tambahkan satuan setelah nominal terbilang jika tersedia:
+  - `{label} sebesar 300.000 (tiga ratus ribu) per bulan.`
+- Jika satuan kosong:
+  - `{label} sebesar 300.000 (tiga ratus ribu).`
+- Aturan tampil allowance tetap sama:
+  - nominal `0`, kosong, atau tidak dikirim tidak tampil
+  - satuan tidak boleh membuat allowance tampil jika nominalnya tidak aktif
+- Penomoran dan indent tetap mengikuti perilaku existing.
 
 ### 3. Bulk Generate Backend
 File yang kemungkinan disentuh:
 - `app/Controllers/Http/BulkPdfController.js`
 - `scripts/create-bulk-template.js`
-- `resources/templates/cooperation_agreement-bulk-template.xlsx` atau file template Excel terkait
+- `resources/templates/cooperation_agreement-bulk-template.xlsx`
 
 Rencana:
-- Tambahkan parsing kolom baru:
-  - `operationalCostAllowance`
-  - `tlAllowance`
-- Tambahkan dukungan alias kolom Excel:
-  - `Tunjangan Biaya Operasional`
-  - `Tunjangan TL`
-- Pastikan nilai kosong dari Excel diperlakukan sebagai tidak tampil.
-- Pastikan nilai `0` dari Excel tetap valid dan tidak tampil di PDF.
-- Pertahankan kompatibilitas kolom lama untuk 3 tunjangan existing.
+- Tambahkan parsing kolom satuan untuk 5 tunjangan.
+- Kolom canonical yang disarankan:
+  - `transportAllowanceUnit`
+  - `mealAllowanceUnit`
+  - `phoneAllowanceUnit`
+  - `operationalCostAllowanceUnit`
+  - `tlAllowanceUnit`
+- Alias kolom Excel yang disarankan:
+  - `Satuan Tunjangan Transport`
+  - `Satuan Tunjangan Makan`
+  - `Satuan Tunjangan Pulsa`
+  - `Satuan Tunjangan Biaya Operasional`
+  - `Satuan Tunjangan TL`
+- Pastikan data Excel `bulan`, `hari`, `minggu`, atau `per bulan` terbaca sebagai teks.
+- Pastikan kolom satuan kosong tetap valid.
 
 ### 4. Contoh PDF
 Setelah implementasi selesai, buat contoh PDF untuk validasi manual.
 
 Output yang disarankan:
-- `output/cooperation_agreement.five-allowances-sample.pdf`
+- `output/cooperation_agreement.allowance-units-sample.pdf`
 
 Data contoh:
-- Gunakan data partner dan perusahaan yang aman untuk sample.
-- Isi `salary` dengan nominal valid.
-- Isi sebagian atau semua allowance dengan nominal lebih dari `0` agar 2 tunjangan baru terlihat.
-- Buat juga skenario manual dengan salah satu tunjangan bernilai `0` untuk memastikan item tidak tampil.
+- Gunakan data sample aman.
+- Isi beberapa tunjangan dengan satuan berbeda:
+  - `transportAllowanceUnit`: `hari`
+  - `mealAllowanceUnit`: `hari`
+  - `phoneAllowanceUnit`: `bulan`
+  - `operationalCostAllowanceUnit`: `per bulan`
+  - `tlAllowanceUnit`: `minggu`
+- Pastikan PDF memperlihatkan variasi input tanpa menggandakan kata `per`.
 
 ## Scope Frontend
 
@@ -104,13 +131,17 @@ File yang kemungkinan disentuh:
 - `ui-pdf-generator/src/components/forms/GeneratePdfForm.jsx` jika ada logic khusus template
 
 Rencana:
-- Tambahkan field baru pada mapping template `cooperation_agreement`:
-  - `operationalCostAllowance`, label `Tunjangan Biaya Operasional`, type `number`
-  - `tlAllowance`, label `Tunjangan TL`, type `number`
-- Letakkan field baru setelah `phoneAllowance`.
-- Pastikan payload yang dikirim ke backend memakai nama canonical.
-- Jika allowance existing tidak wajib secara bisnis, field baru juga jangan dibuat required.
-- Jika allowance existing tetap required di UI, pastikan nilai `0` bisa disubmit.
+- Tambahkan field satuan setelah setiap field nominal tunjangan.
+- Field satuan bertipe text biasa.
+- Label yang disarankan:
+  - `Satuan Tunjangan Transport`
+  - `Satuan Tunjangan Makan`
+  - `Satuan Tunjangan Pulsa`
+  - `Satuan Tunjangan Biaya Operasional`
+  - `Satuan Tunjangan TL`
+- Placeholder yang disarankan: `bulan`, `hari`, `minggu`, atau `per bulan`.
+- Field satuan tidak required.
+- Payload tetap dikirim di `data` dengan nama canonical.
 
 ### 2. Halaman `/bulk-generate`
 File yang kemungkinan disentuh:
@@ -118,17 +149,15 @@ File yang kemungkinan disentuh:
 - `ui-pdf-generator/public/templates/cooperation_agreement.xlsx`
 
 Rencana:
-- Tambahkan hint kolom baru untuk mode `cooperation_agreement`:
-  - `operationalCostAllowance` / `Tunjangan Biaya Operasional`
-  - `tlAllowance` / `Tunjangan TL`
-- Update file template Excel unduhan `public/templates/cooperation_agreement.xlsx`.
-- Pastikan urutan kolom tunjangan di Excel mengikuti urutan PDF:
+- Tambahkan hint kolom satuan untuk mode `cooperation_agreement`.
+- Update file Excel unduhan `public/templates/cooperation_agreement.xlsx`.
+- Letakkan kolom satuan tepat setelah nominal tunjangan masing-masing, contoh:
   - `transportAllowance`
+  - `transportAllowanceUnit`
   - `mealAllowance`
-  - `phoneAllowance`
-  - `operationalCostAllowance`
-  - `tlAllowance`
-- Beri contoh nilai `0` atau kosong pada template Excel jika ingin menunjukkan bahwa tunjangan tersebut tidak ditampilkan.
+  - `mealAllowanceUnit`
+  - dan seterusnya
+- Isi sample Excel dengan contoh satuan manual seperti `hari`, `bulan`, dan `per bulan`.
 
 ## File yang Kemungkinan Disentuh
 
@@ -138,10 +167,10 @@ Backend:
 - `app/Services/CooperationAgreementService.js`
 - `app/Controllers/Http/BulkPdfController.js`
 - `scripts/create-bulk-template.js`
-- `resources/templates/cooperation_agreement-bulk-template.xlsx` atau file template Excel terkait
+- `resources/templates/cooperation_agreement-bulk-template.xlsx`
 - `test/unit/cooperation_agreement_template.spec.js`
 - `test/functional/api_endpoint_matrix.spec.js`
-- `output/cooperation_agreement.five-allowances-sample.pdf`
+- `output/cooperation_agreement.allowance-units-sample.pdf`
 
 Frontend:
 - `src/utils/templateFields.js`
@@ -156,60 +185,48 @@ Frontend:
   "template": "cooperation_agreement",
   "email": "mitra@example.com",
   "data": {
-    "partnerName": "Budi Mitra",
-    "salary": 5000000,
-    "transportAllowance": 100000,
+    "transportAllowance": 45000,
+    "transportAllowanceUnit": "hari",
     "mealAllowance": 300000,
+    "mealAllowanceUnit": "per bulan",
     "phoneAllowance": 100000,
+    "phoneAllowanceUnit": "bulan",
     "operationalCostAllowance": 250000,
-    "tlAllowance": 150000
+    "operationalCostAllowanceUnit": "bulan",
+    "tlAllowance": 150000,
+    "tlAllowanceUnit": "minggu"
   }
 }
 ```
 
-Contoh kombinasi tidak tampil:
-
-```json
-{
-  "template": "cooperation_agreement",
-  "email": "mitra@example.com",
-  "data": {
-    "partnerName": "Budi Mitra",
-    "salary": 5000000,
-    "transportAllowance": 0,
-    "mealAllowance": 300000,
-    "phoneAllowance": "",
-    "operationalCostAllowance": 250000,
-    "tlAllowance": 0
-  }
-}
-```
-
-Pada contoh kedua, PDF hanya menampilkan `Tunjangan makan` dan `Tunjangan biaya operasional`, dengan nomor sub-poin tetap berurutan.
+Output PDF yang diharapkan pada bagian tunjangan:
+- `Tunjangan transport sebesar 45.000 (empat puluh lima ribu) per hari.`
+- `Tunjangan makan sebesar 300.000 (tiga ratus ribu) per bulan.`
+- `Tunjangan pulsa sebesar 100.000 (seratus ribu) per bulan.`
+- `Tunjangan biaya operasional sebesar 250.000 (dua ratus lima puluh ribu) per bulan.`
+- `Tunjangan TL sebesar 150.000 (seratus lima puluh ribu) per minggu.`
 
 ## Skenario Test
 Bagian ini sengaja hanya berisi skenario high-level. Detail mock, assertion granular, fixture, dan struktur test diserahkan ke implementor.
 
-- Generate PDF `cooperation_agreement` berhasil saat 5 tunjangan bernilai lebih dari `0`.
-- PDF menampilkan `Tunjangan biaya operasional` dan `Tunjangan TL` dengan format nominal yang benar.
-- PDF menyembunyikan tunjangan baru saat nilainya `0`, kosong, atau tidak dikirim.
-- Penomoran dan indent tetap benar saat semua tunjangan aktif.
-- Penomoran dan indent tetap benar saat hanya sebagian tunjangan aktif.
-- Saat semua tunjangan bernilai `0`/kosong, blok tunjangan hilang dan nomor poin berikutnya naik.
-- Backend menerima alias field baru dari JSON dan Excel.
-- Bulk generate membaca kolom `Tunjangan Biaya Operasional` dan `Tunjangan TL` dari Excel.
-- Frontend `/generate-pdf` menampilkan 2 field tunjangan baru dan mengirim payload canonical.
-- Frontend `/bulk-generate` menampilkan hint kolom baru dan link template Excel tetap berfungsi.
-- Template Excel unduhan `cooperation_agreement.xlsx` memiliki kolom 2 tunjangan baru.
+- Generate PDF menampilkan satuan untuk setiap tunjangan aktif.
+- Input satuan `bulan` tampil sebagai `per bulan`.
+- Input satuan `per bulan` tetap tampil sebagai `per bulan`, bukan `per per bulan`.
+- Tunjangan bernilai `0`, kosong, atau tidak dikirim tetap tidak tampil walaupun satuannya diisi.
+- Tunjangan aktif tanpa satuan tetap tampil dengan format nominal lama.
+- Penomoran dan indent tunjangan tidak berubah setelah satuan ditambahkan.
+- Bulk generate membaca kolom satuan dari Excel dan menampilkannya di PDF.
+- Frontend `/generate-pdf` menampilkan field satuan untuk semua tunjangan.
+- Frontend `/bulk-generate` menampilkan hint kolom satuan.
+- Template Excel unduhan memiliki kolom satuan di posisi yang sesuai.
 - Contoh PDF berhasil dibuat dan bisa dipakai untuk validasi manual.
 
 ## Acceptance Criteria
-- Template `cooperation_agreement` mendukung total 5 tunjangan.
-- Dua field baru tersedia di backend: `operationalCostAllowance` dan `tlAllowance`.
-- Label PDF untuk field baru adalah `Tunjangan biaya operasional` dan `Tunjangan TL`.
-- Nilai `0`, kosong, atau missing tidak tampil di PDF.
-- Penomoran dan indent mengikuti perilaku tunjangan existing.
-- Frontend `/generate-pdf` memiliki input untuk 2 tunjangan baru.
-- Frontend `/bulk-generate` memiliki hint kolom dan template Excel yang sudah diperbarui.
-- File contoh PDF tersedia di `output/cooperation_agreement.five-allowances-sample.pdf`.
+- Semua tunjangan `cooperation_agreement` mendukung satuan manual.
+- Satuan ditampilkan dengan format kata `per`.
+- Satuan kosong tidak menyebabkan validasi gagal.
+- Tidak ada duplikasi kata `per`.
+- Frontend `/generate-pdf` mendukung input satuan.
+- Frontend `/bulk-generate` mendukung kolom satuan dan template Excel sudah diperbarui.
+- File contoh PDF tersedia di `output/cooperation_agreement.allowance-units-sample.pdf`.
 - Instruksi test tetap berupa skenario high-level, bukan detail implementasi unit test.

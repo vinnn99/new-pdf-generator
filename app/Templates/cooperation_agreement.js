@@ -311,7 +311,7 @@ function requirementPaymentItems(data, companyName) {
     const allowanceNumber = `3.${nextSubNumber}`
     beforeBankTable.push(`${allowanceNumber} MITRA sepakat mendapatkan upah dengan tunjangan sebagai berikut:`)
     allowanceItems.forEach((item, index) => {
-      beforeBankTable.push(`${allowanceNumber}.${index + 1} ${item.label} sebesar ${NumberFormatService.formatRupiahWithWords(item.amount, item.fieldName)}.`)
+      beforeBankTable.push(`${allowanceNumber}.${index + 1} ${item.label} sebesar ${formatAllowanceAmount(item)}.`)
     })
     beforeBankTable.push(continuationOf(allowanceNumber, `Seluruh pembayaran tersebut dilakukan setiap bulan dan dapat dilakukan pemotongan oleh ${upper(companyName)} untuk BPJS Ketenagakerjaan sesuai dengan aturan yang berlaku, jika MITRA mendapatkan Tunjangan BPJS dari pihak Principal dan/atau Brand.`))
     nextSubNumber += 1
@@ -330,12 +330,24 @@ function requirementPaymentItems(data, companyName) {
 
 function activeAllowanceItems(data) {
   return [
-    { label: 'Tunjangan transport', amount: allowanceAmount(data.transportAllowance, 'tunjangan transport'), fieldName: 'tunjangan transport' },
-    { label: 'Tunjangan makan', amount: allowanceAmount(data.mealAllowance, 'tunjangan makan'), fieldName: 'tunjangan makan' },
-    { label: 'Tunjangan pulsa', amount: allowanceAmount(data.phoneAllowance, 'tunjangan pulsa'), fieldName: 'tunjangan pulsa' },
-    { label: 'Tunjangan biaya operasional', amount: allowanceAmount(data.operationalCostAllowance, 'tunjangan biaya operasional'), fieldName: 'tunjangan biaya operasional' },
-    { label: 'Tunjangan TL', amount: allowanceAmount(data.tlAllowance, 'tunjangan TL'), fieldName: 'tunjangan TL' }
+    { label: 'Tunjangan transport', amount: allowanceAmount(data.transportAllowance, 'tunjangan transport'), fieldName: 'tunjangan transport', unit: data.transportAllowanceUnit },
+    { label: 'Tunjangan makan', amount: allowanceAmount(data.mealAllowance, 'tunjangan makan'), fieldName: 'tunjangan makan', unit: data.mealAllowanceUnit },
+    { label: 'Tunjangan pulsa', amount: allowanceAmount(data.phoneAllowance, 'tunjangan pulsa'), fieldName: 'tunjangan pulsa', unit: data.phoneAllowanceUnit },
+    { label: 'Tunjangan biaya operasional', amount: allowanceAmount(data.operationalCostAllowance, 'tunjangan biaya operasional'), fieldName: 'tunjangan biaya operasional', unit: data.operationalCostAllowanceUnit },
+    { label: 'Tunjangan TL', amount: allowanceAmount(data.tlAllowance, 'tunjangan TL'), fieldName: 'tunjangan TL', unit: data.tlAllowanceUnit }
   ].filter((item) => item.amount > 0)
+}
+
+function formatAllowanceAmount(item) {
+  const amount = NumberFormatService.formatRupiahWithWords(item.amount, item.fieldName)
+  const unit = allowanceUnitSuffix(item.unit)
+  return unit ? `${amount} ${unit}` : amount
+}
+
+function allowanceUnitSuffix(value) {
+  const unit = String(value || '').trim().replace(/\s+/g, ' ')
+  if (!unit) return ''
+  return /^per\s+/i.test(unit) ? unit : `per ${unit}`
 }
 
 function allowanceAmount(value, fieldName) {
