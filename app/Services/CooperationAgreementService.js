@@ -3,7 +3,9 @@
 const NumberFormatService = use('App/Services/NumberFormatService')
 
 const TEMPLATE = 'cooperation_agreement'
+const EXEL_TEMPLATE = 'exel_cooperation_agreement'
 const DEFAULT_COMPANY_NAME = 'PT. ORIGIN MAGDA INOVASI'
+const EXEL_DEFAULT_COMPANY_NAME = 'PT. EXEL INTEGRASI SOLUSINDO'
 const ROMAN_MONTH = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
 
 const REQUIRED_FIELDS = Object.freeze([
@@ -49,17 +51,32 @@ class CooperationAgreementService {
     return DEFAULT_COMPANY_NAME
   }
 
+  static get EXEL_TEMPLATE() {
+    return EXEL_TEMPLATE
+  }
+
+  static get EXEL_DEFAULT_COMPANY_NAME() {
+    return EXEL_DEFAULT_COMPANY_NAME
+  }
+
   static requiredFields() {
     return REQUIRED_FIELDS.slice()
   }
 
   static isTemplate(template) {
-    return String(template || '').trim().toLowerCase() === TEMPLATE
+    const normalized = String(template || '').trim().toLowerCase()
+    return normalized === TEMPLATE || normalized === EXEL_TEMPLATE
   }
 
-  static normalizeData(data = {}) {
+  static isExelTemplate(template) {
+    return String(template || '').trim().toLowerCase() === EXEL_TEMPLATE
+  }
+
+  static normalizeData(data = {}, template = null) {
     const source = data && typeof data === 'object' && !Array.isArray(data) ? data : {}
     const out = { ...source }
+    const requestedTemplate = String(template || source.template || '').trim().toLowerCase()
+    const isExel = requestedTemplate === EXEL_TEMPLATE || this.isExelTemplate(out.template)
 
     alias(out, 'companyName', ['namaPerusahaan', 'nama perusahaan', 'company_name'])
     alias(out, 'firstPartyName', ['pihak1Nama', 'pihak 1 nama', 'first_party_name'])
@@ -99,7 +116,8 @@ class CooperationAgreementService {
     alias(out, 'directorSignatureUrl', ['signatureDirectorUrl', 'signature direktur'])
     alias(out, 'partnerSignatureUrl', ['signatureMitraUrl', 'signature mitra'])
 
-    if (!hasValue(out.companyName)) out.companyName = DEFAULT_COMPANY_NAME
+    if (!hasValue(out.companyName)) out.companyName = isExel ? EXEL_DEFAULT_COMPANY_NAME : DEFAULT_COMPANY_NAME
+    if (isExel && !hasValue(out.logoPath) && !hasValue(out.companyLogoPath)) out.logoPath = 'resources/images/logo-old.png'
 
     for (const [field, label] of MONEY_FIELDS) {
       if (hasValue(out[field])) out[field] = NumberFormatService.parseInteger(out[field], { fieldName: label })
@@ -169,9 +187,11 @@ class CooperationAgreementService {
     return errors
   }
 
-  static buildPreviewLetterNo(now = new Date()) {
+  static buildPreviewLetterNo(now = new Date(), template = TEMPLATE) {
     const parts = getDateParts(now)
-    return `PREVIEW/HRD-OMI/PKM/${parts.romanMonth}/${parts.year}`
+    const normalizedTemplate = String(template || TEMPLATE).trim().toLowerCase()
+    const officeCode = normalizedTemplate === EXEL_TEMPLATE ? 'HRD-EIS' : 'HRD-OMI'
+    return `PREVIEW/${officeCode}/PKM/${parts.romanMonth}/${parts.year}`
   }
 
   static buildMatchKey(payloadData) {

@@ -168,7 +168,8 @@ class SingleEmailController {
         try {
           const numbering = await CooperationAgreementLetterNoService.nextLetterNo({
             companyId: company.company_id,
-            createdBy: user.id
+            createdBy: user.id,
+            template: normalizedTemplate
           })
           data.letterNo = numbering.letterNo
         } catch (err) {

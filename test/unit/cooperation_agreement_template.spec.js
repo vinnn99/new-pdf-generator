@@ -195,6 +195,17 @@ test('menormalisasi alias satuan tunjangan', async ({ assert }) => {
   assert.equal(normalized.tlAllowanceUnit, 'per hari')
 })
 
+test('mengakui template exel_cooperation_agreement sebagai alias cooperation agreement', async ({ assert }) => {
+  assert.isTrue(CooperationAgreementService.isTemplate('exel_cooperation_agreement'))
+
+  const exelPayload = { ...samplePayload() }
+  delete exelPayload.companyName
+
+  const normalized = CooperationAgreementService.normalizeData(exelPayload, 'exel_cooperation_agreement')
+  assert.equal(normalized.companyName, 'PT. EXEL INTEGRASI SOLUSINDO')
+  assert.equal(normalized.logoPath, 'resources/images/logo-old.png')
+})
+
 function samplePayload() {
   return {
     companyName: 'PT. Contoh Company Indonesia',

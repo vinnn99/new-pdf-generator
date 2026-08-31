@@ -118,7 +118,8 @@ class PdfController {
         try {
           const numbering = await CooperationAgreementLetterNoService.nextLetterNo({
             companyId: company.company_id,
-            createdBy: user ? user.id : null
+            createdBy: user ? user.id : null,
+            template: normalizedTemplate
           })
           payload.data.letterNo = numbering.letterNo
         } catch (err) {

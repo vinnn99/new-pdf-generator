@@ -364,6 +364,35 @@ class BulkEmailController {
     return this._sendBaTemplate({ request, response, auth }, cfg)
   }
 
+  async sendExelCooperationAgreement({ request, response, auth }) {
+    const cfg = {
+      template: 'exel_cooperation_agreement',
+      label: 'Exel Cooperation Agreement',
+      context: 'bulk-exel-cooperation-agreement',
+      extractFields: extractCooperationAgreementMatchFields,
+      buildMatchKey: (fields) => CooperationAgreementService.buildMatchKey(fields),
+      validateFields: (fields) => {
+        const missing = []
+        if (!hasValue(fields.partnerName)) missing.push('partnerName')
+        if (!hasValue(fields.partnerEmail) && !hasValue(fields.partnerIdentityNumber)) {
+          missing.push('partnerEmail/partnerIdentityNumber')
+        }
+        return missing
+      },
+      subject: (f, _company, item) => `Cooperation Agreement - ${f.partnerName || (item && item.letter_no) || ''}`,
+      body: (f, company, item) => [
+        `Yth. ${f.partnerName || 'Bapak/Ibu'},`,
+        '',
+        'Berikut terlampir dokumen Exel Cooperation Agreement.',
+        item && item.letter_no ? `Nomor Surat: ${item.letter_no}` : null,
+        '',
+        company && company.name ? company.name : 'PT. EXEL INTEGRASI SOLUSINDO',
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ].filter(Boolean).join('\n')
+    }
+    return this._sendBaTemplate({ request, response, auth }, cfg)
+  }
+
   /**
    * Generic sender for batch-based letter templates with lookup via generation batch metadata.
    * cfg: {
@@ -1004,7 +1033,7 @@ function inferSlipTemplateFromTitle(title) {
 
 function normalizeSlipTemplate(template) {
   const normalized = normalizeSlipSegment(template).toLowerCase()
-  if (['payslip', 'insentif', 'thr', 'event_weekly_payslip'].includes(normalized)) return normalized
+  if (['payslip', 'insentif', 'thr', 'exel-payslip', 'event_weekly_payslip'].includes(normalized)) return normalized
   return ''
 }
 

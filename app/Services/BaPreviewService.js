@@ -86,7 +86,7 @@ class BaPreviewService {
         data: payloadData
       })
       payloadData.companyName = payloadData.companyName || CooperationAgreementService.DEFAULT_COMPANY_NAME
-      payloadData.letterNo = CooperationAgreementService.buildPreviewLetterNo()
+      payloadData.letterNo = CooperationAgreementService.buildPreviewLetterNo(new Date(), normalizedTemplate)
     }
 
     const resolvedTemplate = await TemplateResolver.resolve(normalizedTemplate, {

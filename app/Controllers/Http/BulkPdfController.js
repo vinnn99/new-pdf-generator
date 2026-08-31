@@ -74,6 +74,10 @@ class BulkPdfController {
     return this._handleExcel(ctx, CooperationAgreementService.TEMPLATE)
   }
 
+  async exelCooperationAgreementFromExcel(ctx) {
+    return this._handleExcel(ctx, 'exel_cooperation_agreement')
+  }
+
   /**
    * mode: payslip | insentif | thr
    */
@@ -208,7 +212,8 @@ class BulkPdfController {
                   })
                   : await CooperationAgreementLetterNoService.nextLetterNo({
                     companyId: company.company_id,
-                    createdBy: user.id
+                    createdBy: user.id,
+                    template: mode
                   })
                 letterNo = numbering.letterNo
                 payload.data.letterNo = letterNo
@@ -450,6 +455,7 @@ function buildPayloadForMode(lower, mode, opts) {
   if (mode === 'thr') return buildThrPayload(lower, opts)
   if (mode === 'exel-payslip') return buildExelPayslipPayload(lower, opts)
   if (mode === 'event_weekly_payslip') return buildEventWeeklyPayslipPayload(lower, opts)
+  if (mode === 'exel_cooperation_agreement') return buildCooperationAgreementPayload(lower, opts, 'exel_cooperation_agreement')
   if (mode === CooperationAgreementService.TEMPLATE) return buildCooperationAgreementPayload(lower, opts)
   if (mode === 'ba-penempatan') return buildBaPenempatanPayload(lower, opts)
   if (mode === 'ba-request-id') return buildBaRequestIdPayload(lower, opts)
@@ -1028,14 +1034,15 @@ function buildBaResignPayload(lower, opts) {
   return payload
 }
 
-function buildCooperationAgreementPayload(lower, opts) {
+function buildCooperationAgreementPayload(lower, opts, templateName = CooperationAgreementService.TEMPLATE) {
   const payload = basePayload(lower, opts)
-  payload.template = CooperationAgreementService.TEMPLATE
+  const isExel = templateName === 'exel_cooperation_agreement'
+  payload.template = templateName
   const pick = (keys) => pickFromLower(lower, keys)
 
   payload.data = {
     ...payload.data,
-    companyName: pick(['companyname', 'company name', 'company_name', 'namaperusahaan', 'nama perusahaan']) || CooperationAgreementService.DEFAULT_COMPANY_NAME,
+    companyName: pick(['companyname', 'company name', 'company_name', 'namaperusahaan', 'nama perusahaan']) || (isExel ? 'PT. EXEL INTEGRASI SOLUSINDO' : CooperationAgreementService.DEFAULT_COMPANY_NAME),
     logoUrl: pick(['logourl', 'logo url', 'logo_url', 'logofile', 'logo file', 'logo_file', 'companylogourl', 'company logo url', 'company_logo_url']),
     logoPath: pick(['logopath', 'logo path', 'logo_path', 'logofilepath', 'logo file path', 'logo_file_path', 'companylogopath', 'company logo path', 'company_logo_path']),
     letterNo: pick(['letterno', 'letter no', 'no surat', 'letter_number', 'letter number']),

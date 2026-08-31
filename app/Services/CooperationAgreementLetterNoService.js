@@ -11,21 +11,24 @@ class CooperationAgreementLetterNoService {
     return DEFAULT_TIMEZONE
   }
 
-  static async nextLetterNo({ companyId, createdBy = null, trx = null } = {}) {
+  static async nextLetterNo({ companyId, createdBy = null, trx = null, template = CooperationAgreementService.TEMPLATE } = {}) {
     if (!companyId) throw new Error('companyId wajib diisi untuk generate nomor PKM')
+
+    const requestedTemplate = String(template || CooperationAgreementService.TEMPLATE).trim().toLowerCase()
+    const isExel = requestedTemplate === CooperationAgreementService.EXEL_TEMPLATE
 
     const run = async (trxLocal) => {
       const now = new Date()
       const company = await trxLocal.table('companies').where('company_id', companyId).first()
       if (!company) throw new Error('Company tidak ditemukan')
 
-      const counterFilter = { company_id: companyId, template: CooperationAgreementService.TEMPLATE }
+      const counterFilter = { company_id: companyId, template: requestedTemplate }
       let counterRow = await trxLocal.table('company_pkm_numbering_counters').where(counterFilter).forUpdate().first()
       if (!counterRow) {
         try {
           await trxLocal.table('company_pkm_numbering_counters').insert({
             company_id: companyId,
-            template: CooperationAgreementService.TEMPLATE,
+            template: requestedTemplate,
             last_seq: 0,
             created_by: createdBy || null,
             created_at: now,
@@ -46,11 +49,13 @@ class CooperationAgreementLetterNoService {
       })
 
       const dateParts = getDateParts(DEFAULT_TIMEZONE)
+      const officeCode = isExel ? 'HRD-EIS' : 'HRD-OMI'
       return {
-        letterNo: `${nextSeq}/HRD-OMI/PKM/${dateParts.romanMonth}/${dateParts.year}`,
+        letterNo: `${nextSeq}/${officeCode}/PKM/${dateParts.romanMonth}/${dateParts.year}`,
         seq: nextSeq,
-        template: CooperationAgreementService.TEMPLATE,
-        timezone: DEFAULT_TIMEZONE
+        template: requestedTemplate,
+        timezone: DEFAULT_TIMEZONE,
+        officeCode
       }
     }
 

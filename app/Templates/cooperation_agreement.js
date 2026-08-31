@@ -15,9 +15,11 @@ const INDENTED_CONTENT_MARGIN_LEFT = contentMarginForNumber('1.1')
 module.exports = function cooperationAgreementTemplate(payloadData = {}) {
   const data = CooperationAgreementService.normalizeData(payloadData)
   const companyName = val(data.companyName, CooperationAgreementService.DEFAULT_COMPANY_NAME)
+  const isExelTemplate = CooperationAgreementService.isExelTemplate(data.template || payloadData.template)
   const partnerName = val(data.partnerName)
   const firstPartyName = val(data.firstPartyName)
   const firstPartyTitle = val(data.firstPartyTitle)
+  const companySubLabel = isExelTemplate ? companyName : `${companyName} / TEMA Agency`
   const styleText = createTextStyler(companyName)
   const letterDate = data.letterDate || data.agreementDate || new Date().toISOString()
   const brand = val(data.brand)
@@ -59,6 +61,16 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
   const hasFooter = fs.existsSync(footerImage)
   const pageWidth = 595.28
   const pageHeight = 841.89
+  const logoFit = (() => {
+    const explicitHeight = Number(data.logoHeight)
+    if (Number.isFinite(explicitHeight) && explicitHeight > 0) {
+      return [190, explicitHeight]
+    }
+    if (typeof logoImage === 'string' && logoImage.toLowerCase().includes('logo-old.png')) {
+      return [190, 28]
+    }
+    return undefined
+  })()
 
   const docDefinition = {
     pageSize: 'A4',
@@ -73,14 +85,14 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
       const background = logoImage
         ? [{
             image: logoImage,
-            width: logoWidth,
-            absolutePosition: { x: pw - 54 - logoWidth, y: 28 }
+            ...(logoFit ? { fit: logoFit } : { width: logoWidth }),
+            absolutePosition: { x: 54, y: 28 }
           }]
         : [{
           text: 'ORIGIN MAGDA INOVASI',
           width: logoWidth,
-          alignment: 'right',
-          absolutePosition: { x: pw - 54 - logoWidth, y: 30 },
+          alignment: 'left',
+          absolutePosition: { x: 54, y: 30 },
           color: '#00a6a6',
           bold: true,
           fontSize: 15,
@@ -115,7 +127,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
         ['Jabatan', firstPartyTitle],
         ['Perusahaan', [
           { text: companyName },
-          { text: ' / TEMA Agency', bold: true }
+          ...(isExelTemplate ? [] : [{ text: ' / TEMA Agency', bold: true }])
         ]]
       ]),
       p(`Dalam hal ini bertindak mewakili secara sah untuk dan atas nama ${upper(companyName)}, yang selanjutnya disebut sebagai "${upper(companyName)}".`),

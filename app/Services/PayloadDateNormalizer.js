@@ -16,7 +16,8 @@ const DATE_FIELDS_BY_TEMPLATE = Object.freeze({
   'ba-terminated': ['terminateDate', 'letterDate'],
   'ba-cancel-join': ['cancelJoinDate', 'letterDate'],
   'ba-resign': ['birthDate', 'effectiveResignDate', 'letterDate'],
-  cooperation_agreement: ['letterDate', 'partnerBirthDate']
+  cooperation_agreement: ['letterDate', 'partnerBirthDate'],
+  exel_cooperation_agreement: ['letterDate', 'partnerBirthDate']
 })
 
 class PayloadDateNormalizer {
