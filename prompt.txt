@@ -1,18 +1,16 @@
-buatkan issue.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+buatkan issue-slip-exel.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 informasi umum:
 1. core.pdf-generator.indinesia.id adalah backend
 2. ui-pdf-generator adalah frontend
 
+
 latar belakang:
-saat pada template cooperation_agreement semua tunjangan belum jelas apakah per bulan atau per hari atau per minggu atau yang lain
 
 isi planning nya sebagai berikut:
-1. tambahkan satuan pada tiap tiap tunjangan
-2. satuan ditulis manual
-3. satuan nya menggunakan kata "per" contoh 300.000 (tiga ratus ribu) per bulan, 45.000 (Empat puluh lima ribu) per hari
-4. implementasikan di frontend /generate-pdf dan /bulk-generate
-5. untuk bulk generate, sesuaikan unduhan template excel nya 
-6. buatkan contoh pdf nya
+1. buatkan template "exel-payslip" yang templatenya mirip seperti template payslip hanya saja logonya ganti resources/images/logo-old.png
+2. Secara default Nama Perusahaan nya adalah "PT. EXEL INTEGRASI SOLUSINDO"
+3. Background warna "PEndapatan" dan Potongan   adalah "#d92d2d"
+4. implemtasikan ke frontend di "Generate Single PDF", "Bulk Generate PDF" 
 
-
+buat issue secara detail termasuk kira-kira apa saja file yang harus di modifikasi atau di create
 jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah

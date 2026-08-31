@@ -6,7 +6,7 @@ const path = require('path')
 const DEFAULT_COMPANY_NAME = 'PT. EXEL INTEGRASI SOLUSINDO'
 const DEFAULT_SLIP_TITLE = 'SLIP GAJI'
 const VISIT_DAYS = 7
-const LOGO_BLUE = '#20A0F0'
+const LOGO_BLUE = '#d92d2d'
 
 module.exports = function eventWeeklyPayslipTemplate(payloadData = {}) {
   const data = normalizePayload(payloadData)
@@ -16,7 +16,7 @@ module.exports = function eventWeeklyPayslipTemplate(payloadData = {}) {
     minimumFractionDigits: 0
   })
   const printedAt = formatDateLong(new Date())
-  const logoPath = path.join(__dirname, '..', '..', 'resources', 'images', 'exel-logo.png')
+  const logoPath = path.join(__dirname, '..', '..', 'resources', 'images', 'logo-old.png')
   const hasLogo = fs.existsSync(logoPath)
 
   const earningsTotal = data.visitEarnings.reduce((sum, item) => sum + num(item.amount), 0)
