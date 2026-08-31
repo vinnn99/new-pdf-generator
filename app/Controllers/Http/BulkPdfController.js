@@ -26,6 +26,10 @@ class BulkPdfController {
     return this._handleExcel(ctx, 'thr')
   }
 
+  async exelPayslipFromExcel(ctx) {
+    return this._handleExcel(ctx, 'exel-payslip')
+  }
+
   async eventWeeklyPayslipFromExcel(ctx) {
     return this._handleExcel(ctx, 'event_weekly_payslip')
   }
@@ -325,6 +329,7 @@ class BulkPdfController {
 }
 
 function defaultSlipTitleForMode(mode) {
+  if (mode === 'exel-payslip') return 'SLIP GAJI'
   if (mode === 'event_weekly_payslip') return 'SLIP GAJI'
   if (mode === 'insentif') return 'Payslip Insentif'
   if (mode === 'thr') return 'Payslip THR'
@@ -443,6 +448,7 @@ function parseExcelDate(val) {
 function buildPayloadForMode(lower, mode, opts) {
   if (mode === 'insentif') return buildInsentifPayload(lower, opts)
   if (mode === 'thr') return buildThrPayload(lower, opts)
+  if (mode === 'exel-payslip') return buildExelPayslipPayload(lower, opts)
   if (mode === 'event_weekly_payslip') return buildEventWeeklyPayslipPayload(lower, opts)
   if (mode === CooperationAgreementService.TEMPLATE) return buildCooperationAgreementPayload(lower, opts)
   if (mode === 'ba-penempatan') return buildBaPenempatanPayload(lower, opts)
@@ -472,6 +478,35 @@ function basePayload(lower, opts) {
 
   if (callback) payload.callback = callback
   payload.data = { ...dataJson }
+
+  return payload
+}
+
+function buildExelPayslipPayload(lower, opts) {
+  const payload = buildPayslipPayload(lower, opts)
+  payload.template = 'exel-payslip'
+  payload.data = {
+    ...payload.data,
+    companyName: lower.companyname || lower.company_name || opts.defaultCompany || 'PT. EXEL INTEGRASI SOLUSINDO',
+    slipTitle: lower.sliptitle || lower.slip_title || opts.defaultSlipTitle || 'SLIP GAJI',
+    employeeName: lower.employeename || lower.employee_name || lower.nama || lower['nama karyawan'],
+    employeeId: lower.employeeid || lower.employee_id || lower.nik,
+    position: lower.position || lower.jabatan,
+    department: lower.department || lower.departement || lower.departemen,
+    period: formatPeriodValue(parseSlipPeriod(lower) || lower.period || lower.periode),
+    jumlahHK: lower.jumlahhk || lower['jumlah hk'] || lower.jumlah_hk || lower.targethk || lower.target_hk,
+    joinDate: parseSlipJoinDate(lower),
+    ptkp: lower.ptkp,
+    targetHK: lower.targethk,
+    attendance: lower.attendance,
+    earnings: parseMoneyList(lower.earnings),
+    deductions: parseMoneyList(lower.deductions),
+    note: lower.note
+  }
+
+  const required = ['employeeName', 'position', 'period']
+  const missing = required.filter((key) => !payload.data[key])
+  if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
 
   return payload
 }
@@ -1132,6 +1167,36 @@ function parsePeriodStart(period) {
   return match ? parseDateLabel(match[1]) : null
 }
 
+function formatPeriodValue(value) {
+  const raw = value === undefined || value === null ? '' : String(value).trim()
+  if (!raw) return ''
+
+  const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
+
+  const iso = raw.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/)
+  if (iso) {
+    const month = Number(iso[2])
+    const year = Number(iso[1])
+    return month >= 1 && month <= 12 ? `${months[month - 1]} ${year}` : raw
+  }
+
+  const slash = raw.match(/^(\d{1,2})[/-](\d{4})$/)
+  if (slash) {
+    const month = Number(slash[1])
+    const year = Number(slash[2])
+    return month >= 1 && month <= 12 ? `${months[month - 1]} ${year}` : raw
+  }
+
+  const ymd = raw.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/)
+  if (ymd) {
+    const month = Number(ymd[2])
+    const year = Number(ymd[1])
+    return month >= 1 && month <= 12 ? `${months[month - 1]} ${year}` : raw
+  }
+
+  return raw
+}
+
 function parseDateLabel(value) {
   const raw = String(value || '').trim()
   const local = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
@@ -1175,6 +1240,7 @@ function isSlipMode(mode) {
   return mode === 'payslip' ||
     mode === 'insentif' ||
     mode === 'thr' ||
+    mode === 'exel-payslip' ||
     mode === 'event_weekly_payslip'
 }
 

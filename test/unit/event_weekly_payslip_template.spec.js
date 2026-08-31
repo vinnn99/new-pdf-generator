@@ -62,6 +62,26 @@ test('normalizer membentuk 7 hari pendapatan dari alias event weekly', async ({ 
   assert.equal(data.kasbon, 10000)
 })
 
+test('pendapatan event weekly mengikuti jumlah input tanggal yang diberikan', async ({ assert }) => {
+  const data = SlipPayloadNormalizer.normalize({
+    template: 'event_weekly_payslip',
+    data: {
+      employeeName: 'Budi Event',
+      employeeId: '3171000000000001',
+      position: 'Event Crew',
+      period: '25/07/2026 - 31/07/2026',
+      visitEarnings: [
+        { tgl_date: '2026-07-25', tgl_value: '150000' },
+        { tgl_date: '2026-07-26', tgl_value: '200000' }
+      ]
+    }
+  })
+
+  assert.equal(data.visitEarnings.length, 2)
+  assert.equal(data.visitEarnings[0].date, '25/07/2026')
+  assert.equal(data.visitEarnings[1].date, '26/07/2026')
+})
+
 test('employeeName dan employeeId wajib untuk event weekly payslip', async ({ assert }) => {
   const resolved = await TemplateResolver.resolve('event_weekly_payslip')
   const errors = TemplateResolver.validateRequiredFields({ employeeId: '3171000000000001' }, resolved.requiredFields)

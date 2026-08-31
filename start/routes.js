@@ -93,6 +93,7 @@ Route.group(() => {
   Route.post('/bulk/payslip', 'BulkPdfController.payslipFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/insentif', 'BulkPdfController.insentifFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/thr', 'BulkPdfController.thrFromExcel').middleware(['auth:jwt'])
+  Route.post('/bulk/exel-payslip', 'BulkPdfController.exelPayslipFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/event_weekly_payslip', 'BulkPdfController.eventWeeklyPayslipFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/ba-penempatan', 'BulkPdfController.baPenempatanFromExcel').middleware(['auth:jwt'])
   Route.post('/bulk/ba-request-id', 'BulkPdfController.baRequestIdFromExcel').middleware(['auth:jwt'])

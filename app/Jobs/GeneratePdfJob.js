@@ -324,7 +324,7 @@ function normalizeFilenameTemplate(value) {
 
 function isSlipFilenameTemplate(template) {
   const keyA = normalizeFilenameTemplate(template)
-  return ['payslip', 'insentif', 'thr', 'event_weekly_payslip'].includes(keyA)
+  return ['payslip', 'insentif', 'thr', 'exel-payslip', 'event_weekly_payslip'].includes(keyA)
 }
 
 function sanitizeSlipSegment(value, fallback) {

@@ -3,6 +3,7 @@
 const ExcelDateService = require('./ExcelDateService')
 const SlipPeriodService = require('./SlipPeriodService')
 
+const EXEL_PAYSLIP_TEMPLATE = 'exel-payslip'
 const EVENT_WEEKLY_PAYSLIP_TEMPLATE = 'event_weekly_payslip'
 const EVENT_WEEKLY_DEFAULT_COMPANY = 'PT. EXEL INTEGRASI SOLUSINDO'
 const EVENT_WEEKLY_DEFAULT_TITLE = 'SLIP GAJI'
@@ -19,6 +20,38 @@ class SlipPayloadNormalizer {
 
     const out = { ...source }
     const isThr = normalizedTemplate === 'thr'
+
+    if (normalizedTemplate === EXEL_PAYSLIP_TEMPLATE) {
+      assignAlias(out, 'companyName', ['companyName', 'company_name', 'company'])
+      if (isMissing(out.companyName)) out.companyName = EVENT_WEEKLY_DEFAULT_COMPANY
+      assignAlias(out, 'slipTitle', ['slipTitle', 'slip_title', 'title', 'judul'])
+      if (isMissing(out.slipTitle)) out.slipTitle = EVENT_WEEKLY_DEFAULT_TITLE
+      assignAlias(out, 'department', ['department', 'departement', 'departemen'])
+      assignAlias(out, 'period', ['period', 'periode'])
+      if (!isMissing(out.period)) out.period = SlipPeriodService.normalize(out.period)
+      assignAlias(out, 'employeeName', ['employeeName', 'employee_name', 'nama', 'nama karyawan'])
+      assignAlias(out, 'employeeId', ['employeeId', 'employee_id', 'nip', 'nik'])
+      assignAlias(out, 'position', ['position', 'jabatan'])
+      assignAlias(out, 'jumlahHK', ['jumlahHK', 'jumlah_hk', 'jumlah hk', 'jumlahhk'])
+      assignAlias(out, 'joinDate', ['joinDate', 'join_date', 'tanggalMasuk', 'tglMasuk'])
+      normalizeDate(out, 'joinDate')
+      assignAlias(out, 'targetHK', ['targetHK', 'target_hk'])
+      assignAlias(out, 'attendance', ['attendance', 'kehadiran'])
+      assignAlias(out, 'ptkp', ['ptkp', 'PTKP'])
+      const earnings = normalizeMoneyList(out.earnings)
+      const deductions = normalizeMoneyList(out.deductions)
+      appendAliasMoney(earnings, out, 'Gaji Pokok', ['gajiPokok', 'gaji_pokok', 'gaji pokok', 'baseSalary', 'base_salary'])
+      appendAliasMoney(earnings, out, 'Tunjangan Makan', ['tunjanganMakan', 'tunjangan_makan', 'tunjangan makan'])
+      appendAliasMoney(earnings, out, 'Tunjangan Transport', ['tunjanganTransport', 'tunjangan_transport', 'tunjangan transport'])
+      appendAliasMoney(earnings, out, 'Tunjangan Komunikasi', ['tunjanganKomunikasi', 'tunjangan_komunikasi', 'tunjangan komunikasi', 'yunjangan komunikasi'])
+      appendAliasMoney(earnings, out, 'Tunjangan Jabatan', ['tunjanganJabatan', 'tunjangan_jabatan', 'tunjangan jabatan'])
+      appendAliasMoney(earnings, out, 'Tunjangan BPJS Ketenagakerjaan', ['tunjanganBpjsKetenagakerjaan', 'tunjanganBPJSKetenagakerjaan', 'tunjangan_bpjs_ketenagakerjaan', 'tunjangan bpjs ketenagakerjaan'])
+      appendAliasMoney(deductions, out, 'BPJS Ketenagakerjaan', ['bpjsKetenagakerjaan', 'bpjs_ketenagakerjaan', 'bpjs ketenagakerjaan'])
+      appendAliasMoney(deductions, out, 'PPh21', ['pph21', 'pph_21', 'pph 21'])
+      out.earnings = earnings
+      out.deductions = deductions
+      return out
+    }
 
     assignAlias(out, 'department', ['department', 'departement', 'departemen'])
     assignAlias(out, 'period', ['period', 'periode'])
@@ -142,6 +175,7 @@ function isSlipTemplate (template) {
   return template === 'payslip' ||
     template === 'insentif' ||
     template === 'thr' ||
+    template === EXEL_PAYSLIP_TEMPLATE ||
     template === EVENT_WEEKLY_PAYSLIP_TEMPLATE
 }
 
@@ -297,7 +331,8 @@ function sumMoneyByLabel (list, keywords) {
 function normalizeEventVisitEarnings (source) {
   const explicit = source.visitEarnings || source.visit_earnings || source.dailyEarnings || source.daily_earnings
   if (Array.isArray(explicit) && explicit.length) {
-    return fillEventVisitEarnings(explicit.map((item, index) => normalizeEventVisitItem(item, index)), source.period)
+    const normalized = explicit.map((item, index) => normalizeEventVisitItem(item, index))
+    return fillEventVisitEarnings(normalized, source.period, normalized.length)
   }
 
   const dateKeyItems = Object.keys(source || {})
@@ -311,7 +346,7 @@ function normalizeEventVisitEarnings (source) {
     .sort((left, right) => left.sort - right.sort)
 
   if (dateKeyItems.length) {
-    return fillEventVisitEarnings(dateKeyItems.slice(0, EVENT_WEEKLY_VISIT_DAYS), source.period)
+    return fillEventVisitEarnings(dateKeyItems.slice(0, EVENT_WEEKLY_VISIT_DAYS), source.period, dateKeyItems.length)
   }
 
   return fillEventVisitEarnings(Array.from({ length: EVENT_WEEKLY_VISIT_DAYS }).map((_, index) => {
@@ -353,15 +388,22 @@ function normalizeEventVisitItem (item, index) {
   }
 }
 
-function fillEventVisitEarnings (items, period) {
-  const list = Array.isArray(items) ? items.slice(0, EVENT_WEEKLY_VISIT_DAYS) : []
+function fillEventVisitEarnings (items, period, targetLength = EVENT_WEEKLY_VISIT_DAYS) {
+  const list = Array.isArray(items)
+    ? items.filter((item) => item && String(item.date || item.label || '').trim() !== '').slice(0, targetLength)
+    : []
   const start = parsePeriodStart(period)
-  for (let i = list.length; i < EVENT_WEEKLY_VISIT_DAYS; i++) {
-    list.push({
-      date: start ? formatDateShort(addDays(start, i)) : `TGL${i + 1}`,
-      amount: 0
-    })
+  const hasRealValues = Array.isArray(items) && items.some((item) => item && String(item.date || item.label || '').trim() !== '')
+
+  if (!hasRealValues) {
+    for (let i = list.length; i < targetLength; i++) {
+      list.push({
+        date: start ? formatDateShort(addDays(start, i)) : `TGL${i + 1}`,
+        amount: 0
+      })
+    }
   }
+
   return list.map((item, index) => ({
     date: item.date || item.label || (start ? formatDateShort(addDays(start, index)) : `TGL${index + 1}`),
     amount: eventAmount(item.amount)

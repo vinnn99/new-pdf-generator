@@ -199,7 +199,10 @@ function normalizePayload(payload) {
 function normalizeVisitEarnings(source, period) {
   const explicit = source.visitEarnings || source.visit_earnings || source.dailyEarnings || source.daily_earnings
   if (Array.isArray(explicit) && explicit.length) {
-    return fillVisitItems(normalizeExplicitVisitEarnings(explicit).slice(0, VISIT_DAYS), period)
+    const normalized = normalizeExplicitVisitEarnings(explicit)
+    if (normalized.length) {
+      return fillVisitItems(normalized, period, normalized.length)
+    }
   }
 
   const dateKeyItems = Object.keys(source)
@@ -213,10 +216,11 @@ function normalizeVisitEarnings(source, period) {
     .sort((left, right) => left.sort - right.sort)
 
   if (dateKeyItems.length) {
-    return fillVisitItems(dateKeyItems.slice(0, VISIT_DAYS), period)
+    return fillVisitItems(dateKeyItems, period, dateKeyItems.length)
   }
 
-  return fillVisitItems(Array.from({ length: VISIT_DAYS }).map((_, index) => {
+  const fallbackLength = VISIT_DAYS
+  return fillVisitItems(Array.from({ length: fallbackLength }).map((_, index) => {
     const n = index + 1
     return {
       label: visitLabelForIndex(source, period, n),
@@ -230,38 +234,45 @@ function normalizeVisitEarnings(source, period) {
         `tgl${n} amount`
       ]))
     }
-  }), period)
+  }), period, fallbackLength)
 }
 
 function normalizeExplicitVisitEarnings(items) {
-  return items.map((item, index) => {
-    if (Array.isArray(item)) {
-      return {
-        label: formatDateValue(item[0]) || `TGL${index + 1}`,
-        amount: moneyValue(item[1])
+  return items
+    .map((item, index) => {
+      if (Array.isArray(item)) {
+        return {
+          label: formatDateValue(item[0]) || `TGL${index + 1}`,
+          amount: moneyValue(item[1])
+        }
       }
-    }
-    if (item && typeof item === 'object') {
-      return {
-        label: formatDateValue(firstValue(item, ['tgl_date', 'tglDate', 'tgl date', 'date', 'tanggal', 'label', 'name'])) || `TGL${index + 1}`,
-        amount: moneyValue(firstValue(item, ['tgl_value', 'tglValue', 'tgl value', 'amount', 'value', 'nominal', 'total']))
+      if (item && typeof item === 'object') {
+        return {
+          label: formatDateValue(firstValue(item, ['tgl_date', 'tglDate', 'tgl date', 'date', 'tanggal', 'label', 'name'])) || `TGL${index + 1}`,
+          amount: moneyValue(firstValue(item, ['tgl_value', 'tglValue', 'tgl value', 'amount', 'value', 'nominal', 'total']))
+        }
       }
-    }
-    return { label: `TGL${index + 1}`, amount: moneyValue(item) }
-  })
+      return { label: `TGL${index + 1}`, amount: moneyValue(item) }
+    })
+    .filter((item) => item && String(item.label || '').trim() !== '')
 }
 
-function fillVisitItems(items, period) {
+function fillVisitItems(items, period, targetLength = VISIT_DAYS) {
   const start = parsePeriodStart(period)
-  const out = Array.isArray(items) ? items.slice(0, VISIT_DAYS) : []
-  for (let i = out.length; i < VISIT_DAYS; i++) {
-    out.push({
-      label: start ? formatDateShort(addDays(start, i)) : `TGL${i + 1}`,
-      amount: 0
-    })
+  const out = Array.isArray(items) ? items.slice(0, targetLength) : []
+  const hasRealValues = Array.isArray(items) && items.some((item) => item && String(item.label || '').trim() !== '')
+
+  if (!hasRealValues) {
+    for (let i = out.length; i < targetLength; i++) {
+      out.push({
+        label: start ? formatDateShort(addDays(start, i)) : `TGL${i + 1}`,
+        amount: 0
+      })
+    }
   }
-  return out.map((item) => ({
-    label: item.label || `TGL${out.indexOf(item) + 1}`,
+
+  return out.map((item, index) => ({
+    label: item.label || `TGL${index + 1}`,
     amount: moneyValue(item.amount)
   }))
 }
