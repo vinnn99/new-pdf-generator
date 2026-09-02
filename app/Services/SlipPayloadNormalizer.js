@@ -346,7 +346,7 @@ function normalizeEventVisitEarnings (source) {
     .sort((left, right) => left.sort - right.sort)
 
   if (dateKeyItems.length) {
-    return fillEventVisitEarnings(dateKeyItems.slice(0, EVENT_WEEKLY_VISIT_DAYS), source.period, dateKeyItems.length)
+    return fillEventVisitEarnings(dateKeyItems, source.period, dateKeyItems.length)
   }
 
   return fillEventVisitEarnings(Array.from({ length: EVENT_WEEKLY_VISIT_DAYS }).map((_, index) => {
@@ -364,7 +364,7 @@ function normalizeEventVisitEarnings (source) {
         `tgl${n} amount`
       ]))
     }
-  }), source.period)
+  }), source.period, EVENT_WEEKLY_VISIT_DAYS)
 }
 
 function normalizeEventVisitItem (item, index) {

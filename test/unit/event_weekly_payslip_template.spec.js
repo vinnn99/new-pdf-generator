@@ -82,6 +82,33 @@ test('pendapatan event weekly mengikuti jumlah input tanggal yang diberikan', as
   assert.equal(data.visitEarnings[1].date, '26/07/2026')
 })
 
+test('header tanggal event weekly lebih dari 7 hari tetap dipertahankan semua', async ({ assert }) => {
+  const data = SlipPayloadNormalizer.normalize({
+    template: 'event_weekly_payslip',
+    data: {
+      employeeName: 'Budi Event',
+      employeeId: '3171000000000001',
+      position: 'Event Crew',
+      period: '25/07/2026 - 03/08/2026',
+      '25/07/2026': '150000',
+      '26/07/2026': '160000',
+      '27/07/2026': '170000',
+      '28/07/2026': '180000',
+      '29/07/2026': '190000',
+      '30/07/2026': '200000',
+      '31/07/2026': '210000',
+      '01/08/2026': '220000',
+      '02/08/2026': '230000',
+      '03/08/2026': '240000'
+    }
+  })
+
+  assert.equal(data.visitEarnings.length, 10)
+  assert.equal(data.visitEarnings[0].date, '25/07/2026')
+  assert.equal(data.visitEarnings[9].date, '03/08/2026')
+  assert.equal(data.visitEarnings[9].amount, 240000)
+})
+
 test('employeeName dan employeeId wajib untuk event weekly payslip', async ({ assert }) => {
   const resolved = await TemplateResolver.resolve('event_weekly_payslip')
   const errors = TemplateResolver.validateRequiredFields({ employeeId: '3171000000000001' }, resolved.requiredFields)

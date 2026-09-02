@@ -918,7 +918,7 @@ function buildEventWeeklyPayslipPayload(lower, opts) {
 
 function buildEventVisitEarnings(lower, period) {
   const dateKeyItems = Object.keys(lower || {})
-    .map((key) => ({ key, date: parseDateLabel(key) }))
+    .map((key) => ({ key, date: parseEventWeeklyDateHeader(key) }))
     .filter((item) => item.date)
     .map((item) => ({
       date: formatDateShort(item.date),
@@ -927,7 +927,7 @@ function buildEventVisitEarnings(lower, period) {
     }))
     .sort((left, right) => left.sort - right.sort)
 
-  if (dateKeyItems.length) return fillEventVisitEarnings(dateKeyItems, period)
+  if (dateKeyItems.length) return fillEventVisitEarnings(dateKeyItems, period, dateKeyItems.length)
 
   return fillEventVisitEarnings(Array.from({ length: 7 }).map((_, index) => {
     const n = index + 1
@@ -951,22 +951,35 @@ function buildEventVisitEarnings(lower, period) {
       date: formatDateValue(date) || eventDateForIndex(period, n),
       amount: toNumber(amount)
     }
-  }), period)
+  }), period, 7)
 }
 
-function fillEventVisitEarnings(items, period) {
-  const out = (Array.isArray(items) ? items : []).slice(0, 7)
+function fillEventVisitEarnings(items, period, targetLength = 7) {
+  const out = (Array.isArray(items) ? items : []).slice(0, targetLength)
   const start = parsePeriodStart(period)
-  for (let i = out.length; i < 7; i++) {
-    out.push({
-      date: start ? formatDateShort(addDays(start, i)) : `TGL${i + 1}`,
-      amount: 0
-    })
+  const hasRealValues = Array.isArray(items) && items.some((item) => item && String(item.date || item.label || '').trim() !== '')
+
+  if (!hasRealValues) {
+    for (let i = out.length; i < targetLength; i++) {
+      out.push({
+        date: start ? formatDateShort(addDays(start, i)) : `TGL${i + 1}`,
+        amount: 0
+      })
+    }
   }
+
   return out.map((item, index) => ({
-    date: item.date || (start ? formatDateShort(addDays(start, index)) : `TGL${index + 1}`),
+    date: item.date || item.label || (start ? formatDateShort(addDays(start, index)) : `TGL${index + 1}`),
     amount: toNumber(item.amount)
   }))
+}
+
+function parseEventWeeklyDateHeader(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return null
+  const parsed = parseDateLabel(raw)
+  if (parsed) return parsed
+  return null
 }
 
 function buildBaCancelJoinPayload(lower, opts) {
