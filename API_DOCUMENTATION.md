@@ -824,6 +824,14 @@ Lookup lampiran berbasis metadata batch (`batch_id + template + match_key`).
 ## 8) History Batch Generate
 - `GET /api/v1/batches?template=<template>&page=1&perPage=10`
 - `GET /api/v1/batches/:batch_id?page=1&perPage=20`
+- `GET /api/v1/batches/:batch_id/download`
+
+Download ZIP batch:
+- Response: file ZIP (`Content-Type: application/zip`)
+- Hanya berisi file PDF yang sudah berhasil dibuat pada batch tersebut
+- `user`/`admin`: hanya batch di company sendiri
+- `superadmin`: semua company
+- Jika tidak ada file valid, response `422` dengan pesan jelas
 
 Template batch yang didukung:
 - `event_weekly_payslip`

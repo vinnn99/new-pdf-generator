@@ -1,8 +1,135 @@
 'use strict'
 
+const fs = require('fs')
+const path = require('path')
+const archiver = require('archiver')
 const Database = use('Database')
 
 class BatchController {
+  static resolveSafeDownloadPath(savedPath) {
+    if (!savedPath || typeof savedPath !== 'string') return null
+
+    const normalized = savedPath.replace(/\\/g, '/')
+    const safeRoot = path.resolve(process.cwd(), 'public', 'download')
+    const absolute = path.resolve(process.cwd(), normalized)
+    const relative = path.relative(safeRoot, absolute)
+
+    if (
+      relative === '' ||
+      (!relative.startsWith('..') && !path.isAbsolute(relative))
+    ) {
+      return absolute
+    }
+
+    return null
+  }
+
+  static sanitizeZipEntryName(value, fallback = 'batch-file.pdf') {
+    const raw = String(value || '').trim()
+    const cleaned = raw
+      .replace(/\\/g, '/')
+      .split('/')
+      .join('-')
+      .replace(/\.\.+/g, '-')
+      .replace(/[^a-zA-Z0-9._-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+
+    return cleaned || fallback
+  }
+
+  async downloadZip({ params, response, auth }) {
+    const actor = await auth.getUser()
+    const role = resolveRole(actor)
+
+    if (!isAllowedRole(role)) {
+      return response.status(403).json({
+        status: 'forbidden',
+        message: 'Role tidak diizinkan mengunduh batch zip'
+      })
+    }
+
+    const batchId = String(params.batch_id || '').trim()
+    if (!batchId) {
+      return response.status(400).json({ status: 'error', message: 'batch_id tidak valid' })
+    }
+
+    const batch = await Database.from('generation_batches')
+      .where('batch_id', batchId)
+      .first()
+
+    if (!batch) {
+      return response.status(404).json({ status: 'error', message: 'Batch tidak ditemukan' })
+    }
+
+    if ((role === 'user' || role === 'admin') && Number(batch.company_id) !== Number(actor.company_id)) {
+      return response.status(403).json({
+        status: 'forbidden',
+        message: 'Batch di luar scope company user/admin'
+      })
+    }
+
+    const itemRows = await Database.from('generation_batch_items as gbi')
+      .leftJoin('generated_pdfs as gp', 'gbi.generated_pdf_id', 'gp.id')
+      .where('gbi.batch_id', batchId)
+      .where('gbi.company_id', batch.company_id)
+      .select(
+        'gbi.row_no',
+        'gbi.filename',
+        'gbi.saved_path',
+        'gbi.status',
+        'gp.filename as generated_filename'
+      )
+      .orderBy('gbi.row_no', 'asc')
+
+    const archiveFiles = itemRows
+      .filter((item) => String(item.status || '').toLowerCase() === 'success')
+      .map((item) => {
+        const savedPath = item.saved_path || (item.generated_filename ? `public/download/${item.generated_filename}` : '')
+        const absolute = BatchController.resolveSafeDownloadPath(savedPath)
+        if (!absolute || !absolute.endsWith('.pdf') || !fs.existsSync(absolute)) return null
+        return {
+          absolute,
+          entryName: BatchController.sanitizeZipEntryName(
+            item.filename || item.generated_filename || `row-${item.row_no || 'batch'}.pdf`,
+            `row-${item.row_no || 'batch'}.pdf`
+          )
+        }
+      })
+      .filter(Boolean)
+
+    if (!archiveFiles.length) {
+      return response.status(422).json({
+        status: 'error',
+        message: 'Tidak ada file PDF yang bisa didownload untuk batch ini'
+      })
+    }
+
+    const zipName = `batch-${String(batchId).replace(/[^a-zA-Z0-9_-]/g, '-')}.zip`
+    response.header('Content-Type', 'application/zip')
+    response.header('Content-Disposition', `attachment; filename="${zipName}"`)
+
+    const nativeResponse = response.response || response
+    const archive = archiver('zip', { zlib: { level: 9 } })
+
+    archive.on('error', (err) => {
+      console.error('[BatchController.downloadZip] archive error:', err)
+      if (!nativeResponse.headersSent) {
+        response.status(500).json({ status: 'error', message: 'Gagal membuat ZIP batch' })
+      }
+    })
+
+    response.implicitEnd = false
+    archive.pipe(nativeResponse)
+
+    for (const file of archiveFiles) {
+      archive.file(file.absolute, { name: file.entryName })
+    }
+
+    await archive.finalize()
+    return response
+  }
+
   async index({ request, response, auth }) {
     const actor = await auth.getUser()
     const role = resolveRole(actor)

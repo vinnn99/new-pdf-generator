@@ -52,6 +52,7 @@ Route.group(() => {
   Route.get('/generated-pdfs', 'GeneratedPdfController.index').middleware(['auth:jwt'])
   Route.get('/batches', 'BatchController.index').middleware(['auth:jwt'])
   Route.get('/batches/:batch_id', 'BatchController.show').middleware(['auth:jwt'])
+  Route.get('/batches/:batch_id/download', 'BatchController.downloadZip').middleware(['auth:jwt'])
   Route.post('/send-slip-emails', 'BulkEmailController.sendSlips').middleware(['auth:jwt'])
   Route.post('/send-event-weekly-payslip-emails', 'BulkEmailController.sendEventWeeklyPayslip').middleware(['auth:jwt'])
   Route.post('/send-ba-penempatan-emails', 'BulkEmailController.sendBaPenempatan').middleware(['auth:jwt'])

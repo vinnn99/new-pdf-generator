@@ -1,38 +1,15 @@
-buatkan issue-weekly_payslip.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+** buatkan issue-download-bulk-file.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 informasi umum:
 1. core.pdf-generator.indinesia.id adalah backend
 2. ui-pdf-generator adalah frontend
 
-Latar bekalang:
-pada "Bulk Generate PDF" mode Endpoint "Event weekly Payslip", format kolom template .xlsx header yang dicontohkan adalah :
-    NIK
-    employeeName	
-    STATUS	
-    AREA	
-    JABATAN	
-    NPWP	
-    JUMLAH HK	
-    PERIODE	DESKRIPSI	
-    25/07/2026	
-    26/07/2026	
-    27/07/2026	
-    28/07/2026	
-    29/07/2026	
-    30/07/2026	
-    31/07/2026	
-    ADJUSTMENT	
-    POT TELAT	
-    KASBON	
-    email	
-    callback_url	
-    callback_header
+** Latar bekalang:
 
-keterangan: 25/07/2026,26/07/2026,27/07/2026,28/07/2026,29/07/2026,30/07/2026,31/07/2026 adalah tanggal employee kerja dan bagian baris data adalah jumlah yang dibayar
+** isi planning nya sebagai berikut:
+1. pada frontend di halaman /batches tambahkan "download" setelah tombol "detail"
+2. file yang di download adalah semua file yang ada di batch itu yang telah di zip 
+3. proses compresi file zip dilakukan di backend
 
-masalahnya sasat implementasi, tanggal kerja bisa lebih dari 7 hari 
 
-isi planning nya sebagai berikut:
-1. bulk generate bisa menghandle file .xlsx yang tanggal pendapatan nya lebih dari 7 hari, dengan cara mendeteksi header apabila headernya tanggal maka dianggap sebagai pendapatan
-
-buat issue secara detail termasuk kira-kira apa saja file yang harus di modifikasi atau di create
-jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah
+** buat issue secara detail termasuk kira-kira apa saja file yang harus di modifikasi atau di create
+** jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah
