@@ -266,7 +266,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
       {
         
         stack: [
-          unbreakableParagraph('Demikianlah Perjanjian ini dibuat oleh Para Pihak dalam keadaan bermeterai cukup dan 2 (dua) rangkap. Para Pihak saat menandatangani Perjanjian ini dalam keadaan sehat jasmani dan rohani tanpa adanya paksaan ataupun tekanan dari pihak mana pun.'),
+          unbreakableParagraph('Demikianlah Perjanjian ini dibuat oleh Para Pihak dalam 2 (dua) rangkap dan telah benar-benar memahami seluruh ketentuan dalam Perjanjian ini dan oleh karenanya telah sepakat melaksanakan Perjanjian ini. Para Pihak saat menandatangani Perjanjian ini dalam keadaan sehat jasmani dan rohani tanpa adanya paksaan ataupun tekanan dari pihak manapun.'),
           signatureSection({
             companyName,
             partnerName,
