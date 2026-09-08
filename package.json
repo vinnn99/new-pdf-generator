@@ -15,6 +15,10 @@
   "author": "",
   "license": "UNLICENSED",
   "private": true,
+  "engines": {
+    "node": "16.20.2",
+    "npm": "8.19.4"
+  },
   "dependencies": {
     "@adonisjs/ace": "^5.0.8",
     "@adonisjs/auth": "^3.0.7",
@@ -30,7 +34,7 @@
     "archiver": "^5.3.1",
     "mysql": "^2.18.1",
     "nodemailer": "^6.9.8",
-    "pdfmake": "^0.2.10",
+    "pdfmake": "0.2.23",
     "xlsx": "^0.18.5"
   },
   "autoload": {

@@ -10,6 +10,14 @@ const NUMERIC_LIST_LEVELS = Object.freeze({
   2: { marginLeft: 18, numberWidth: 34 },
   3: { marginLeft: 52, numberWidth: 44 }
 })
+const NUMBERED_ITEM_TABLE_LAYOUT = Object.freeze({
+  hLineWidth: () => 0,
+  vLineWidth: () => 0,
+  paddingLeft: () => 0,
+  paddingRight: () => 0,
+  paddingTop: () => 0,
+  paddingBottom: () => 0
+})
 const INDENTED_CONTENT_MARGIN_LEFT = contentMarginForNumber('1.1')
 
 module.exports = function cooperationAgreementTemplate(payloadData = {}) {
@@ -318,11 +326,7 @@ function requirementPaymentItems(data, companyName) {
 
   if (allowanceItems.length) {
     const allowanceNumber = `3.${nextSubNumber}`
-    beforeBankTable.push(`${allowanceNumber} MITRA sepakat mendapatkan upah dengan tunjangan sebagai berikut:`)
-    allowanceItems.forEach((item, index) => {
-      beforeBankTable.push(`${allowanceNumber}.${index + 1} ${item.label} sebesar ${formatAllowanceAmount(item)}.`)
-    })
-    beforeBankTable.push(continuationOf(allowanceNumber, `Seluruh pembayaran tersebut dilakukan setiap bulan dan dapat dilakukan pemotongan oleh ${upper(companyName)} untuk BPJS Ketenagakerjaan sesuai dengan aturan yang berlaku, jika MITRA mendapatkan Tunjangan BPJS dari pihak Principal dan/atau Brand.`))
+    beforeBankTable.push(...allowanceSection(allowanceNumber, allowanceItems, companyName))
     nextSubNumber += 1
   }
 
@@ -345,6 +349,25 @@ function activeAllowanceItems(data) {
     { label: 'Tunjangan biaya operasional', amount: allowanceAmount(data.operationalCostAllowance, 'tunjangan biaya operasional'), fieldName: 'tunjangan biaya operasional', unit: data.operationalCostAllowanceUnit },
     { label: 'Tunjangan TL', amount: allowanceAmount(data.tlAllowance, 'tunjangan TL'), fieldName: 'tunjangan TL', unit: data.tlAllowanceUnit }
   ].filter((item) => item.amount > 0)
+}
+
+function allowanceSection(allowanceNumber, allowanceItems, companyName) {
+  const allowanceLines = [
+    `${allowanceNumber} MITRA sepakat mendapatkan upah dengan tunjangan sebagai berikut:`,
+    ...allowanceItems.map((item, index) => {
+      return `${allowanceNumber}.${index + 1} ${item.label} sebesar ${formatAllowanceAmount(item)}.`
+    }),
+    continuationOf(allowanceNumber, `Seluruh pembayaran tersebut dilakukan setiap bulan dan dapat dilakukan pemotongan oleh ${upper(companyName)} untuk BPJS Ketenagakerjaan sesuai dengan aturan yang berlaku, jika MITRA mendapatkan Tunjangan BPJS dari pihak Principal dan/atau Brand.`)
+  ]
+
+  if (allowanceItems.length < 3) {
+    return [{
+      unbreakable: true,
+      stack: indented(allowanceLines)
+    }]
+  }
+
+  return allowanceLines
 }
 
 function formatAllowanceAmount(item) {
@@ -417,6 +440,8 @@ function indented(items) {
       }
     }
 
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value
+
     const text = String(value)
     const match = text.match(/^(\d+(?:\.\d+)+)\.?\s+(.+)$/)
 
@@ -438,10 +463,14 @@ function numberedItem(number, text) {
 
   return {
     unbreakable: true,
-    columns: [
-      { width: layout.numberWidth, text: displayListNumber(number) },
-      { width: '*', text, alignment: 'justify' }
-    ],
+    table: {
+      widths: [layout.numberWidth, '*'],
+      body: [[
+        { text: displayListNumber(number) },
+        { text, alignment: 'justify' }
+      ]]
+    },
+    layout: NUMBERED_ITEM_TABLE_LAYOUT,
     margin: [layout.marginLeft, 0, 0, 6]
   }
 }

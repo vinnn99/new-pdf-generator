@@ -119,12 +119,19 @@ test('menjaga item tunjangan pulsa dan operasional tetap utuh saat page break', 
     .filter((item) => /^3\.3\.\d+/.test(item.number))
   const allowanceNodes = collectNodes(doc.content)
     .filter((node) => node.unbreakable && Array.isArray(node.columns))
+  const compactAllowanceBlock = collectNodes(doc.content)
+    .find((node) => {
+      return node.unbreakable &&
+        Array.isArray(node.stack) &&
+        node.stack.some((item) => isNumberedTableNode(item) && plainText(item.table.body[0][0].text) === '3.3.1')
+    })
 
   assert.deepEqual(allowanceItems.map((item) => item.number), ['3.3.1', '3.3.2'])
   assert.isTrue(allowanceItems[0].text.includes('Tunjangan pulsa'))
   assert.isTrue(allowanceItems[1].text.includes('Tunjangan biaya operasional'))
-  assert.isTrue(allowanceNodes.some((node) => plainText(node.columns[0].text) === '3.3.1'))
-  assert.isTrue(allowanceNodes.some((node) => plainText(node.columns[0].text) === '3.3.2'))
+  assert.isTrue(allowanceItems.every((item) => item.unbreakable))
+  assert.isOk(compactAllowanceBlock)
+  assert.isFalse(allowanceNodes.some((node) => Array.isArray(node.columns) && /^3\.3\.\d+/.test(plainText(node.columns[0].text))))
 })
 
 test('menyembunyikan tunjangan bernilai 0 dan menomori ulang sub tunjangan', async ({ assert }) => {
@@ -367,13 +374,24 @@ function collectBoldFragments(value, out = []) {
 
 function collectListItems(nodes) {
   return nodes
-    .filter((node) => Array.isArray(node.columns) && node.columns[0] && node.columns[1])
+    .filter((node) => isNumberedTableNode(node))
     .map((node) => ({
-      number: plainText(node.columns[0].text),
-      text: plainText(node.columns[1].text),
+      number: plainText(node.table.body[0][0].text),
+      text: plainText(node.table.body[0][1].text),
       margin: node.margin && node.margin[0],
-      width: node.columns[0].width
+      width: node.table.widths[0],
+      unbreakable: node.unbreakable
     }))
+}
+
+function isNumberedTableNode(node) {
+  if (!node || !node.table || !Array.isArray(node.table.widths)) return false
+  if (node.table.widths.length !== 2 || node.table.widths[1] !== '*') return false
+  if (!Array.isArray(node.table.body) || node.table.body.length !== 1) return false
+
+  const row = node.table.body[0]
+  if (!Array.isArray(row) || row.length !== 2) return false
+  return /^\d+(?:\.\d+)*\.?$/.test(plainText(row[0].text))
 }
 
 function plainText(value) {
