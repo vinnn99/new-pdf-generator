@@ -74,7 +74,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
 
   const docDefinition = {
     pageSize: 'A4',
-    pageMargins: [54, 88, 54, 78],
+    pageMargins: CooperationAgreementService.defaultPageMargins(),
     defaultStyle: { font: 'Roboto', fontSize: 10.5, color: '#111111', lineHeight: 1.18 },
     pageBreakBefore: keepArticleHeadingWithOpeningContent,
     background: (_currentPage, pageSize) => {
@@ -264,9 +264,10 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
         'Perjanjian ini dapat ditandatangani dalam sejumlah salinan dan disampaikan dengan transmisi faksimile atau lainnya. Lampiran-lampiran dalam Perjanjian ini merupakan satu kesatuan yang tidak terpisahkan.'
       ])),
       {
-        
+        pageBreak: 'before',
+        unbreakable: true,
         stack: [
-          unbreakableParagraph('Demikianlah Perjanjian ini dibuat oleh Para Pihak dalam 2 (dua) rangkap dan telah benar-benar memahami seluruh ketentuan dalam Perjanjian ini dan oleh karenanya telah sepakat melaksanakan Perjanjian ini. Para Pihak saat menandatangani Perjanjian ini dalam keadaan sehat jasmani dan rohani tanpa adanya paksaan ataupun tekanan dari pihak manapun.'),
+          p('Demikianlah Perjanjian ini dibuat oleh Para Pihak dalam 2 (dua) rangkap dan telah benar-benar memahami seluruh ketentuan dalam Perjanjian ini dan oleh karenanya telah sepakat melaksanakan Perjanjian ini. Para Pihak saat menandatangani Perjanjian ini dalam keadaan sehat jasmani dan rohani tanpa adanya paksaan ataupun tekanan dari pihak manapun.'),
           signatureSection({
             companyName,
             partnerName,
@@ -305,13 +306,6 @@ function upper(value) {
 
 function p(text) {
   return { text, style: 'paragraph' }
-}
-
-function unbreakableParagraph(text) {
-  return {
-    unbreakable: true,
-    stack: [p(text)]
-  }
 }
 
 function requirementPaymentItems(data, companyName) {
@@ -559,6 +553,7 @@ function correspondenceBlock(title, rows) {
 
 function signatureSection({ companyName, partnerName, firstPartyName, firstPartyTitle, directorSignature, partnerSignature }) {
   return {
+    unbreakable: true,
     margin: [0, 24, 0, 0],
     table: {
       widths: ['50%', '50%'],

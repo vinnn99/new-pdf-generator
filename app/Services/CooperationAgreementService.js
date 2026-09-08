@@ -6,6 +6,7 @@ const TEMPLATE = 'cooperation_agreement'
 const EXEL_TEMPLATE = 'exel_cooperation_agreement'
 const DEFAULT_COMPANY_NAME = 'PT. ORIGIN MAGDA INOVASI'
 const EXEL_DEFAULT_COMPANY_NAME = 'PT. EXEL INTEGRASI SOLUSINDO'
+const DEFAULT_PAGE_MARGINS = Object.freeze([54, 88, 54, 78])
 const ROMAN_MONTH = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
 
 const REQUIRED_FIELDS = Object.freeze([
@@ -57,6 +58,10 @@ class CooperationAgreementService {
 
   static get EXEL_DEFAULT_COMPANY_NAME() {
     return EXEL_DEFAULT_COMPANY_NAME
+  }
+
+  static defaultPageMargins() {
+    return DEFAULT_PAGE_MARGINS.slice()
   }
 
   static requiredFields() {

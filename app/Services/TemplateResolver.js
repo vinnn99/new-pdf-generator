@@ -78,7 +78,17 @@ class TemplateResolver {
       throw new Error('Dynamic template content_json harus object JSON (docDefinition)')
     }
     const interpolated = deepInterpolate(doc, data)
-    return normalizePdfmakeLayout(interpolated)
+    return this.normalizeDocDefinition(templateRecord.templateKey, interpolated)
+  }
+
+  static normalizeDocDefinition(templateKey, docDefinition) {
+    const normalized = normalizePdfmakeLayout(docDefinition)
+
+    if (CooperationAgreementService.isTemplate(templateKey)) {
+      normalized.pageMargins = CooperationAgreementService.defaultPageMargins()
+    }
+
+    return normalized
   }
 
   static async listDynamicTemplates({ includeInactive = false, companyId } = {}) {

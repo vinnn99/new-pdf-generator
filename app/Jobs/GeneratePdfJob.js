@@ -92,6 +92,11 @@ class GeneratePdfJob {
         docDefinition = templateFunction(payloadData)
       }
 
+      if (CooperationAgreementService.isTemplate(template)) {
+        docDefinition = TemplateResolver.normalizeDocDefinition(template, docDefinition)
+      }
+      logCooperationAgreementLayout(template, resolvedTemplate, docDefinition)
+
       // Create PDF
       console.log('Creating PDF...')
       const pdfDoc = printer.createPdfKitDocument(docDefinition)
@@ -437,6 +442,21 @@ async function updateBatchItemStatus({
 }
 
 module.exports = GeneratePdfJob
+
+function logCooperationAgreementLayout(templateKey, resolvedTemplate, docDefinition) {
+  if (process.env.PDF_DEBUG_LAYOUT !== 'true') return
+  if (!CooperationAgreementService.isTemplate(templateKey)) return
+
+  const dynamicTemplateId = resolvedTemplate.source === 'dynamic'
+    ? resolvedTemplate.templateRecord.id
+    : null
+  console.log('[cooperation_agreement] layout=%j', {
+    templateKey,
+    source: resolvedTemplate.source,
+    dynamicTemplateId,
+    pageMargins: docDefinition.pageMargins
+  })
+}
 
 /**
  * Enrich payloadData with base64 data URLs for signature images if URL provided.

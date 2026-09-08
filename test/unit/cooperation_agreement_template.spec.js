@@ -1,12 +1,14 @@
 'use strict'
 
 const path = require('path')
+const PdfPrinter = require('pdfmake')
 
 const suite = use('Test/Suite')('Cooperation Agreement Template')
 const { test } = suite
 
 const template = require(path.join(process.cwd(), 'app', 'Templates', 'cooperation_agreement'))
 const CooperationAgreementService = use('App/Services/CooperationAgreementService')
+const TemplateResolver = use('App/Services/TemplateResolver')
 
 test('menerapkan bold, blok korespondensi, dan indent numerik', async ({ assert }) => {
   const doc = template(samplePayload())
@@ -17,11 +19,13 @@ test('menerapkan bold, blok korespondensi, dan indent numerik', async ({ assert 
     boldFragments.includes('PT. Contoh Company Indonesia') ||
     boldFragments.includes('PT. CONTOH COMPANY INDONESIA')
   )
-  assert.isTrue(boldFragments.includes('TEMA Agency') || boldFragments.includes('TEMA AGENCY'))
+  assert.isTrue(boldFragments.some((fragment) => fragment.includes('TEMA Agency') || fragment.includes('TEMA AGENCY')))
   assert.isTrue(boldFragments.includes('MITRA'))
   assert.isFalse(boldFragments.includes('MITRAAN'))
 
-  const correspondenceBlocks = nodes.filter((node) => node.unbreakable && node.table)
+  const correspondenceBlocks = nodes.filter((node) => {
+    return node.unbreakable && node.table && node.table.widths[0] === 130
+  })
   assert.equal(correspondenceBlocks.length, 2)
   assert.deepEqual(correspondenceBlocks.map((block) => plainText(block.table.body[0][0].text)), [
     'PT. CONTOH COMPANY INDONESIA',
@@ -29,18 +33,70 @@ test('menerapkan bold, blok korespondensi, dan indent numerik', async ({ assert 
   ])
   assert.isTrue(correspondenceBlocks[1].table.body.some((row) => row[0].text === 'Nomor KTP'))
 
-  const closingParagraph = nodes.find((node) => {
-    return node.unbreakable &&
+  const closingParagraph = nodes.find((node) => plainText(node.text).includes('Demikianlah Perjanjian ini dibuat'))
+  assert.isOk(closingParagraph)
+  assert.isUndefined(closingParagraph.unbreakable)
+
+  const finalAgreementBlock = doc.content.find((node) => {
+    return node.pageBreak === 'before' &&
+      node.unbreakable &&
       Array.isArray(node.stack) &&
       node.stack.some((item) => plainText(item.text).includes('Demikianlah Perjanjian ini dibuat'))
   })
-  assert.isOk(closingParagraph)
+  assert.isOk(finalAgreementBlock)
+
+  const signatureBlock = nodes.find((node) => {
+    return node.unbreakable &&
+      node.table &&
+      plainText(node.table.body[0][0].text) === 'PIHAK PERTAMA' &&
+      plainText(node.table.body[0][1].text) === 'PIHAK KEDUA'
+  })
+  assert.isOk(signatureBlock)
+  assert.deepEqual(signatureBlock.table.widths, ['50%', '50%'])
+  assert.deepEqual(doc.pageMargins, CooperationAgreementService.defaultPageMargins())
 
   const listItems = collectListItems(nodes)
 
   assert.isTrue(listItems.some((item) => item.number === '1.' && item.margin === 0 && item.width === 20))
   assert.isTrue(listItems.some((item) => item.number === '3.1.' && item.margin === 18 && item.width === 34))
   assert.isTrue(listItems.some((item) => item.number === '3.3.1' && item.margin === 52 && item.width === 44))
+})
+
+test('menormalkan margin dynamic cooperation agreement tanpa mengubah template lain', async ({ assert }) => {
+  const dynamicCooperationAgreement = TemplateResolver.renderDynamicDocDefinition({
+    templateKey: 'cooperation_agreement',
+    contentObject: {
+      pageMargins: [54, 88, 0, 78],
+      content: [{ text: 'Dokumen dynamic' }]
+    }
+  }, {})
+  const dynamicOtherTemplate = TemplateResolver.renderDynamicDocDefinition({
+    templateKey: 'invoice',
+    contentObject: {
+      pageMargins: [12, 24, 36, 48],
+      content: [{ text: 'Invoice dynamic' }]
+    }
+  }, {})
+
+  assert.deepEqual(dynamicCooperationAgreement.pageMargins, CooperationAgreementService.defaultPageMargins())
+  assert.deepEqual(dynamicOtherTemplate.pageMargins, [12, 24, 36, 48])
+})
+
+test('merender blok penutup dan tanda tangan pada halaman baru', async ({ assert }) => {
+  const fontsDir = path.join(process.cwd(), 'app', 'Fonts')
+  const printer = new PdfPrinter({
+    Roboto: {
+      normal: path.join(fontsDir, 'Roboto_Condensed-Regular.ttf'),
+      bold: path.join(fontsDir, 'Roboto_Condensed-Bold.ttf'),
+      italics: path.join(fontsDir, 'Roboto_Condensed-Italic.ttf'),
+      bolditalics: path.join(fontsDir, 'Roboto_Condensed-BoldItalic.ttf')
+    }
+  })
+  const pdfDoc = printer.createPdfKitDocument(template(samplePayload()))
+  const buffer = await pdfBuffer(pdfDoc)
+
+  assert.equal(buffer.slice(0, 4).toString(), '%PDF')
+  assert.isTrue(buffer.length > 1000)
 })
 
 test('menyembunyikan tunjangan bernilai 0 dan menomori ulang sub tunjangan', async ({ assert }) => {
@@ -296,4 +352,14 @@ function plainText(value) {
   if (Array.isArray(value)) return value.map(plainText).join('')
   if (value && typeof value === 'object') return plainText(value.text)
   return value === undefined || value === null ? '' : String(value)
+}
+
+function pdfBuffer(pdfDoc) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    pdfDoc.on('data', (chunk) => chunks.push(chunk))
+    pdfDoc.on('end', () => resolve(Buffer.concat(chunks)))
+    pdfDoc.on('error', reject)
+    pdfDoc.end()
+  })
 }

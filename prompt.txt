@@ -4,11 +4,15 @@ informasi umum:
 2. ui-pdf-generator adalah frontend
 
 ** Latar bekalang:
+Aplikasi setelah di deploy di production ada masalah terutama pada saat create template cooperation_agreement.
+Di Production hasilnya ada di /output/cooperation_agreement_production.pdf
+Pada hasil production, halaman 3 dan sseterusya, margin kanan 0, text mepet ke kanan kertas
+Saya test di development, kasus ini tidak terjadi
+
 
 ** isi planning nya sebagai berikut:
-1. pada frontend di halaman /batches tambahkan "download" setelah tombol "detail"
-2. file yang di download adalah semua file yang ada di batch itu yang telah di zip 
-3. proses compresi file zip dilakukan di backend
+1. pastikan di production hasilnya sesuai dengan yang di development, jangan sampai terjadi margin kanan 0
+
 
 
 ** buat issue secara detail termasuk kira-kira apa saja file yang harus di modifikasi atau di create
