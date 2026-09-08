@@ -490,6 +490,15 @@ function basePayload(lower, opts) {
 
 function buildExelPayslipPayload(lower, opts) {
   const payload = buildPayslipPayload(lower, opts)
+  const tunjanganSewaMotor = firstDefined(lower, [
+    'tunjangansewamotor',
+    'tunjangan_sewa_motor',
+    'tunjangan sewa motor',
+    'sewamotorallowance',
+    'sewa_motor_allowance',
+    'motorrentalallowance',
+    'motor_rental_allowance'
+  ])
   payload.template = 'exel-payslip'
   payload.data = {
     ...payload.data,
@@ -505,9 +514,10 @@ function buildExelPayslipPayload(lower, opts) {
     ptkp: lower.ptkp,
     targetHK: lower.targethk,
     attendance: lower.attendance,
-    earnings: parseMoneyList(lower.earnings),
+    earnings: payload.data.earnings,
     deductions: parseMoneyList(lower.deductions),
-    note: lower.note
+    note: lower.note,
+    ...(tunjanganSewaMotor === undefined ? {} : { tunjanganSewaMotor })
   }
 
   const required = ['employeeName', 'position', 'period']
@@ -515,6 +525,13 @@ function buildExelPayslipPayload(lower, opts) {
   if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
 
   return payload
+}
+
+function firstDefined(source, keys) {
+  for (const key of keys) {
+    if (source[key] !== undefined && source[key] !== '') return source[key]
+  }
+  return undefined
 }
 
 function buildPayslipPayload(lower, opts) {

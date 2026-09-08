@@ -39,10 +39,12 @@ class SlipPayloadNormalizer {
       assignAlias(out, 'attendance', ['attendance', 'kehadiran'])
       assignAlias(out, 'ptkp', ['ptkp', 'PTKP'])
       const earnings = normalizeMoneyList(out.earnings)
+        .filter((item) => normalizeLabel(item.label) !== 'tunjangan sewa motor' || toNumberSafe(item.amount) !== 0)
       const deductions = normalizeMoneyList(out.deductions)
       appendAliasMoney(earnings, out, 'Gaji Pokok', ['gajiPokok', 'gaji_pokok', 'gaji pokok', 'baseSalary', 'base_salary'])
       appendAliasMoney(earnings, out, 'Tunjangan Makan', ['tunjanganMakan', 'tunjangan_makan', 'tunjangan makan'])
       appendAliasMoney(earnings, out, 'Tunjangan Transport', ['tunjanganTransport', 'tunjangan_transport', 'tunjangan transport'])
+      appendPositiveAliasMoney(earnings, out, 'Tunjangan Sewa Motor', ['tunjanganSewaMotor', 'tunjangan_sewa_motor', 'tunjangan sewa motor', 'sewaMotorAllowance', 'sewa_motor_allowance', 'motorRentalAllowance', 'motor_rental_allowance'])
       appendAliasMoney(earnings, out, 'Tunjangan Komunikasi', ['tunjanganKomunikasi', 'tunjangan_komunikasi', 'tunjangan komunikasi', 'yunjangan komunikasi'])
       appendAliasMoney(earnings, out, 'Tunjangan Jabatan', ['tunjanganJabatan', 'tunjangan_jabatan', 'tunjangan jabatan'])
       appendAliasMoney(earnings, out, 'Tunjangan BPJS Ketenagakerjaan', ['tunjanganBpjsKetenagakerjaan', 'tunjanganBPJSKetenagakerjaan', 'tunjangan_bpjs_ketenagakerjaan', 'tunjangan bpjs ketenagakerjaan'])
@@ -242,6 +244,15 @@ function appendAliasMoney (list, source, label, keys) {
   if (isMissing(value)) return
   if (hasLabel(list, label)) return
   list.push({ label, amount: toAmount(value) })
+}
+
+function appendPositiveAliasMoney (list, source, label, keys) {
+  const value = pickFirstValue(source, keys)
+  if (isMissing(value) || hasLabel(list, label)) return
+
+  const amount = toAmount(value)
+  if (toNumberSafe(amount) === 0) return
+  list.push({ label, amount })
 }
 
 function hasLabel (list, label) {

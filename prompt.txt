@@ -1,17 +1,14 @@
-** buatkan issue-download-bulk-file.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+** buatkan issue-exel_payslip.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 informasi umum:
 1. core.pdf-generator.indinesia.id adalah backend
 2. ui-pdf-generator adalah frontend
 
 ** Latar bekalang:
-Aplikasi setelah di deploy di production ada masalah terutama pada saat create template cooperation_agreement.
-Di Production hasilnya ada di /output/cooperation_agreement_production.pdf
-Pada hasil production, halaman 3 dan sseterusya, margin kanan 0, text mepet ke kanan kertas
-Saya test di development, kasus ini tidak terjadi
-
 
 ** isi planning nya sebagai berikut:
-1. pastikan di production hasilnya sesuai dengan yang di development, jangan sampai terjadi margin kanan 0
+1. Pada template exel_payslip, tambahkan tunjangan sewa motor yang sifatnya eaarning
+2. implementasikan pada frontend Bulk Generate PDF, Generate Single PDF, Send Single Email, Bulk Sned Email
+3. Untuk BulK PDF, update juga Header template excel nya sesuai penambahan tunjangan
 
 
 
