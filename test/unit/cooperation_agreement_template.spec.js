@@ -92,11 +92,39 @@ test('merender blok penutup dan tanda tangan pada halaman baru', async ({ assert
       bolditalics: path.join(fontsDir, 'Roboto_Condensed-BoldItalic.ttf')
     }
   })
-  const pdfDoc = printer.createPdfKitDocument(template(samplePayload()))
+  const pdfDoc = printer.createPdfKitDocument(template({
+    ...samplePayload(),
+    transportAllowance: 0,
+    mealAllowance: 0,
+    phoneAllowance: 100000,
+    operationalCostAllowance: 250000,
+    tlAllowance: 0
+  }))
   const buffer = await pdfBuffer(pdfDoc)
 
   assert.equal(buffer.slice(0, 4).toString(), '%PDF')
   assert.isTrue(buffer.length > 1000)
+})
+
+test('menjaga item tunjangan pulsa dan operasional tetap utuh saat page break', async ({ assert }) => {
+  const doc = template({
+    ...samplePayload(),
+    transportAllowance: 0,
+    mealAllowance: 0,
+    phoneAllowance: 100000,
+    operationalCostAllowance: 250000,
+    tlAllowance: 0
+  })
+  const allowanceItems = collectListItems(collectNodes(doc.content))
+    .filter((item) => /^3\.3\.\d+/.test(item.number))
+  const allowanceNodes = collectNodes(doc.content)
+    .filter((node) => node.unbreakable && Array.isArray(node.columns))
+
+  assert.deepEqual(allowanceItems.map((item) => item.number), ['3.3.1', '3.3.2'])
+  assert.isTrue(allowanceItems[0].text.includes('Tunjangan pulsa'))
+  assert.isTrue(allowanceItems[1].text.includes('Tunjangan biaya operasional'))
+  assert.isTrue(allowanceNodes.some((node) => plainText(node.columns[0].text) === '3.3.1'))
+  assert.isTrue(allowanceNodes.some((node) => plainText(node.columns[0].text) === '3.3.2'))
 })
 
 test('menyembunyikan tunjangan bernilai 0 dan menomori ulang sub tunjangan', async ({ assert }) => {

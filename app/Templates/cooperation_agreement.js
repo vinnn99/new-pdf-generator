@@ -437,6 +437,7 @@ function numberedItem(number, text) {
   const layout = numericListLayout(number)
 
   return {
+    unbreakable: true,
     columns: [
       { width: layout.numberWidth, text: displayListNumber(number) },
       { width: '*', text, alignment: 'justify' }
