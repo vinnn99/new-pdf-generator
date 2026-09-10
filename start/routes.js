@@ -70,6 +70,7 @@ Route.group(() => {
   Route.post('/send/payslip', 'SingleEmailController.sendPayslip').middleware(['auth:jwt'])
   Route.post('/send/insentif', 'SingleEmailController.sendInsentif').middleware(['auth:jwt'])
   Route.post('/send/thr', 'SingleEmailController.sendThr').middleware(['auth:jwt'])
+  Route.post('/send/exel-payslip', 'SingleEmailController.sendExelPayslip').middleware(['auth:jwt'])
   Route.post('/send/event_weekly_payslip', 'SingleEmailController.sendEventWeeklyPayslip').middleware(['auth:jwt'])
   Route.post('/send/ba-penempatan', 'SingleEmailController.sendBaPenempatan').middleware(['auth:jwt'])
   Route.post('/send/ba-request-id', 'SingleEmailController.sendBaRequestId').middleware(['auth:jwt'])

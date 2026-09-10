@@ -1,14 +1,42 @@
-** buatkan issue-exel_payslip.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+** buatkan issue-exel_payslip_update.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 informasi umum:
 1. core.pdf-generator.indinesia.id adalah backend
 2. ui-pdf-generator adalah frontend
 
 ** Latar bekalang:
+saat ini untuk template exel_payslip komponen nya adalah:
+- earning:
+    1. Gaji Pokok
+    2. Tunjangan Makan
+    3. Tunjangan Transport
+    4. Tunjangan Sewa Motor
+    5. Tunjangan Komunikasi
+    6. Tunjangan Jabatan
+    7. Tunjangan BPJS Ketenagakerjaan
+- deduction:
+    1. BPJS Ketenagakerjaan
+    2. PPH21
+
 
 ** isi planning nya sebagai berikut:
-1. Pada template exel_payslip, tambahkan tunjangan sewa motor yang sifatnya eaarning
+1. ubah komponenya menjadi:
+    - earning:
+        a. Gaji Pokok
+        b. Tunjangan Makan
+        c. Tunjangan Transport
+        d. Tunjangan Sewa Motor
+        e. Tunjangan Komunikasi
+        f. Tunjangan Jabatan
+        g. Insentif
+    - deduction:
+        1. BPJS Kesehatan
+        2. BPJS Ketenagakerjaan
+        3. PPH21
+
 2. implementasikan pada frontend Bulk Generate PDF, Generate Single PDF, Send Single Email, Bulk Sned Email
-3. Untuk BulK PDF, update juga Header template excel nya sesuai penambahan tunjangan
+3. Untuk BulK PDF, update juga Header template excel_payslip nya sesuai format yang baru
+4. Untuk Bulk PDF, Pastikan Batch nya masuk ke menu Batch ID sesuai role template untuk perusahaan
+5. Pastikan perubahan tidak mengganggu Template lain
 
 
 

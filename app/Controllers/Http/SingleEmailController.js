@@ -23,6 +23,9 @@ class SingleEmailController {
   async sendThr(ctx) {
     return this._send(ctx, cfgSlip('thr'))
   }
+  async sendExelPayslip(ctx) {
+    return this._send(ctx, cfgSlip('exel-payslip'))
+  }
   async sendEventWeeklyPayslip(ctx) {
     return this._send(ctx, cfgSlip('event_weekly_payslip'))
   }
@@ -80,6 +83,15 @@ class SingleEmailController {
       const company = await Database.table('companies').where('company_id', user.company_id).first()
       if (!company) {
         return response.status(401).json({ status: 'error', message: 'Perusahaan user tidak ditemukan' })
+      }
+
+      const allowedTemplates = parseAllowedTemplates(company.allowed_templates)
+      const requestedTemplate = String(cfg.template || '').trim().toLowerCase()
+      if (allowedTemplates.length > 0 && !allowedTemplates.includes(requestedTemplate)) {
+        return response.status(403).json({
+          status: 'forbidden',
+          message: `Template '${requestedTemplate}' tidak diizinkan untuk company ini`
+        })
       }
 
       const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, mailFrom } = pickSmtpConfig(company)
@@ -497,6 +509,7 @@ function requiredFields(template) {
     payslip: ['employeeName', 'position', 'period'],
     insentif: ['employeeName', 'position', 'period'],
     thr: ['employeeName', 'position', 'period', 'payoutDate', 'baseSalary'],
+    'exel-payslip': ['employeeName', 'position', 'period'],
     event_weekly_payslip: ['employeeName', 'employeeId'],
     'ba-penempatan': ['mdsName', 'placementDate', 'outlet'],
     'ba-request-id': ['mdsName', 'nik', 'joinDate'],
@@ -510,6 +523,24 @@ function requiredFields(template) {
     cooperation_agreement: CooperationAgreementService.requiredFields()
   }
   return map[template] || []
+}
+
+function parseAllowedTemplates(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim().toLowerCase()).filter(Boolean)
+  }
+  if (typeof value !== 'string' || !value.trim()) return []
+
+  try {
+    const parsed = JSON.parse(value)
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item).trim().toLowerCase()).filter(Boolean)
+    }
+  } catch (_) {
+    return value.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean)
+  }
+
+  return []
 }
 
 function title(template) {

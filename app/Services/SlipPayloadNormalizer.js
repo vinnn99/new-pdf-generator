@@ -8,6 +8,51 @@ const EVENT_WEEKLY_PAYSLIP_TEMPLATE = 'event_weekly_payslip'
 const EVENT_WEEKLY_DEFAULT_COMPANY = 'PT. EXEL INTEGRASI SOLUSINDO'
 const EVENT_WEEKLY_DEFAULT_TITLE = 'SLIP GAJI'
 const EVENT_WEEKLY_VISIT_DAYS = 7
+const EXEL_PAYSLIP_EARNINGS = [
+  {
+    label: 'Gaji Pokok',
+    keys: ['gajiPokok', 'gaji_pokok', 'gaji pokok', 'baseSalary', 'base_salary']
+  },
+  {
+    label: 'Tunjangan Makan',
+    keys: ['tunjanganMakan', 'tunjangan_makan', 'tunjangan makan']
+  },
+  {
+    label: 'Tunjangan Transport',
+    keys: ['tunjanganTransport', 'tunjangan_transport', 'tunjangan transport']
+  },
+  {
+    label: 'Tunjangan Sewa Motor',
+    keys: ['tunjanganSewaMotor', 'tunjangan_sewa_motor', 'tunjangan sewa motor', 'sewaMotorAllowance', 'sewa_motor_allowance', 'motorRentalAllowance', 'motor_rental_allowance'],
+    positiveOnly: true
+  },
+  {
+    label: 'Tunjangan Komunikasi',
+    keys: ['tunjanganKomunikasi', 'tunjangan_komunikasi', 'tunjangan komunikasi', 'yunjangan komunikasi']
+  },
+  {
+    label: 'Tunjangan Jabatan',
+    keys: ['tunjanganJabatan', 'tunjangan_jabatan', 'tunjangan jabatan']
+  },
+  {
+    label: 'Insentif',
+    keys: ['insentif', 'incentive']
+  }
+]
+const EXEL_PAYSLIP_DEDUCTIONS = [
+  {
+    label: 'BPJS Kesehatan',
+    keys: ['bpjsKesehatan', 'bpjs_kesehatan', 'bpjs kesehatan']
+  },
+  {
+    label: 'BPJS Ketenagakerjaan',
+    keys: ['bpjsKetenagakerjaan', 'bpjs_ketenagakerjaan', 'bpjs ketenagakerjaan']
+  },
+  {
+    label: 'PPH21',
+    keys: ['pph21', 'pph_21', 'pph 21', 'PPh21']
+  }
+]
 
 class SlipPayloadNormalizer {
   static normalize ({ template, data } = {}) {
@@ -38,20 +83,8 @@ class SlipPayloadNormalizer {
       assignAlias(out, 'targetHK', ['targetHK', 'target_hk'])
       assignAlias(out, 'attendance', ['attendance', 'kehadiran'])
       assignAlias(out, 'ptkp', ['ptkp', 'PTKP'])
-      const earnings = normalizeMoneyList(out.earnings)
-        .filter((item) => normalizeLabel(item.label) !== 'tunjangan sewa motor' || toNumberSafe(item.amount) !== 0)
-      const deductions = normalizeMoneyList(out.deductions)
-      appendAliasMoney(earnings, out, 'Gaji Pokok', ['gajiPokok', 'gaji_pokok', 'gaji pokok', 'baseSalary', 'base_salary'])
-      appendAliasMoney(earnings, out, 'Tunjangan Makan', ['tunjanganMakan', 'tunjangan_makan', 'tunjangan makan'])
-      appendAliasMoney(earnings, out, 'Tunjangan Transport', ['tunjanganTransport', 'tunjangan_transport', 'tunjangan transport'])
-      appendPositiveAliasMoney(earnings, out, 'Tunjangan Sewa Motor', ['tunjanganSewaMotor', 'tunjangan_sewa_motor', 'tunjangan sewa motor', 'sewaMotorAllowance', 'sewa_motor_allowance', 'motorRentalAllowance', 'motor_rental_allowance'])
-      appendAliasMoney(earnings, out, 'Tunjangan Komunikasi', ['tunjanganKomunikasi', 'tunjangan_komunikasi', 'tunjangan komunikasi', 'yunjangan komunikasi'])
-      appendAliasMoney(earnings, out, 'Tunjangan Jabatan', ['tunjanganJabatan', 'tunjangan_jabatan', 'tunjangan jabatan'])
-      appendAliasMoney(earnings, out, 'Tunjangan BPJS Ketenagakerjaan', ['tunjanganBpjsKetenagakerjaan', 'tunjanganBPJSKetenagakerjaan', 'tunjangan_bpjs_ketenagakerjaan', 'tunjangan bpjs ketenagakerjaan'])
-      appendAliasMoney(deductions, out, 'BPJS Ketenagakerjaan', ['bpjsKetenagakerjaan', 'bpjs_ketenagakerjaan', 'bpjs ketenagakerjaan'])
-      appendAliasMoney(deductions, out, 'PPh21', ['pph21', 'pph_21', 'pph 21'])
-      out.earnings = earnings
-      out.deductions = deductions
+      out.earnings = normalizeCanonicalMoneyList(out.earnings, out, EXEL_PAYSLIP_EARNINGS)
+      out.deductions = normalizeCanonicalMoneyList(out.deductions, out, EXEL_PAYSLIP_DEDUCTIONS)
       return out
     }
 
@@ -239,20 +272,28 @@ function normalizeMoneyItem (item) {
   }
 }
 
+function normalizeCanonicalMoneyList (input, source, definitions) {
+  const normalizedInput = normalizeMoneyList(input)
+
+  return definitions.reduce((result, definition) => {
+    const acceptedLabels = [definition.label, ...definition.keys].map(normalizeLabel)
+    const existing = normalizedInput.find((item) => acceptedLabels.includes(normalizeLabel(item && item.label)))
+    const value = existing ? existing.amount : pickFirstValue(source, definition.keys)
+    if (isMissing(value)) return result
+
+    const amount = toAmount(value)
+    if (definition.positiveOnly && toNumberSafe(amount) === 0) return result
+
+    result.push({ label: definition.label, amount })
+    return result
+  }, [])
+}
+
 function appendAliasMoney (list, source, label, keys) {
   const value = pickFirstValue(source, keys)
   if (isMissing(value)) return
   if (hasLabel(list, label)) return
   list.push({ label, amount: toAmount(value) })
-}
-
-function appendPositiveAliasMoney (list, source, label, keys) {
-  const value = pickFirstValue(source, keys)
-  if (isMissing(value) || hasLabel(list, label)) return
-
-  const amount = toAmount(value)
-  if (toNumberSafe(amount) === 0) return
-  list.push({ label, amount })
 }
 
 function hasLabel (list, label) {

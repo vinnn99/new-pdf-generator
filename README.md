@@ -1113,9 +1113,11 @@ Catatan: kolom `email` opsional; jika kosong, sistem memakai email akun yang log
   - Tambahan: `birthDate`, `resignReason`, `location`, `letterDate`, `signerLeft*`, `signerRight*`, `signatureLeftUrl`, `signatureRightUrl`, `callback_url`, `callback_header`, `data_json`.  
   - Header contoh: `region | mdsName | mdsCode | nik | birthDate | effectiveResignDate | status | mdsCategory | outletFrom | resignReason | location | letterDate | signerLeftName | signerLeftTitle | signerRightName | signerRightTitle | signatureLeftUrl | signatureRightUrl | email (opsional) | callback_url | callback_header`
 
-Catatan khusus BA:
+Catatan khusus batch:
 - `letterNo` selalu di-generate otomatis sistem (format default: `{seq}/{CompanyCode}/{templateCode}/{romanMonth}/{Year}`, timezone server `Asia/Jakarta`).
 - Jika request bulk BA bukan `dryRun`, response akan mengembalikan `batch_id` untuk referensi kirim email bulk BA.
+- Jika request bulk `exel-payslip` bukan `dryRun`, response juga mengembalikan `batch_id` untuk audit melalui menu Batch IDs. `match_key` item memakai `employeeId`.
+- Header payroll `exel-payslip`: `employeeId | employeeName | position | departement | periode | joinDate | ptkp | targetHK | attendance | Gaji Pokok | Tunjangan Makan | Tunjangan Transport | Tunjangan Sewa Motor | Tunjangan Komunikasi | Tunjangan Jabatan | Insentif | BPJS Kesehatan | BPJS Ketenagakerjaan | PPH21 | email`.
 
 Kolom opsional umum (semua mode): `employeeId`, `department/departement/departemen`, `joinDate`, `ptkp`, `targetHK`, `attendance`, `note`, `data_json` (JSON string untuk override/tambah field data), `callback_url`, `callback_header`.
 
@@ -1129,7 +1131,7 @@ curl -X POST http://localhost:3334/api/v1/bulk/payslip \
 ```
 
 ### Respons
-`200 OK` dengan ringkasan: `status`, `mode`, `total`, `queued`, `failed`, `dryRun`, `sheet`, dan `results[]` per baris (`queued`, `failed`, atau `dry-run` dengan pesan error jika ada). Untuk mode BA non-`dryRun`, response juga mengandung `batch_id`. Job sukses masuk queue `GeneratePdfJob` dan webhook dikirim bila callback tersedia.
+`200 OK` dengan ringkasan: `status`, `mode`, `total`, `queued`, `failed`, `dryRun`, `sheet`, dan `results[]` per baris (`queued`, `failed`, atau `dry-run` dengan pesan error jika ada). Untuk mode BA, cooperation agreement, `event_weekly_payslip`, dan `exel-payslip` non-`dryRun`, response juga mengandung `batch_id`. Job sukses masuk queue `GeneratePdfJob` dan webhook dikirim bila callback tersedia.
 
 ---
 
@@ -1137,7 +1139,7 @@ curl -X POST http://localhost:3334/api/v1/bulk/payslip \
 
 Endpoint: `POST /api/v1/send-slip-emails` (auth: JWT).  
 Form-data:
-- `file` (wajib): XLS/XLSX dengan kolom (case-insensitive): `sentTo`, `employeeId`, `employeeName`, `slipTitle`, `template` (opsional: `payslip`/`insentif`/`thr`), `body`, `cc`, `bcc`.
+- `file` (wajib): XLS/XLSX dengan kolom (case-insensitive): `sentTo`, `employeeId`, `employeeName`, `slipTitle`, `template` (opsional: `payslip`/`insentif`/`thr`/`exel-payslip`), `body`, `cc`, `bcc`.
 - `periode` (opsional): contoh `2026-03`; filter segmen periode pada nama file.
 
 Perilaku:
@@ -1147,6 +1149,7 @@ Perilaku:
 - Untuk format file bulk baru, kandidat diprioritaskan yang `employeeName` cocok; jika tidak ada, sistem fallback ke `employeeId` exact selama `periode` dan `template` cocok.
 - Jika ada lebih dari satu kandidat lampiran yang cocok (beda `kodeUnique`), sistem memilih file terbaru.
 - Satu lampiran dikirim per baris email.
+- Untuk `exel-payslip`, spreadsheet email hanya mencari dan mengirim PDF yang sudah dibuat; kolom komponen payroll tidak diperlukan dan `batch_id` tidak wajib.
 - Log tercatat di `logs/bulk-email.log`.
 - SMTP: jika semua field SMTP di tabel `companies` terisi (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, opsional `smtp_secure`, `mail_from`) maka konfigurasi auth SMTP company dipakai; jika tidak lengkap, fallback ke `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`). `SMTP_USER` hanya dipakai untuk autentikasi SMTP, sedangkan pengirim email (`from`) wajib dari `MAIL_FROM` atau fallback `companies.mail_from`.
 
@@ -1175,8 +1178,8 @@ Endpoint (auth: JWT, form-data `batch_id` + `file` xls/xlsx; kolom minimal `sent
 - `POST /api/v1/send-ba-cancel-join-emails` — wajib: `mdsName`, `region/wilayah`
 - `POST /api/v1/send-ba-resign-emails` — wajib: `mdsName`, `region/wilayah`
 
-## History Batch BA
-- `GET /api/v1/batches?template=<ba-template>&page=1&perPage=10`
+## History Batch
+- `GET /api/v1/batches?template=<template>&page=1&perPage=10` (`exel-payslip`, `event_weekly_payslip`, BA, atau cooperation agreement)
 - `GET /api/v1/batches/:batch_id?page=1&perPage=20`
 
 Scope akses:

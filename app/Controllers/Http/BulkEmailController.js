@@ -33,7 +33,28 @@ class BulkEmailController {
   }
 
   async sendEventWeeklyPayslip(ctx) {
-    return this._sendSlipEmails(ctx, 'event_weekly_payslip')
+    return this._sendBaTemplate(ctx, {
+      template: 'event_weekly_payslip',
+      context: 'bulk-slip',
+      label: 'event weekly payslip',
+      required: ['employeeId', 'employeeName'],
+      requireSuccessfulBatchItems: true,
+      extractFields: (norm) => ({
+        employeeId: String(norm.employeeid || norm['employee id'] || norm.employee_id || norm.nik || '').trim(),
+        employeeName: String(norm.employeename || norm['employee name'] || norm.employee_name || norm.nama || '').trim()
+      }),
+      buildMatchKey: buildEventWeeklyBatchMatchKey,
+      normalizeStoredMatchKey: normalizeEventWeeklyBatchMatchKey,
+      subject: (fields) => `SLIP GAJI - ${fields.employeeName || fields.employeeId || ''}`,
+      body: (fields, company) => [
+        `Yth. ${fields.employeeName || fields.employeeId || 'Bapak/Ibu'},`,
+        '',
+        'Berikut terlampir slip gaji mingguan/event Anda.',
+        '',
+        company && company.name ? company.name : '',
+        'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
+      ].filter(Boolean).join('\n')
+    })
   }
 
   async _sendSlipEmails({ request, response, auth }, forcedTemplate = '') {
@@ -470,8 +491,14 @@ class BulkEmailController {
         .orderBy('updated_at', 'desc')
         .orderBy('id', 'desc')
 
-      const attachmentsByMatchKey = batchItems.reduce((acc, item) => {
-        const key = (item.match_key || '').toString()
+      const eligibleBatchItems = cfg.requireSuccessfulBatchItems
+        ? batchItems.filter((item) => String(item.status || '').toLowerCase() === 'success')
+        : batchItems
+      const attachmentsByMatchKey = eligibleBatchItems.reduce((acc, item) => {
+        const rawKey = (item.match_key || '').toString()
+        const key = typeof cfg.normalizeStoredMatchKey === 'function'
+          ? cfg.normalizeStoredMatchKey(rawKey)
+          : rawKey
         if (!key) return acc
         if (!acc[key]) acc[key] = []
         acc[key].push(item)
@@ -550,7 +577,8 @@ class BulkEmailController {
             to, cc, bcc, subject, text: body,
             attachments: jobAttachments,
             requireAttachments: true,
-            employeeName: fields.mdsName || fields.partnerName,
+            employeeId: fields.employeeId || fields.nik || undefined,
+            employeeName: fields.employeeName || fields.mdsName || fields.partnerName,
             userId: user.id,
             companyId: company.company_id,
             template: cfg.template,
@@ -1092,6 +1120,35 @@ function resolveSavedPath(savedPath) {
   const raw = String(savedPath || '').trim()
   if (!raw) return ''
   return path.join(process.cwd(), raw)
+}
+
+function buildEventWeeklyBatchMatchKey(fields) {
+  const source = fields && typeof fields === 'object' ? fields : {}
+  const employeeId = normalizeEventWeeklyEmployeeId(source.employeeId || source.nik)
+  const employeeName = normalizeEventWeeklyEmployeeName(source.employeeName || source.nama)
+  if (!employeeId || !employeeName) return ''
+  return `${employeeId}|${employeeName}`
+}
+
+function normalizeEventWeeklyBatchMatchKey(value) {
+  const parts = String(value || '').split('|')
+  if (parts.length < 2) return ''
+  const employeeId = normalizeEventWeeklyEmployeeId(parts.shift())
+  const employeeName = normalizeEventWeeklyEmployeeName(parts.join('|'))
+  if (!employeeId || !employeeName) return ''
+  return `${employeeId}|${employeeName}`
+}
+
+function normalizeEventWeeklyEmployeeId(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function normalizeEventWeeklyEmployeeName(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
 }
 
 function ensureLogDir() {

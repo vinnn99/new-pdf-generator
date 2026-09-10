@@ -12,6 +12,7 @@ const BaTemplateService = use('App/Services/BaTemplateService')
 const BaLetterNoService = use('App/Services/BaLetterNoService')
 const CooperationAgreementService = use('App/Services/CooperationAgreementService')
 const CooperationAgreementLetterNoService = use('App/Services/CooperationAgreementLetterNoService')
+const SlipPayloadNormalizer = use('App/Services/SlipPayloadNormalizer')
 
 class BulkPdfController {
   async payslipFromExcel(ctx) {
@@ -131,7 +132,8 @@ class BulkPdfController {
       const isCooperationAgreementMode = CooperationAgreementService.isTemplate(mode)
       const isLetteredBatchMode = isBaMode || isCooperationAgreementMode
       const isEventWeeklyBatchMode = mode === 'event_weekly_payslip'
-      const isBatchTrackedMode = isLetteredBatchMode || isEventWeeklyBatchMode
+      const isExelPayslipBatchMode = mode === 'exel-payslip'
+      const isBatchTrackedMode = isLetteredBatchMode || isEventWeeklyBatchMode || isExelPayslipBatchMode
       const batchId = isBatchTrackedMode && !opts.dryRun ? createBatchId() : null
 
       const results = []
@@ -489,18 +491,9 @@ function basePayload(lower, opts) {
 }
 
 function buildExelPayslipPayload(lower, opts) {
-  const payload = buildPayslipPayload(lower, opts)
-  const tunjanganSewaMotor = firstDefined(lower, [
-    'tunjangansewamotor',
-    'tunjangan_sewa_motor',
-    'tunjangan sewa motor',
-    'sewamotorallowance',
-    'sewa_motor_allowance',
-    'motorrentalallowance',
-    'motor_rental_allowance'
-  ])
+  const payload = basePayload(lower, opts)
   payload.template = 'exel-payslip'
-  payload.data = {
+  const data = {
     ...payload.data,
     companyName: lower.companyname || lower.company_name || opts.defaultCompany || 'PT. EXEL INTEGRASI SOLUSINDO',
     slipTitle: lower.sliptitle || lower.slip_title || opts.defaultSlipTitle || 'SLIP GAJI',
@@ -512,15 +505,25 @@ function buildExelPayslipPayload(lower, opts) {
     jumlahHK: lower.jumlahhk || lower['jumlah hk'] || lower.jumlah_hk || lower.targethk || lower.target_hk,
     joinDate: parseSlipJoinDate(lower),
     ptkp: lower.ptkp,
-    targetHK: lower.targethk,
-    attendance: lower.attendance,
-    earnings: payload.data.earnings,
+    targetHK: firstDefined(lower, ['targethk', 'target_hk', 'target hk']),
+    attendance: firstDefined(lower, ['attendance', 'kehadiran']),
+    earnings: parseMoneyList(lower.earnings),
     deductions: parseMoneyList(lower.deductions),
     note: lower.note,
-    ...(tunjanganSewaMotor === undefined ? {} : { tunjanganSewaMotor })
+    gajiPokok: firstDefined(lower, ['gajipokok', 'gaji_pokok', 'gaji pokok', 'basesalary', 'base_salary']),
+    tunjanganMakan: firstDefined(lower, ['tunjanganmakan', 'tunjangan_makan', 'tunjangan makan']),
+    tunjanganTransport: firstDefined(lower, ['tunjangantransport', 'tunjangan_transport', 'tunjangan transport']),
+    tunjanganSewaMotor: firstDefined(lower, ['tunjangansewamotor', 'tunjangan_sewa_motor', 'tunjangan sewa motor', 'sewamotorallowance', 'sewa_motor_allowance', 'motorrentalallowance', 'motor_rental_allowance']),
+    tunjanganKomunikasi: firstDefined(lower, ['tunjangankomunikasi', 'tunjangan_komunikasi', 'tunjangan komunikasi', 'yunjangan komunikasi']),
+    tunjanganJabatan: firstDefined(lower, ['tunjanganjabatan', 'tunjangan_jabatan', 'tunjangan jabatan']),
+    insentif: firstDefined(lower, ['insentif', 'incentive']),
+    bpjsKesehatan: firstDefined(lower, ['bpjskesehatan', 'bpjs_kesehatan', 'bpjs kesehatan']),
+    bpjsKetenagakerjaan: firstDefined(lower, ['bpjsketenagakerjaan', 'bpjs_ketenagakerjaan', 'bpjs ketenagakerjaan']),
+    pph21: firstDefined(lower, ['pph21', 'pph_21', 'pph 21'])
   }
+  payload.data = SlipPayloadNormalizer.normalize({ template: payload.template, data })
 
-  const required = ['employeeName', 'position', 'period']
+  const required = ['employeeId', 'employeeName', 'position', 'period']
   const missing = required.filter((key) => !payload.data[key])
   if (missing.length) throw new Error(`Kolom wajib kosong: ${missing.join(', ')}`)
 
@@ -1124,6 +1127,13 @@ function buildCooperationAgreementPayload(lower, opts, templateName = Cooperatio
 }
 
 function buildBatchMatchKey(mode, lower, payloadData) {
+  if (mode === 'exel-payslip') {
+    const employeeId = payloadData && payloadData.employeeId
+      ? payloadData.employeeId
+      : pickFromLower(lower, ['employeeid', 'employee id', 'employee_id', 'nik'])
+    return normalizeMatchPart(employeeId)
+  }
+
   if (mode === 'event_weekly_payslip') {
     const data = payloadData && typeof payloadData === 'object'
       ? payloadData
@@ -1154,6 +1164,7 @@ function buildBatchMatchKey(mode, lower, payloadData) {
 }
 
 function getRequiredBatchMatchFields(mode) {
+  if (mode === 'exel-payslip') return ['employeeId']
   if (mode === 'event_weekly_payslip') return ['employeeId', 'employeeName']
   if (BaTemplateService.isBaTemplate(mode)) return BaTemplateService.getRequiredMatchFields(mode)
   if (CooperationAgreementService.isTemplate(mode)) return ['partnerName', 'partnerEmail/partnerIdentityNumber']
@@ -1163,9 +1174,17 @@ function getRequiredBatchMatchFields(mode) {
 function buildEventWeeklyMatchKey(data) {
   const source = data && typeof data === 'object' ? data : {}
   const employeeId = normalizeMatchPart(source.employeeId || source.nik)
-  const employeeName = normalizeMatchPart(source.employeeName || source.nama)
+  const employeeName = normalizeEventWeeklyEmployeeName(source.employeeName || source.nama)
   if (!employeeId || !employeeName) return ''
   return [employeeId, employeeName].join('|')
+}
+
+function normalizeEventWeeklyEmployeeName(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
 }
 
 function normalizeMatchPart(value) {

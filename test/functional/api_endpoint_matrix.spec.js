@@ -30,6 +30,7 @@ const BULK_ENDPOINTS = [
   '/api/v1/bulk/payslip',
   '/api/v1/bulk/insentif',
   '/api/v1/bulk/thr',
+  '/api/v1/bulk/exel-payslip',
   '/api/v1/bulk/ba-penempatan',
   '/api/v1/bulk/ba-request-id',
   '/api/v1/bulk/ba-hold',
@@ -1022,6 +1023,94 @@ test('send/payslip menerima recipient object dan body 4-byte', async ({ client, 
   assert.equal(payload.data.text, `Halo ${marker}`)
 })
 
+test('send/exel-payslip tersedia dan memvalidasi field wajib', async ({ client, assert }) => {
+  const token = await loginAndGetToken(client, seed.credentials.user)
+  const response = await client
+    .post('/api/v1/send/exel-payslip')
+    .header('Authorization', `Bearer ${token}`)
+    .send({
+      to: `exel.${uniqueId('single')}@test.local`,
+      data: {
+        employeeName: 'Exel Single',
+        position: 'Staff'
+      }
+    })
+    .end()
+
+  response.assertStatus(422)
+  assert.equal(String(response.body.message || '').includes('period'), true)
+})
+
+test('bulk/exel-payslip membuat batch dan payload komponen baru', async ({ client, assert }) => {
+  const stamp = uniqueId('bulk_exel')
+  const xlsxPath = path.join(Helpers.tmpPath(), `${stamp}.xlsx`)
+  const workbook = XLSX.utils.book_new()
+  const sheet = XLSX.utils.json_to_sheet([
+    {
+      employeeId: `EMP-${stamp}`,
+      employeeName: 'Bulk Exel',
+      position: 'Sales',
+      periode: '2026-09',
+      'Gaji Pokok': 5000000,
+      Insentif: 600000,
+      'BPJS Kesehatan': 100000,
+      'BPJS Ketenagakerjaan': 150000,
+      PPH21: 125000,
+      'Tunjangan BPJS Ketenagakerjaan': 999999
+    }
+  ])
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Data')
+  XLSX.writeFile(workbook, xlsxPath)
+
+  try {
+    const token = await loginAndGetToken(client, seed.credentials.user)
+    const response = await client
+      .post('/api/v1/bulk/exel-payslip')
+      .header('Authorization', `Bearer ${token}`)
+      .field('dryRun', 'false')
+      .attach('file', xlsxPath)
+      .end()
+
+    response.assertStatus(200)
+    assert.equal(response.body.mode, 'exel-payslip')
+    assert.ok(response.body.batch_id)
+    assert.equal(Number(response.body.queued), 1)
+
+    const batch = await Database.table('generation_batches')
+      .where('batch_id', response.body.batch_id)
+      .first()
+    const item = await Database.table('generation_batch_items')
+      .where('batch_id', response.body.batch_id)
+      .first()
+    const job = await Database.table('jobs')
+      .where('payload', 'like', `%EMP-${stamp}%`)
+      .orderBy('id', 'desc')
+      .first()
+
+    assert.ok(batch)
+    assert.equal(batch.template, 'exel-payslip')
+    assert.equal(Number(batch.company_id), Number(seed.companyAId))
+    assert.ok(item)
+    assert.equal(item.match_key, `emp-${stamp}`.toLowerCase())
+    assert.ok(job)
+
+    const queuedPayload = JSON.parse(job.payload).data
+    assert.deepEqual(queuedPayload.data.earnings.map((entry) => entry.label), ['Gaji Pokok', 'Insentif'])
+    assert.deepEqual(queuedPayload.data.deductions.map((entry) => entry.label), [
+      'BPJS Kesehatan',
+      'BPJS Ketenagakerjaan',
+      'PPH21'
+    ])
+    assert.isUndefined(queuedPayload.data.earnings.find((entry) => entry.label === 'Tunjangan BPJS Ketenagakerjaan'))
+  } finally {
+    try {
+      fs.unlinkSync(xlsxPath)
+    } catch (e) {
+      // ignore
+    }
+  }
+})
+
 test('Dashboard summary default scope konsisten dengan generated-pdfs per role', async ({ client, assert }) => {
   const expectedScopeByRole = {
     user: 'user',
@@ -1325,12 +1414,40 @@ test('send-event-weekly-payslip-emails menemukan PDF event weekly hasil generate
   const toEmail = `event.weekly.${stamp}@test.local`
   const employeeId = `EVT-${stamp}`
   const employeeName = `Budi Event ${stamp}`
+  const batchId = `batch-${stamp}`
+  const matchKey = `${employeeId.toLowerCase()}|${employeeName.toLowerCase()}`
   const xlsxPath = path.join(Helpers.tmpPath(), `send-event-weekly-${stamp}.xlsx`)
   let pdfMeta = null
 
   const company = await Database.table('companies')
     .where('company_id', seed.companyAId)
     .first()
+
+  const now = new Date()
+  await Database.table('generation_batches').insert({
+    batch_id: batchId,
+    company_id: seed.companyAId,
+    template: 'event_weekly_payslip',
+    created_by: seed.userMainId,
+    total_rows: 1,
+    queued: 1,
+    failed: 0,
+    status: 'completed',
+    created_at: now,
+    updated_at: now
+  })
+  const insertedBatchItem = await Database.table('generation_batch_items').insert({
+    batch_id: batchId,
+    company_id: seed.companyAId,
+    template: 'event_weekly_payslip',
+    row_no: 1,
+    match_key: matchKey,
+    status: 'queued',
+    row_data: JSON.stringify({ employeeId, employeeName }),
+    created_at: now,
+    updated_at: now
+  })
+  const batchItemId = Array.isArray(insertedBatchItem) ? insertedBatchItem[0] : insertedBatchItem
 
   pdfMeta = await new GeneratePdfJob().handle({
     template: 'event_weekly_payslip',
@@ -1361,7 +1478,10 @@ test('send-event-weekly-payslip-emails menemukan PDF event weekly hasil generate
     email: seed.credentials.user.email,
     companyName: company.name,
     userId: seed.userMainId,
-    companyId: seed.companyAId
+    companyId: seed.companyAId,
+    batchId,
+    batchItemId,
+    matchKey
   })
 
   const workbook = XLSX.utils.book_new()
@@ -1370,7 +1490,6 @@ test('send-event-weekly-payslip-emails menemukan PDF event weekly hasil generate
       sentTo: toEmail,
       NIK: employeeId,
       employeeName,
-      periode: 'juli-2026',
       body: 'Body'
     }
   ])
@@ -1384,7 +1503,7 @@ test('send-event-weekly-payslip-emails menemukan PDF event weekly hasil generate
     const response = await client
       .post('/api/v1/send-event-weekly-payslip-emails')
       .header('Authorization', `Bearer ${token}`)
-      .field('periode', 'juli-2026')
+      .field('batch_id', batchId)
       .attach('file', xlsxPath)
       .end()
 
@@ -1392,8 +1511,9 @@ test('send-event-weekly-payslip-emails menemukan PDF event weekly hasil generate
     assert.equal(response.body.status, 'ok')
     assert.equal(Number(response.body.queued), 1)
     assert.equal(Number(response.body.skipped), 0)
+    assert.equal(response.body.batch_id, batchId)
     assert.equal(response.body.results[0].status, 'queued')
-    assert.equal(response.body.results[0].attachments[0], pdfMeta.filename)
+    assert.equal(response.body.results[0].attachment, pdfMeta.filename)
 
     const job = await Database.table('jobs')
       .where('payload', 'like', `%${toEmail}%`)
@@ -1402,7 +1522,7 @@ test('send-event-weekly-payslip-emails menemukan PDF event weekly hasil generate
 
     assert.ok(job)
     const payload = JSON.parse(job.payload)
-    assert.equal(payload.data.template, 'payslip-email')
+    assert.equal(payload.data.template, 'event_weekly_payslip')
     assert.equal(payload.data.employeeId, employeeId)
     assert.equal(payload.data.employeeName, employeeName)
   } finally {
@@ -1416,6 +1536,8 @@ test('send-event-weekly-payslip-emails menemukan PDF event weekly hasil generate
     } catch (e) {
       // ignore
     }
+    await Database.table('generation_batch_items').where('batch_id', batchId).delete()
+    await Database.table('generation_batches').where('batch_id', batchId).delete()
   }
 })
 

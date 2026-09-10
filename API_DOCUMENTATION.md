@@ -540,6 +540,35 @@ Contoh payload `event_weekly_payslip`:
   }
 }
 ```
+Contoh payload `exel-payslip` dengan komponen payroll canonical:
+```json
+{
+  "template": "exel-payslip",
+  "email": "user@example.com",
+  "data": {
+    "employeeName": "Budi",
+    "employeeId": "EMP-001",
+    "position": "Sales",
+    "period": "September 2026",
+    "gajiPokok": 5000000,
+    "tunjanganMakan": 500000,
+    "tunjanganTransport": 300000,
+    "tunjanganSewaMotor": 250000,
+    "tunjanganKomunikasi": 200000,
+    "tunjanganJabatan": 400000,
+    "insentif": 600000,
+    "bpjsKesehatan": 100000,
+    "bpjsKetenagakerjaan": 150000,
+    "pph21": 125000
+  }
+}
+```
+
+Komponen `exel-payslip` dinormalisasi ke urutan berikut:
+- Pendapatan: `Gaji Pokok`, `Tunjangan Makan`, `Tunjangan Transport`, `Tunjangan Sewa Motor`, `Tunjangan Komunikasi`, `Tunjangan Jabatan`, `Insentif`.
+- Potongan: `BPJS Kesehatan`, `BPJS Ketenagakerjaan`, `PPH21`.
+- `Tunjangan BPJS Ketenagakerjaan` tidak lagi diterima sebagai komponen pendapatan `exel-payslip` dan tidak ikut perhitungan total.
+
 Response 202:
 ```json
 { "status": "queued", "message": "PDF generation is being processed" }
@@ -569,6 +598,7 @@ Webhook payload (on success):
 - `musik`: `nama`, `judul`, `nik`, `address`, `pt`, `pencipta`, `asNama`, `bankName`, `npwp`, `imail`, `phone`, `norek`
 - `invoice`: `clientName`, `items`
 - `payslip`: `employeeName`, `position`, `period`
+- `exel-payslip`: `employeeName`, `position`, `period`
 - `event_weekly_payslip`: `employeeName`, `employeeId`
 - `thr`: `employeeName`, `position`, `period`, `payoutDate`, `baseSalary`
 - `ba-penempatan`: `mdsName`, `placementDate`, `outlet`
@@ -587,7 +617,7 @@ Catatan BA:
 - `data.signatureLeftUrl` dan `data.signatureRightUrl` bersifat opsional untuk override gambar tanda tangan.
 
 **Penamaan file:**
-- `payslip`/`insentif`/`thr`/`event_weekly_payslip`: `<periode>.<template>.<employeeId>.<nama>.<unik>.pdf`
+- `payslip`/`insentif`/`thr`/`exel-payslip`/`event_weekly_payslip`: `<periode>.<template>.<employeeId>.<nama>.<unik>.pdf`
 - `ba-penempatan`: `ba-penempatan.<mdsName>.<outlet>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-request-id`: `ba-request-id.<mdsName>.<area>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-hold`: `ba-hold.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
@@ -598,6 +628,52 @@ Catatan BA:
 - `ba-cancel-join`: `ba-cancel-join.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - `ba-resign`: `ba-resign.<mdsName>.<region>.<letterNo>.<unik>.pdf` (karakter `/` di `letterNo` diganti `-`)
 - Lainnya: `<template>_<unik>.pdf`
+
+### Send Single Email `exel-payslip`
+
+`POST /api/v1/send/exel-payslip`
+Headers: `Authorization: Bearer <JWT>`, `Content-Type: application/json`
+
+Endpoint ini membuat PDF `exel-payslip`, menyimpannya pada folder company/penerima, lalu mengantrekan email dengan PDF tersebut sebagai attachment.
+
+Request body:
+```json
+{
+  "to": "budi@example.com",
+  "cc": [],
+  "bcc": [],
+  "subject": "Slip Gaji - Budi",
+  "body": "Berikut terlampir slip gaji Anda.",
+  "data": {
+    "employeeName": "Budi",
+    "employeeId": "EMP-001",
+    "position": "Sales",
+    "period": "September 2026",
+    "gajiPokok": 5000000,
+    "tunjanganMakan": 500000,
+    "tunjanganTransport": 300000,
+    "tunjanganSewaMotor": 250000,
+    "tunjanganKomunikasi": 200000,
+    "tunjanganJabatan": 400000,
+    "insentif": 600000,
+    "bpjsKesehatan": 100000,
+    "bpjsKetenagakerjaan": 150000,
+    "pph21": 125000
+  }
+}
+```
+
+Required fields di dalam `data`: `employeeName`, `position`, `period`. Field `to` wajib berisi minimal satu email valid. `subject`, `body`, `cc`, dan `bcc` opsional. Template harus termasuk dalam `allowed_templates` company jika daftar tersebut tidak kosong.
+
+Response 202:
+```json
+{
+  "status": "queued",
+  "message": "PDF digenerate dan email akan dikirim",
+  "download_url": "http://localhost:3334/download/Contoh_Corp/budi%40example.com/2026-09.exel-payslip.EMP-001.Budi.ab12C.pdf",
+  "filename": "2026-09.exel-payslip.EMP-001.Budi.ab12C.pdf"
+}
+```
 
 ---
 
@@ -639,6 +715,7 @@ Content-Type: `multipart/form-data` dengan field `file` (xls/xlsx, max 10 MB). O
 - `POST /api/v1/bulk/payslip`
 - `POST /api/v1/bulk/insentif`
 - `POST /api/v1/bulk/thr`
+- `POST /api/v1/bulk/exel-payslip`
 - `POST /api/v1/bulk/event_weekly_payslip`
 - `POST /api/v1/bulk/ba-penempatan`
 - `POST /api/v1/bulk/ba-request-id`
@@ -696,10 +773,11 @@ Response 200:
   ]
 }
 ```
-Untuk `event_weekly_payslip`, response bulk juga mengembalikan `batch_id` saat `dryRun=false`. Batch ini muncul di halaman Batch IDs dan bisa dipakai untuk audit hasil generate.
+Untuk `exel-payslip` dan `event_weekly_payslip`, response bulk juga mengembalikan `batch_id` saat `dryRun=false`. Batch muncul di halaman Batch IDs dan dapat dipakai untuk audit hasil generate. Pada `dryRun=true`, tidak ada record batch yang dibuat dan `batch_id` bernilai `null`.
 
 #### Header kolom Excel (disarankan)
 - **Payslip**: `employeeId | employeeName | position | departement | periode | joinDate | ptkp | targetHK | attendance | Gaji Pokok | Tunjangan makan | Tunjangan Transport | Tunjangan Komunikasi | Tunjangan Jabatan | Tunjangan BPJS Ketenagakerjaan | BPJS Ketenagakerjaan | PPH 21 | email (opsional)`
+- **Exel Payslip**: `employeeId | employeeName | position | departement | periode | joinDate | ptkp | targetHK | attendance | Gaji Pokok | Tunjangan Makan | Tunjangan Transport | Tunjangan Sewa Motor | Tunjangan Komunikasi | Tunjangan Jabatan | Insentif | BPJS Kesehatan | BPJS Ketenagakerjaan | PPH21 | email`
 - **Insentif**: `employeeId | employeeName | position | departement | periode | INSENTIF SAMPLING | INSENTIF SELLOUT | INSENTIF KERAJINAN | INSENTIF TL | earnings | deductions | email (opsional)`
 - **THR**: `employeeId | employeeName | position | departement | periode | THR | earnings | deductions | note | email (opsional)`
 - **Event Weekly Payslip**: `NIK | employeeName | STATUS | AREA | JABATAN | NPWP | JUMLAH HK | PERIODE | DESKRIPSI | 25/07/2026 | 26/07/2026 | 27/07/2026 | 28/07/2026 | 29/07/2026 | 30/07/2026 | 31/07/2026 | ADJUSTMENT | POT TELAT | KASBON | email (opsional) | callback_url | callback_header`
@@ -724,23 +802,24 @@ Kolom umum: `callback_url`, `callback_header` (JSON), `data_json` (override/extr
 
 ## 5) Bulk Kirim Email Slip
 Endpoint:
-- `POST /api/v1/send-slip-emails` untuk `payslip`, `insentif`, `thr`
+- `POST /api/v1/send-slip-emails` untuk `payslip`, `insentif`, `thr`, `exel-payslip`
 - `POST /api/v1/send-event-weekly-payslip-emails` untuk `event_weekly_payslip`
 
 Auth: `Authorization: Bearer <JWT>`  
 Form-data `/api/v1/send-slip-emails`:
-- `file` (xls/xlsx, max 5 MB) dengan kolom: `sentTo` (wajib) | `employeeId` (wajib) | `employeeName` | `slipTitle` | `template` (opsional: `payslip`/`insentif`/`thr`) | `body` | `cc` | `bcc`
+- `file` (xls/xlsx, max 5 MB) dengan kolom: `sentTo` (wajib) | `employeeId` (wajib) | `employeeName` | `slipTitle` | `template` (opsional: `payslip`/`insentif`/`thr`/`exel-payslip`) | `body` | `cc` | `bcc`
 - `periode` (opsional, filter segmen periode pada nama file, contoh `2026-03`)
 
 Form-data `/api/v1/send-event-weekly-payslip-emails`:
-- `file` (xls/xlsx, max 5 MB) dengan kolom: `sentTo` (wajib) | `NIK` atau `employeeId` (wajib) | `employeeName` (wajib) | `periode` | `body` | `cc` | `bcc`
-- `periode` (opsional, filter segmen periode pada nama file, contoh `2026-07`, `juli-2026`, `Juli 2026`)
+- `file` (xls/xlsx, max 5 MB) dengan kolom: `sentTo` (wajib) | `NIK` atau `employeeId` (wajib) | `employeeName` (wajib) | `body` | `cc` | `bcc`
+- `batch_id` (wajib): ID batch hasil `POST /api/v1/bulk/event_weekly_payslip` pada company yang sama.
 
 Untuk `/send-slip-emails`, lampiran dicari hanya di `public/download/{companyName}/{email_login}/` (folder disanitasi sesuai email user login) dengan format:
 `[periode].[template].[employeeId].[nama].[kodeUnique].pdf`.
 Pencarian menormalisasi separator periode (`2026.03`, `2026_03`, `2026/03`, `2026-03`) dan nama bulan (`april-2026`, `April 2026`, `apr-2026`) ke bentuk yang sama. Untuk format file bulk baru, kandidat diprioritaskan yang `employeeName` cocok; jika tidak ada, sistem fallback ke `employeeId` exact selama `periode` dan `template` cocok.
 Jika ditemukan lebih dari satu kandidat untuk baris yang sama, sistem memilih file paling baru (berdasarkan waktu file).
-Untuk `/send-event-weekly-payslip-emails`, lampiran dicari di folder yang sama dengan template tetap `event_weekly_payslip`, format filename sama, dan kandidat wajib cocok dengan `employeeId`/`NIK` serta `employeeName`. Endpoint ini tidak membutuhkan `batch_id`.
+Untuk `exel-payslip`, gunakan form-data `template=exel-payslip`. Spreadsheet ini hanya memilih penerima dan mencari attachment PDF yang sudah digenerate; kolom payroll seperti `Insentif` dan `BPJS Kesehatan` tidak digunakan untuk membuat ulang PDF. Endpoint ini tidak membutuhkan `batch_id`.
+Untuk `/send-event-weekly-payslip-emails`, lampiran dicari dari `generation_batch_items` milik `batch_id` dengan template tetap `event_weekly_payslip`, bukan dengan scan seluruh folder berdasarkan nama file. Kandidat wajib cocok dengan `employeeId`/`NIK` serta `employeeName`; perbandingan nama mengabaikan kapitalisasi, spasi, `_`, dan `-`. `periode` tidak digunakan sebagai filter. Item batch harus sudah berhasil diproses queue, memiliki `saved_path`, dan file PDF-nya masih tersedia.
 SMTP: jika semua field SMTP di tabel `companies` terisi (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, opsional `smtp_secure`, `mail_from`) maka konfigurasi auth SMTP company dipakai; jika tidak lengkap, fallback ke `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`). `SMTP_USER` hanya dipakai untuk autentikasi SMTP, sedangkan pengirim email (`from`) wajib dari `MAIL_FROM` atau fallback `companies.mail_from`.
 
 Response 200:
@@ -834,11 +913,13 @@ Download ZIP batch:
 - Jika tidak ada file valid, response `422` dengan pesan jelas
 
 Template batch yang didukung:
+- `exel-payslip`
 - `event_weekly_payslip`
 - semua template BA (`ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`, `ba-cancel-join`, `ba-resign`)
 - `cooperation_agreement`
 
 Catatan `event_weekly_payslip`: batch dibuat oleh `/api/v1/bulk/event_weekly_payslip`; `match_key` memakai `employeeId|employeeName`, dan `letter_no` bernilai `null`.
+Catatan `exel-payslip`: batch dibuat oleh `/api/v1/bulk/exel-payslip` saat `dryRun=false`; `match_key` memakai `employeeId`, dan `letter_no` bernilai `null`.
 
 Akses:
 - `user`/`admin`: hanya batch di company sendiri
