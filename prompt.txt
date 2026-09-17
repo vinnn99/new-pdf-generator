@@ -1,42 +1,16 @@
-** buatkan issue-exel_payslip_update.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+** buatkan issue-event_weekly_payslip.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 informasi umum:
 1. core.pdf-generator.indinesia.id adalah backend
 2. ui-pdf-generator adalah frontend
 
-** Latar bekalang:
-saat ini untuk template exel_payslip komponen nya adalah:
-- earning:
-    1. Gaji Pokok
-    2. Tunjangan Makan
-    3. Tunjangan Transport
-    4. Tunjangan Sewa Motor
-    5. Tunjangan Komunikasi
-    6. Tunjangan Jabatan
-    7. Tunjangan BPJS Ketenagakerjaan
-- deduction:
-    1. BPJS Ketenagakerjaan
-    2. PPH21
+** Latar belakang:
+Di Production, pada tabel email_log terdapat pesan error :
+    "Lampiran slip tidak ditemukan; email tidak dikirim. Filter: periode=2026-08, template=event_weekly_payslip, employeeId=014, employeeName=sindi_ayu. Folder dicek: public/download/PT. ORIGIN MAGDA INOVATION/rizqiarumdhita@indinesia.id (exists=true, pdf=118). Contoh PDF di folder: 08-08-2026---14-08-2026.event_weekly_payslip.001.OKTA_ADELIA.mtigdh90I1TIL.pdf, 08-08-2026---14-08-2026.event_weekly_payslip.001.OKTA_ADELIA.mtjj420xDF65Y.pdf, 08-08-2026---14-08-2026.event_weekly_payslip.001.OKTA_ADELIA.mtjkd6gyNZYH3.pdf. PDF dengan employeeId ini ditemukan: 28-08-2026---30-08-2026.event_weekly_payslip.014.SINDI_AYU.mtv4tbet6YM55.pdf, 26-08-2026---28-08-2026.event_weekly_payslip.014.SINDI_AYU.mtv4t9wiDTANF.pdf, 22-08-2026---27-08-2026.event_weekly_payslip.014.SINDI_AYU.mtv4t8yr5XW15.pdf. Pastikan generate bulk PDF sudah selesai diproses queue dan file tersimpan di folder company/email user login yang sama."
+Error ini saat mengirim Bulk Email dengan template "event_weekly_payslip"
 
-
-** isi planning nya sebagai berikut:
-1. ubah komponenya menjadi:
-    - earning:
-        a. Gaji Pokok
-        b. Tunjangan Makan
-        c. Tunjangan Transport
-        d. Tunjangan Sewa Motor
-        e. Tunjangan Komunikasi
-        f. Tunjangan Jabatan
-        g. Insentif
-    - deduction:
-        1. BPJS Kesehatan
-        2. BPJS Ketenagakerjaan
-        3. PPH21
-
-2. implementasikan pada frontend Bulk Generate PDF, Generate Single PDF, Send Single Email, Bulk Sned Email
-3. Untuk BulK PDF, update juga Header template excel_payslip nya sesuai format yang baru
-4. Untuk Bulk PDF, Pastikan Batch nya masuk ke menu Batch ID sesuai role template untuk perusahaan
-5. Pastikan perubahan tidak mengganggu Template lain
+** planingnya adalah:
+1. Khusus untuk "Bulk Send Email: dengan template "event_weekly_payslip", Filter tidak menggunakan Periode, cukup employeeName dan employeeId dalam 1 batch dalam pencarian file Lampiran
+5. Pastikan perubahan tidak mengganggu Pengiriman Bulk email Template lain
 
 
 

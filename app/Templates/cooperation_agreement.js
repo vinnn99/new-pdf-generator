@@ -198,7 +198,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
         'MITRA bersedia untuk melaksanakan kemitraan apabila ada perubahan Lokasi Kemitraan.',
         `Apabila diperlukan perpanjangan Masa Waktu Perjanjian, Para Pihak dapat melakukan Adendum Perjanjian sesuai kebutuhan ${upper(companyName)} yang akan ditentukan kemudian hari.`,
         `Apabila Masa Waktu Perjanjian telah selesai, maka hubungan kemitraan antara ${upper(companyName)} dengan MITRA dianggap berakhir tanpa kewajiban ${upper(companyName)} untuk memberikan uang pisah dan/atau pesangon, uang jasa, atau ganti kerugian lainnya kepada MITRA.`,
-        `Apabila dalam Masa Waktu Perjanjian MITRA mengundurkan diri, MITRA wajib memberikan pemberitahuan tertulis lebih dahulu kepada ${upper(companyName)} dan memenuhi ketentuan ganti rugi sampai batas waktu Perjanjian berakhir sesuai ketentuan ${upper(companyName)}.`,
+        `Apabila dalam Masa Waktu Perjanjian, MITRA sewaktu-waktu mengundurkan diri wajib dengan pemberitahuan secara tertulis lebih dahulu 1 (satu) bulan kepada ${upper(companyName)} dan wajib untuk menjalankan 1 (satu) bulan pemberitahuan. Tanpa menjalankan 1 (satu) bulan pemberitahuan, MITRA wajib membayar ganti rugi sampai batas waktu PKM berakhir yang akan ditentukan oleh ${upper(companyName)}.`,
         `${upper(companyName)} dapat sewaktu-waktu mengakhiri Perjanjian ini secara sepihak apabila terbukti MITRA tidak bertanggung jawab atau tidak mematuhi ketentuan Perjanjian.`
       ])),
       article('Pasal 4', 'SAKIT DAN PERIJINAN LAINNYA', numbered([
@@ -272,7 +272,6 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
         'Perjanjian ini dapat ditandatangani dalam sejumlah salinan dan disampaikan dengan transmisi faksimile atau lainnya. Lampiran-lampiran dalam Perjanjian ini merupakan satu kesatuan yang tidak terpisahkan.'
       ])),
       {
-        pageBreak: 'before',
         unbreakable: true,
         stack: [
           p('Demikianlah Perjanjian ini dibuat oleh Para Pihak dalam 2 (dua) rangkap dan telah benar-benar memahami seluruh ketentuan dalam Perjanjian ini dan oleh karenanya telah sepakat melaksanakan Perjanjian ini. Para Pihak saat menandatangani Perjanjian ini dalam keadaan sehat jasmani dan rohani tanpa adanya paksaan ataupun tekanan dari pihak manapun.'),
