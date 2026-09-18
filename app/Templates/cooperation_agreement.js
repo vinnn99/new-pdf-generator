@@ -226,7 +226,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
       ])),
       article('Pasal 9', 'SANKSI, MANGKIR DAN DENDA', numbered([
         `${upper(companyName)} berwenang memberikan teguran atau peringatan baik lisan maupun tulisan kepada MITRA apabila MITRA tidak memenuhi kewajiban-kewajiban dalam Perjanjian ini.`,
-        `Sesuai dengan ketentuan mekanisme program yang berlaku, PT Origin Magda Inovasi berwenang untuk melakukan pemotongan terhadap biaya upah bulanan dan/atau insentif (jikalau ada).`
+        `Sesuai dengan ketentuan mekanisme program yang berlaku, ${upper(companyName)} berwenang untuk melakukan pemotongan terhadap biaya upah bulanan dan/atau insentif (jikalau ada).`
       ])),
       article('Pasal 10', 'PEMBERITAHUAN KORESPONDENSI', [
         ...numbered(['Setiap pemberitahuan yang timbul sehubungan dengan Perjanjian ini disampaikan secara tertulis dengan tanda terima dan/atau email kepada alamat berikut:']),
