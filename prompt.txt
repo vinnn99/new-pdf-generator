@@ -1,12 +1,10 @@
-** buatkan issue-event_weekly_payslip.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+** buatkan issue-revisi-template-agreement.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 informasi umum:
 1. core.pdf-generator.indinesia.id adalah backend
 2. ui-pdf-generator adalah frontend
 
-** Latar belakang:
-Di Production, pada tabel email_log terdapat pesan error :
-    "Lampiran slip tidak ditemukan; email tidak dikirim. Filter: periode=2026-08, template=event_weekly_payslip, employeeId=014, employeeName=sindi_ayu. Folder dicek: public/download/PT. ORIGIN MAGDA INOVATION/rizqiarumdhita@indinesia.id (exists=true, pdf=118). Contoh PDF di folder: 08-08-2026---14-08-2026.event_weekly_payslip.001.OKTA_ADELIA.mtigdh90I1TIL.pdf, 08-08-2026---14-08-2026.event_weekly_payslip.001.OKTA_ADELIA.mtjj420xDF65Y.pdf, 08-08-2026---14-08-2026.event_weekly_payslip.001.OKTA_ADELIA.mtjkd6gyNZYH3.pdf. PDF dengan employeeId ini ditemukan: 28-08-2026---30-08-2026.event_weekly_payslip.014.SINDI_AYU.mtv4tbet6YM55.pdf, 26-08-2026---28-08-2026.event_weekly_payslip.014.SINDI_AYU.mtv4t9wiDTANF.pdf, 22-08-2026---27-08-2026.event_weekly_payslip.014.SINDI_AYU.mtv4t8yr5XW15.pdf. Pastikan generate bulk PDF sudah selesai diproses queue dan file tersimpan di folder company/email user login yang sama."
-Error ini saat mengirim Bulk Email dengan template "event_weekly_payslip"
+** Masalah:
+Pada template cooperation_agreement, total jumlah halaman sangat dipengaruhi oleh variable jumlah tunjangan, sehingga halaman terakhir sangat berpengaruh karena merupakan tanda tangan
 
 ** planingnya adalah:
 1. Khusus untuk "Bulk Send Email: dengan template "event_weekly_payslip", Filter tidak menggunakan Periode, cukup employeeName dan employeeId dalam 1 batch dalam pencarian file Lampiran
