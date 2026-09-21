@@ -62,6 +62,16 @@ test('menerapkan bold, blok korespondensi, dan indent numerik', async ({ assert 
   assert.isTrue(listItems.some((item) => item.number === '3.3.1' && item.margin === 52 && item.width === 44))
 })
 
+test('menggunakan variable brand pada Pasal 1 Ayat 3', async ({ assert }) => {
+  const brand = 'Brand Kemitraan Uji'
+  const listItems = collectListItems(collectNodes(template({ ...samplePayload(), brand })))
+  const articleOneVerseThree = listItems.find((item) => item.number === '3.' && item.text.includes('tujuan kemitraan'))
+
+  assert.isOk(articleOneVerseThree)
+  assert.equal(articleOneVerseThree.text, `Para Pihak sepakat untuk melakukan tujuan kemitraan dalam rangka pelaksanaan Brand "${brand}".`)
+  assert.isFalse(articleOneVerseThree.text.includes('TEMA Agency'))
+})
+
 test('menormalkan margin dynamic cooperation agreement tanpa mengubah template lain', async ({ assert }) => {
   const dynamicCooperationAgreement = TemplateResolver.renderDynamicDocDefinition({
     templateKey: 'cooperation_agreement',
@@ -295,6 +305,18 @@ test('mengakui template exel_cooperation_agreement sebagai alias cooperation agr
   const normalized = CooperationAgreementService.normalizeData(exelPayload, 'exel_cooperation_agreement')
   assert.equal(normalized.companyName, 'PT. EXEL INTEGRASI SOLUSINDO')
   assert.equal(normalized.logoPath, 'resources/images/logo-old.png')
+})
+
+test('menghilangkan TEMA AGENCY dari pernyataan penempatan template exel', async ({ assert }) => {
+  const nodes = collectNodes(template({ ...samplePayload(), template: 'exel_cooperation_agreement' }))
+  const placementStatement = nodes.find((node) => plainText(node.text).includes('kebutuhan dari pihak PRINCIPAL'))
+
+  assert.isOk(placementStatement)
+  assert.equal(
+    plainText(placementStatement.text),
+    'Bahwa MITRA adalah perorangan yang akan ditempatkan sesuai dengan kebutuhan dari pihak PRINCIPAL dan/atau BRAND yang sedang menjalankan program dengan PT. CONTOH COMPANY INDONESIA.'
+  )
+  assert.isFalse(plainText(placementStatement.text).includes('TEMA AGENCY'))
 })
 
 function samplePayload() {

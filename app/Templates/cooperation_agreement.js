@@ -31,6 +31,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
   const styleText = createTextStyler(companyName)
   const letterDate = data.letterDate || data.agreementDate || new Date().toISOString()
   const brand = val(data.brand)
+  const principalPlacementStatement = `Bahwa MITRA adalah perorangan yang akan ditempatkan sesuai dengan kebutuhan dari pihak PRINCIPAL dan/atau BRAND yang sedang menjalankan program dengan ${upper(companyName)}${isExelTemplate ? '.' : ' dan/atau TEMA AGENCY.'}`
   const agreementDuration = NumberFormatService.formatNumberWithWords(data.agreementDuration, {
     unit: 'bulan',
     fieldName: 'lama perjanjian'
@@ -154,13 +155,13 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
       numbered([
         `Bahwa ${upper(companyName)} adalah badan hukum perseroan terbatas yang bergerak dalam bidang usaha produk dan servis, antara lain di bidang informasi teknologi atau sistem informasi yang berhubungan dengan kegiatan Agency, jasa penyedia tenaga kerja seperti Sales Promotion Girl (SPG), Sales Promotion Boy (SPB), dan penyedia pekerja alih daya (Outsourcing).`,
         'Bahwa MITRA adalah perorangan yang memberikan kemampuan pengetahuan dan jasa untuk melaksanakan kerja sama kemitraan sebagaimana dimaksud dalam Perjanjian ini.',
-        `Bahwa MITRA adalah perorangan yang akan ditempatkan sesuai dengan kebutuhan dari pihak PRINCIPAL dan/atau BRAND yang sedang menjalankan program dengan ${upper(companyName)} dan/atau TEMA AGENCY.`,
+        principalPlacementStatement,
         `Bahwa Para Pihak telah sepakat menjalin kerja sama kemitraan yang bermanfaat. Pelaksanaan Perjanjian ini tidak menciptakan hubungan ketenagakerjaan di antara ${upper(companyName)} dengan MITRA.`
       ]),
       article('Pasal 1', 'KETENTUAN UMUM', numbered([
         'Para Pihak sepakat untuk melakukan kerja sama yang bersifat kemitraan selama masa waktu yang telah ditentukan dalam Perjanjian ini.',
         'Perjanjian ini dilaksanakan dengan itikad baik oleh Para Pihak guna keberhasilan dan mencapai tujuan bersama yang secara khusus disepakati pada Perjanjian ini.',
-        'Para Pihak sepakat untuk melakukan tujuan kemitraan dalam rangka pelaksanaan Brand "TEMA Agency".'
+        `Para Pihak sepakat untuk melakukan tujuan kemitraan dalam rangka pelaksanaan Brand "${brand}".`
       ])),
       article('Pasal 2', 'PERSYARATAN KEMITRAAN', [
         ...numbered([
