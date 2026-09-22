@@ -608,6 +608,15 @@ const TEMPLATE_DEFINITIONS = {
   }
 }
 
+TEMPLATE_DEFINITIONS.exel_cooperation_agreement = {
+  filename: 'exel_cooperation_agreement-bulk-template.xlsx',
+  headers: TEMPLATE_DEFINITIONS.cooperation_agreement.headers.slice(),
+  sample: [
+    'PT. EXEL INTEGRASI SOLUSINDO',
+    ...TEMPLATE_DEFINITIONS.cooperation_agreement.sample.slice(1)
+  ]
+}
+
 function ensureDir(filePath) {
   const dir = path.dirname(filePath)
   if (!fs.existsSync(dir)) {

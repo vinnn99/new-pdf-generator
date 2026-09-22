@@ -819,7 +819,7 @@ Untuk `/send-slip-emails`, lampiran dicari hanya di `public/download/{companyNam
 Pencarian menormalisasi separator periode (`2026.03`, `2026_03`, `2026/03`, `2026-03`) dan nama bulan (`april-2026`, `April 2026`, `apr-2026`) ke bentuk yang sama. Untuk format file bulk baru, kandidat diprioritaskan yang `employeeName` cocok; jika tidak ada, sistem fallback ke `employeeId` exact selama `periode` dan `template` cocok.
 Jika ditemukan lebih dari satu kandidat untuk baris yang sama, sistem memilih file paling baru (berdasarkan waktu file).
 Untuk `exel-payslip`, gunakan form-data `template=exel-payslip`. Spreadsheet ini hanya memilih penerima dan mencari attachment PDF yang sudah digenerate; kolom payroll seperti `Insentif` dan `BPJS Kesehatan` tidak digunakan untuk membuat ulang PDF. Endpoint ini tidak membutuhkan `batch_id`.
-Untuk `/send-event-weekly-payslip-emails`, lampiran dicari dari `generation_batch_items` milik `batch_id` dengan template tetap `event_weekly_payslip`, bukan dengan scan seluruh folder berdasarkan nama file. Kandidat wajib cocok dengan `employeeId`/`NIK` serta `employeeName`; perbandingan nama mengabaikan kapitalisasi, spasi, `_`, dan `-`. `periode` tidak digunakan sebagai filter. Item batch harus sudah berhasil diproses queue, memiliki `saved_path`, dan file PDF-nya masih tersedia.
+Untuk `/send-event-weekly-payslip-emails`, lampiran dicari dari `generation_batch_items` milik `batch_id` dengan template tetap `event_weekly_payslip`, bukan dengan scan seluruh folder berdasarkan nama file. Kandidat wajib cocok dengan `employeeId`/`NIK` serta `employeeName`; perbandingan nama mengabaikan kapitalisasi, spasi, `_`, dan `-`. `periode` tidak digunakan sebagai filter. Item batch harus sudah berhasil diproses queue, memiliki `saved_path`, dan file PDF-nya masih tersedia. Baris email dengan `sentTo/email` dan `employeeName` canonical yang sama digabung menjadi satu email; seluruh PDF yang cocok dari batch menjadi lampiran. Response kelompok tersebut memuat `source_rows`, `attachments`, dan `attachment_count`.
 SMTP: jika semua field SMTP di tabel `companies` terisi (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, opsional `smtp_secure`, `mail_from`) maka konfigurasi auth SMTP company dipakai; jika tidak lengkap, fallback ke `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`). `SMTP_USER` hanya dipakai untuk autentikasi SMTP, sedangkan pengirim email (`from`) wajib dari `MAIL_FROM` atau fallback `companies.mail_from`.
 
 Response 200:
@@ -917,9 +917,11 @@ Template batch yang didukung:
 - `event_weekly_payslip`
 - semua template BA (`ba-penempatan`, `ba-request-id`, `ba-hold`, `ba-rolling`, `ba-hold-activate`, `ba-takeout`, `ba-terminated`, `ba-cancel-join`, `ba-resign`)
 - `cooperation_agreement`
+- `exel_cooperation_agreement`
 
 Catatan `event_weekly_payslip`: batch dibuat oleh `/api/v1/bulk/event_weekly_payslip`; `match_key` memakai `employeeId|employeeName`, dan `letter_no` bernilai `null`.
 Catatan `exel-payslip`: batch dibuat oleh `/api/v1/bulk/exel-payslip` saat `dryRun=false`; `match_key` memakai `employeeId`, dan `letter_no` bernilai `null`.
+Catatan `exel_cooperation_agreement`: batch dibuat oleh `/api/v1/bulk/exel_cooperation_agreement`; format Excel sama dengan `cooperation_agreement`, dengan default branding EXEL jika `companyName` dan logo tidak diisi.
 
 Akses:
 - `user`/`admin`: hanya batch di company sendiri

@@ -39,11 +39,13 @@ class BulkEmailController {
       label: 'event weekly payslip',
       required: ['employeeId', 'employeeName'],
       requireSuccessfulBatchItems: true,
+      groupRecipientRows: true,
       extractFields: (norm) => ({
         employeeId: String(norm.employeeid || norm['employee id'] || norm.employee_id || norm.nik || '').trim(),
         employeeName: String(norm.employeename || norm['employee name'] || norm.employee_name || norm.nama || '').trim()
       }),
       buildMatchKey: buildEventWeeklyBatchMatchKey,
+      buildRecipientGroupKey: buildEventWeeklyRecipientGroupKey,
       normalizeStoredMatchKey: normalizeEventWeeklyBatchMatchKey,
       subject: (fields) => `SLIP GAJI - ${fields.employeeName || fields.employeeId || ''}`,
       body: (fields, company) => [
@@ -483,11 +485,12 @@ class BulkEmailController {
 
       ensureLogDir()
 
-      const batchItems = await Database.table('generation_batch_items')
+      let batchItemsQuery = Database.table('generation_batch_items')
         .where('batch_id', batchId)
         .where('company_id', company.company_id)
         .where('template', cfg.template)
-        .whereNotNull('saved_path')
+      if (!cfg.groupRecipientRows) batchItemsQuery = batchItemsQuery.whereNotNull('saved_path')
+      const batchItems = await batchItemsQuery
         .orderBy('updated_at', 'desc')
         .orderBy('id', 'desc')
 
@@ -511,6 +514,31 @@ class BulkEmailController {
       let skippedCount = 0
       const context = cfg.context || 'bulk-ba'
       const label = cfg.label || cfg.template
+      let recipientGroups = 0
+
+      if (cfg.groupRecipientRows) {
+        const groupedResult = await sendGroupedBatchEmailRows({
+          rows,
+          cfg,
+          attachmentsByMatchKey,
+          user,
+          company,
+          batchId,
+          context,
+          label,
+          smtpHost,
+          smtpPort,
+          smtpSecure,
+          smtpUser,
+          smtpPass,
+          mailFrom
+        })
+        results.push(...groupedResult.results)
+        queuedCount += groupedResult.queuedCount
+        failedCount += groupedResult.failedCount
+        skippedCount += groupedResult.skippedCount
+        recipientGroups = groupedResult.recipientGroups
+      } else {
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i]
@@ -605,18 +633,21 @@ class BulkEmailController {
           failedCount++
         }
       }
+      }
 
       try { fs.unlinkSync(tmpPath) } catch (e) { /* ignore */ }
 
-      return response.json({
+      const responsePayload = {
         status: 'ok',
-        total: results.length,
+        total: cfg.groupRecipientRows ? rows.length : results.length,
         queued: queuedCount,
         failed: failedCount,
         skipped: skippedCount,
         batch_id: batchId,
         results
-      })
+      }
+      if (cfg.groupRecipientRows) responsePayload.recipient_groups = recipientGroups
+      return response.json(responsePayload)
     } catch (error) {
       console.error(`BulkEmail ${cfg.template} error:`, error.message)
       appendLog({ status: 'fatal', template: cfg.template, error: error.message })
@@ -1116,6 +1147,266 @@ function pickLatestBatchAttachment(items) {
   return candidates[0]
 }
 
+async function sendGroupedBatchEmailRows({
+  rows,
+  cfg,
+  attachmentsByMatchKey,
+  user,
+  company,
+  batchId,
+  context,
+  label,
+  smtpHost,
+  smtpPort,
+  smtpSecure,
+  smtpUser,
+  smtpPass,
+  mailFrom
+}) {
+  const results = []
+  const groups = new Map()
+  let queuedCount = 0
+  let failedCount = 0
+  let skippedCount = 0
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    const rowNo = i + 1
+    const norm = normalizeRow(row)
+    const to = String(norm.sentto || norm.email || '').trim()
+    const fields = typeof cfg.extractFields === 'function'
+      ? cfg.extractFields(norm, row)
+      : BaTemplateService.extractMatchFieldsFromRow(cfg.template, norm)
+    const matchKey = typeof cfg.buildMatchKey === 'function'
+      ? cfg.buildMatchKey(fields, norm, row)
+      : BaTemplateService.buildMatchKey(cfg.template, fields)
+    const missing = typeof cfg.validateFields === 'function'
+      ? cfg.validateFields(fields, norm, row)
+      : (cfg.required || []).filter((key) => !fields[key])
+
+    if (!to) {
+      results.push({ row: rowNo, status: 'skipped', message: 'sentTo/email kosong' })
+      appendLog({ row: rowNo, status: 'skipped', reason: 'no_recipient', template: cfg.template, batchId, matchKey })
+      skippedCount++
+      continue
+    }
+    if (missing.length) {
+      results.push({ row: rowNo, status: 'failed', to, message: `Field wajib kosong: ${missing.join(', ')}` })
+      appendLog({ row: rowNo, to, status: 'failed', reason: 'missing_required_fields', missing, template: cfg.template, batchId, matchKey })
+      failedCount++
+      continue
+    }
+    if (!matchKey) {
+      results.push({ row: rowNo, status: 'failed', to, message: 'Match key lampiran tidak valid' })
+      appendLog({ row: rowNo, to, status: 'failed', reason: 'invalid_match_key', template: cfg.template, batchId })
+      failedCount++
+      continue
+    }
+
+    const groupKey = typeof cfg.buildRecipientGroupKey === 'function'
+      ? cfg.buildRecipientGroupKey({ to, fields, matchKey, norm, row })
+      : `${normalizeRecipientAddress(to)}|${matchKey}`
+    if (!groupKey) {
+      results.push({ row: rowNo, status: 'failed', to, message: 'Identitas penerima tidak valid' })
+      appendLog({ row: rowNo, to, status: 'failed', reason: 'invalid_recipient_group', template: cfg.template, batchId, matchKey })
+      failedCount++
+      continue
+    }
+
+    let group = groups.get(groupKey)
+    if (!group) {
+      group = {
+        row: rowNo,
+        sourceRows: [],
+        to,
+        fields,
+        norm,
+        matchKeys: new Set(),
+        cc: [],
+        bcc: []
+      }
+      groups.set(groupKey, group)
+    }
+    group.sourceRows.push(rowNo)
+    group.matchKeys.add(matchKey)
+    mergeRecipientList(group.cc, parseRecipientList(norm.cc))
+    mergeRecipientList(group.bcc, parseRecipientList(norm.bcc))
+  }
+
+  for (const group of groups.values()) {
+    const candidatesById = new Map()
+    for (const matchKey of group.matchKeys) {
+      for (const item of attachmentsByMatchKey[matchKey] || []) {
+        const itemKey = item.id ? `id:${item.id}` : `path:${item.saved_path || ''}|file:${item.filename || ''}`
+        if (!candidatesById.has(itemKey)) candidatesById.set(itemKey, item)
+      }
+    }
+
+    const candidates = Array.from(candidatesById.values())
+    const resolved = resolveBatchAttachments(candidates)
+    if (resolved.missing.length) {
+      const missingFiles = resolved.missing.map((item) => item.filename || item.saved_path || `batch-item-${item.id}`).join(', ')
+      const message = `Lampiran ${label} tidak lengkap: ${missingFiles}`
+      results.push({ row: group.row, source_rows: group.sourceRows, status: 'failed', to: group.to, message })
+      appendLog({
+        row: group.row,
+        sourceRows: group.sourceRows,
+        to: group.to,
+        status: 'failed',
+        reason: 'missing_batch_attachments',
+        template: cfg.template,
+        batchId,
+        matchKeys: Array.from(group.matchKeys),
+        missing: resolved.missing.map((item) => item.filename || item.saved_path || item.id)
+      })
+      failedCount++
+      continue
+    }
+    if (!resolved.attachments.length) {
+      results.push({ row: group.row, source_rows: group.sourceRows, status: 'skipped', to: group.to, message: `Lampiran ${label} tidak ditemukan` })
+      appendLog({
+        row: group.row,
+        sourceRows: group.sourceRows,
+        to: group.to,
+        status: 'skipped',
+        reason: 'no_attachments',
+        template: cfg.template,
+        batchId,
+        matchKeys: Array.from(group.matchKeys)
+      })
+      skippedCount++
+      continue
+    }
+
+    const primaryAttachment = resolved.attachments[0]
+    const subject = group.norm.subject || cfg.subject(group.fields, company, primaryAttachment)
+    const body = group.norm.body || cfg.body(group.fields, company, primaryAttachment)
+    const jobAttachments = resolved.attachments.map((item) => ({ filename: item.filename, path: item.path }))
+    let emailLogId = null
+
+    try {
+      emailLogId = await EmailLogService.createQueued({
+        userId: user.id,
+        companyId: company.company_id,
+        template: cfg.template,
+        context,
+        to: group.to,
+        cc: group.cc,
+        bcc: group.bcc,
+        subject,
+        body,
+        attachments: jobAttachments,
+        status: 'queued'
+      })
+
+      await JobService.dispatch('App/Jobs/SendEmailJob', {
+        smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom,
+        to: group.to,
+        cc: group.cc,
+        bcc: group.bcc,
+        subject,
+        text: body,
+        attachments: jobAttachments,
+        requireAttachments: true,
+        employeeId: group.fields.employeeId || group.fields.nik || undefined,
+        employeeName: group.fields.employeeName || group.fields.mdsName || group.fields.partnerName,
+        userId: user.id,
+        companyId: company.company_id,
+        template: cfg.template,
+        context,
+        emailLogId
+      }, { attempts: 3, timeout: 120000 })
+
+      const attachmentNames = jobAttachments.map((attachment) => attachment.filename)
+      results.push({
+        row: group.row,
+        source_rows: group.sourceRows,
+        status: 'queued',
+        to: group.to,
+        attachment: attachmentNames[0],
+        attachments: attachmentNames,
+        attachment_count: attachmentNames.length
+      })
+      appendLog({
+        row: group.row,
+        sourceRows: group.sourceRows,
+        to: group.to,
+        status: 'queued',
+        template: cfg.template,
+        batchId,
+        matchKeys: Array.from(group.matchKeys),
+        attachments: attachmentNames,
+        attachmentCount: attachmentNames.length,
+        candidates: candidates.length
+      })
+      queuedCount++
+    } catch (err) {
+      await markDispatchFailed(emailLogId, err.message)
+      results.push({ row: group.row, source_rows: group.sourceRows, status: 'failed', to: group.to, message: err.message })
+      appendLog({
+        row: group.row,
+        sourceRows: group.sourceRows,
+        to: group.to,
+        status: 'failed',
+        error: err.message,
+        template: cfg.template,
+        batchId,
+        matchKeys: Array.from(group.matchKeys)
+      })
+      failedCount++
+    }
+  }
+
+  return { results, queuedCount, failedCount, skippedCount, recipientGroups: groups.size }
+}
+
+function resolveBatchAttachments(items) {
+  const sortedItems = (items || []).slice().sort((a, b) => {
+    const rowA = Number(a.row_no || 0)
+    const rowB = Number(b.row_no || 0)
+    if (rowA !== rowB) return rowA - rowB
+    const idA = Number(a.id || 0)
+    const idB = Number(b.id || 0)
+    if (idA !== idB) return idA - idB
+    return String(a.filename || '').localeCompare(String(b.filename || ''), 'en', { sensitivity: 'base' })
+  })
+  const attachments = []
+  const missing = []
+  const seenPaths = new Set()
+
+  for (const item of sortedItems) {
+    const filePath = resolveSavedPath(item.saved_path)
+    if (!filePath || !fs.existsSync(filePath)) {
+      missing.push(item)
+      continue
+    }
+    const canonicalPath = path.resolve(filePath).toLowerCase()
+    if (seenPaths.has(canonicalPath)) continue
+    seenPaths.add(canonicalPath)
+    attachments.push({ ...item, path: filePath })
+  }
+
+  return { attachments, missing }
+}
+
+function parseRecipientList(value) {
+  return String(value || '').split(';').map((item) => item.trim()).filter(Boolean)
+}
+
+function mergeRecipientList(target, values) {
+  const known = new Set(target.map((item) => normalizeRecipientAddress(item)))
+  for (const value of values) {
+    const normalized = normalizeRecipientAddress(value)
+    if (!normalized || known.has(normalized)) continue
+    known.add(normalized)
+    target.push(value)
+  }
+}
+
+function normalizeRecipientAddress(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
 function resolveSavedPath(savedPath) {
   const raw = String(savedPath || '').trim()
   if (!raw) return ''
@@ -1128,6 +1419,13 @@ function buildEventWeeklyBatchMatchKey(fields) {
   const employeeName = normalizeEventWeeklyEmployeeName(source.employeeName || source.nama)
   if (!employeeId || !employeeName) return ''
   return `${employeeId}|${employeeName}`
+}
+
+function buildEventWeeklyRecipientGroupKey({ to, fields }) {
+  const recipient = normalizeRecipientAddress(to)
+  const employeeName = normalizeEventWeeklyEmployeeName(fields && fields.employeeName)
+  if (!recipient || !employeeName) return ''
+  return `${recipient}|${employeeName}`
 }
 
 function normalizeEventWeeklyBatchMatchKey(value) {

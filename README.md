@@ -1150,6 +1150,7 @@ Perilaku:
 - Jika ada lebih dari satu kandidat lampiran yang cocok (beda `kodeUnique`), sistem memilih file terbaru.
 - Satu lampiran dikirim per baris email.
 - Untuk `exel-payslip`, spreadsheet email hanya mencari dan mengirim PDF yang sudah dibuat; kolom komponen payroll tidak diperlukan dan `batch_id` tidak wajib.
+- Khusus `event_weekly_payslip`, gunakan endpoint `/api/v1/send-event-weekly-payslip-emails` dengan `batch_id`. Baris dengan penerima dan nama karyawan sama digabung menjadi satu email, dengan seluruh PDF Event Weekly yang cocok dari batch sebagai lampiran.
 - Log tercatat di `logs/bulk-email.log`.
 - SMTP: jika semua field SMTP di tabel `companies` terisi (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, opsional `smtp_secure`, `mail_from`) maka konfigurasi auth SMTP company dipakai; jika tidak lengkap, fallback ke `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`). `SMTP_USER` hanya dipakai untuk autentikasi SMTP, sedangkan pengirim email (`from`) wajib dari `MAIL_FROM` atau fallback `companies.mail_from`.
 

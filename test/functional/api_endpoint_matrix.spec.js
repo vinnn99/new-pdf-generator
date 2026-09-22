@@ -1541,6 +1541,118 @@ test('send-event-weekly-payslip-emails menemukan PDF event weekly hasil generate
   }
 })
 
+test('send-event-weekly-payslip-emails menggabungkan row penerima duplikat dan melampirkan semua PDF batch', async ({ client, assert }) => {
+  const stamp = uniqueId('event_weekly_grouped_email')
+  const toEmail = `event.weekly.grouped.${stamp}@test.local`
+  const employeeId = `EVT-${stamp}`
+  const employeeName = `Budi Event ${stamp}`
+  const batchId = `batch-${stamp}`
+  const matchKey = `${employeeId.toLowerCase()}|${employeeName.toLowerCase()}`
+  const xlsxPath = path.join(Helpers.tmpPath(), `send-event-weekly-grouped-${stamp}.xlsx`)
+  const pdfDir = path.join(Helpers.publicPath(), 'download', `test-event-weekly-${stamp}`)
+  const pdfPaths = [
+    path.join(pdfDir, `weekly-a-${stamp}.pdf`),
+    path.join(pdfDir, `weekly-b-${stamp}.pdf`)
+  ]
+  const filenames = pdfPaths.map((filePath) => path.basename(filePath))
+  const now = new Date()
+
+  fs.mkdirSync(pdfDir, { recursive: true })
+  pdfPaths.forEach((filePath, index) => fs.writeFileSync(filePath, `PDF-${index + 1}`))
+
+  await Database.table('generation_batches').insert({
+    batch_id: batchId,
+    company_id: seed.companyAId,
+    template: 'event_weekly_payslip',
+    created_by: seed.userMainId,
+    total_rows: 2,
+    queued: 2,
+    failed: 0,
+    status: 'completed',
+    created_at: now,
+    updated_at: now
+  })
+  await Database.table('generation_batch_items').insert(pdfPaths.map((filePath, index) => ({
+    batch_id: batchId,
+    company_id: seed.companyAId,
+    template: 'event_weekly_payslip',
+    row_no: index + 1,
+    match_key: matchKey,
+    filename: filenames[index],
+    saved_path: path.relative(process.cwd(), filePath).replace(/\\/g, '/'),
+    status: 'success',
+    row_data: JSON.stringify({ employeeId, employeeName, index }),
+    created_at: now,
+    updated_at: now
+  })))
+
+  const workbook = XLSX.utils.book_new()
+  const sheet = XLSX.utils.json_to_sheet([
+    { sentTo: toEmail, NIK: employeeId, employeeName, body: 'Body utama' },
+    { sentTo: toEmail.toUpperCase(), NIK: employeeId, employeeName: employeeName.replace(/ /g, '_'), body: 'Body kedua' }
+  ])
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Sheet1')
+  XLSX.writeFile(workbook, xlsxPath)
+
+  try {
+    const token = await loginAndGetToken(client, seed.credentials.user)
+    const response = await client
+      .post('/api/v1/send-event-weekly-payslip-emails')
+      .header('Authorization', `Bearer ${token}`)
+      .field('batch_id', batchId)
+      .attach('file', xlsxPath)
+      .end()
+
+    response.assertStatus(200)
+    assert.equal(response.body.status, 'ok')
+    assert.equal(Number(response.body.total), 2)
+    assert.equal(Number(response.body.recipient_groups), 1)
+    assert.equal(Number(response.body.queued), 1)
+    assert.equal(response.body.results.length, 1)
+    assert.deepEqual(response.body.results[0].source_rows, [1, 2])
+    assert.equal(Number(response.body.results[0].attachment_count), 2)
+    assert.deepEqual(response.body.results[0].attachments, filenames)
+
+    const job = await Database.table('jobs')
+      .where('payload', 'like', `%${toEmail}%`)
+      .orderBy('id', 'desc')
+      .first()
+    assert.ok(job)
+    const payload = JSON.parse(job.payload)
+    assert.equal(payload.data.template, 'event_weekly_payslip')
+    assert.equal(payload.data.attachments.length, 2)
+    assert.deepEqual(payload.data.attachments.map((attachment) => attachment.filename), filenames)
+
+    const emailLog = await Database.table('email_logs')
+      .where('to_email', toEmail)
+      .where('template', 'event_weekly_payslip')
+      .orderBy('id', 'desc')
+      .first()
+    assert.ok(emailLog)
+    assert.equal(JSON.parse(emailLog.attachments).length, 2)
+  } finally {
+    try {
+      fs.unlinkSync(xlsxPath)
+    } catch (e) {
+      // ignore
+    }
+    for (const filePath of pdfPaths) {
+      try {
+        fs.unlinkSync(filePath)
+      } catch (e) {
+        // ignore
+      }
+    }
+    try {
+      fs.rmdirSync(pdfDir)
+    } catch (e) {
+      // ignore
+    }
+    await Database.table('generation_batch_items').where('batch_id', batchId).delete()
+    await Database.table('generation_batches').where('batch_id', batchId).delete()
+  }
+})
+
 test('send-cooperation-agreement-emails memakai lampiran dari batch berdasarkan match key', async ({ client, assert }) => {
   const stamp = uniqueId('coop_bulk_email')
   const batchId = uniqueSlug('coop-email-batch').slice(0, 60)
