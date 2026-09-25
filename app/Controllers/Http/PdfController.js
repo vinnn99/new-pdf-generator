@@ -39,7 +39,7 @@ class PdfController {
         })
         if (CooperationAgreementService.isTemplate(normalizedTemplate)) {
           try {
-            payload.data = CooperationAgreementService.normalizeData(payload.data)
+            payload.data = CooperationAgreementService.normalizeData(payload.data, normalizedTemplate)
           } catch (err) {
             errors.push(err.message)
           }

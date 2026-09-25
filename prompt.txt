@@ -1,14 +1,18 @@
-** buatkan issue-revisi-template-agreement.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+** buatkan issue-update-template-exel-cooperation_agreement.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 informasi umum:
 1. core.pdf-generator.indinesia.id adalah backend
 2. ui-pdf-generator adalah frontend
 
+** Scoop
+- template event_weekly_payslip
+
 ** Masalah:
-Pada template cooperation_agreement, total jumlah halaman sangat dipengaruhi oleh variable jumlah tunjangan, sehingga halaman terakhir sangat berpengaruh karena merupakan tanda tangan
 
 ** planingnya adalah:
-1. Khusus untuk "Bulk Send Email: dengan template "event_weekly_payslip", Filter tidak menggunakan Periode, cukup employeeName dan employeeId dalam 1 batch dalam pencarian file Lampiran
-5. Pastikan perubahan tidak mengganggu Pengiriman Bulk email Template lain
+1. khusus untuk template exel_cooperation_agreement, variable "Tunjangan TL" ganti menjadi "Tunjangan Jabatan"
+2. implementasikan di frontend pada menu "Generate Single PDF", "Send Single Email", dan "Bulk Generate PDF"
+3. Sesuaikan juga download Template excel Header jangan menggunakan header tlAllowance 
+2. jangan mempengaruhi template lain
 
 
 

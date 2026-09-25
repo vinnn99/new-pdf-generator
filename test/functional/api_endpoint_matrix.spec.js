@@ -1041,6 +1041,54 @@ test('send/exel-payslip tersedia dan memvalidasi field wajib', async ({ client, 
   assert.equal(String(response.body.message || '').includes('period'), true)
 })
 
+test('send/exel_cooperation_agreement tersedia dan memvalidasi field wajib', async ({ client, assert }) => {
+  const token = await loginAndGetToken(client, seed.credentials.user)
+  const response = await client
+    .post('/api/v1/send/exel_cooperation_agreement')
+    .header('Authorization', `Bearer ${token}`)
+    .send({
+      to: `exel.agreement.${uniqueId('single')}@test.local`,
+      data: { jabatanAllowance: 150000, jabatanAllowanceUnit: 'minggu' }
+    })
+    .end()
+
+  response.assertStatus(422)
+  assert.equal(String(response.body.message || '').includes('firstPartyName'), true)
+})
+
+test('send/exel_cooperation_agreement membuat PDF dan antrean email', async ({ client, assert }) => {
+  const workbookPath = path.join(process.cwd(), 'resources', 'templates', 'exel_cooperation_agreement-bulk-template.xlsx')
+  const workbook = XLSX.readFile(workbookPath)
+  const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]])[0]
+  const token = await loginAndGetToken(client, seed.credentials.user)
+  const response = await client
+    .post('/api/v1/send/exel_cooperation_agreement')
+    .header('Authorization', `Bearer ${token}`)
+    .send({ to: `exel.agreement.${uniqueId('queued')}@test.local`, data })
+    .end()
+
+  response.assertStatus(202)
+  assert.equal(response.body.status, 'queued')
+  assert.equal(String(response.body.filename || '').endsWith('.pdf'), true)
+})
+
+test('bulk EXEL menerima workbook unduhan dengan header tunjangan jabatan', async ({ client, assert }) => {
+  const workbookPath = path.join(process.cwd(), 'resources', 'templates', 'exel_cooperation_agreement-bulk-template.xlsx')
+  const token = await loginAndGetToken(client, seed.credentials.user)
+  const response = await client
+    .post('/api/v1/bulk/exel_cooperation_agreement')
+    .header('Authorization', `Bearer ${token}`)
+    .field('dryRun', 'true')
+    .attach('file', workbookPath)
+    .end()
+
+  response.assertStatus(200)
+  assert.equal(response.body.failed, 0)
+  assert.equal(response.body.results[0].payload.data.jabatanAllowance, 150000)
+  assert.equal(response.body.results[0].payload.data.jabatanAllowanceUnit, 'minggu')
+  assert.equal(response.body.results[0].payload.data.tlAllowance, undefined)
+})
+
 test('bulk/exel-payslip membuat batch dan payload komponen baru', async ({ client, assert }) => {
   const stamp = uniqueId('bulk_exel')
   const xlsxPath = path.join(Helpers.tmpPath(), `${stamp}.xlsx`)

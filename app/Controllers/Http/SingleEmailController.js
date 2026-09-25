@@ -60,6 +60,9 @@ class SingleEmailController {
   async sendCooperationAgreement(ctx) {
     return this._send(ctx, cfgCooperationAgreement())
   }
+  async sendExelCooperationAgreement(ctx) {
+    return this._send(ctx, cfgCooperationAgreement(CooperationAgreementService.EXEL_TEMPLATE))
+  }
 
   /**
    * Generic handler untuk BA single email.
@@ -134,7 +137,7 @@ class SingleEmailController {
       })
       if (CooperationAgreementService.isTemplate(normalizedTemplate)) {
         try {
-          data = CooperationAgreementService.normalizeData(data)
+          data = CooperationAgreementService.normalizeData(data, normalizedTemplate)
         } catch (err) {
           return response.status(422).json({
             status: 'validation_failed',
@@ -169,7 +172,7 @@ class SingleEmailController {
       }
 
       if (CooperationAgreementService.isTemplate(normalizedTemplate)) {
-        const validationErrors = CooperationAgreementService.validateData(data)
+        const validationErrors = CooperationAgreementService.validateData(data, normalizedTemplate)
         if (validationErrors.length) {
           return response.status(422).json({
             status: 'validation_failed',
@@ -436,10 +439,10 @@ function cfgBa(template) {
   }
 }
 
-function cfgCooperationAgreement() {
+function cfgCooperationAgreement(template = CooperationAgreementService.TEMPLATE) {
   return {
-    template: CooperationAgreementService.TEMPLATE,
-    required: requiredFields(CooperationAgreementService.TEMPLATE),
+    template,
+    required: CooperationAgreementService.requiredFields(),
     subject: (f) => {
       const who = f.partnerName || f.letterNo || ''
       return who ? `Cooperation Agreement - ${who}` : 'Cooperation Agreement'
@@ -453,7 +456,9 @@ function cfgCooperationAgreement() {
         f.placementArea ? `Wilayah Penempatan: ${f.placementArea}` : null,
         f.letterNo ? `Nomor Surat: ${f.letterNo}` : null,
         '',
-        company && company.name ? company.name : CooperationAgreementService.DEFAULT_COMPANY_NAME,
+        company && company.name ? company.name : (CooperationAgreementService.isExelTemplate(template)
+          ? CooperationAgreementService.EXEL_DEFAULT_COMPANY_NAME
+          : CooperationAgreementService.DEFAULT_COMPANY_NAME),
         'Pesan ini dikirim otomatis, mohon tidak membalas ke alamat ini.'
       ]
       return lines.filter(Boolean).join('\n')

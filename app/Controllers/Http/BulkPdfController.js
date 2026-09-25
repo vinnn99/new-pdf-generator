@@ -1097,12 +1097,16 @@ function buildCooperationAgreementPayload(lower, opts, templateName = Cooperatio
     mealAllowance: pick(['mealallowance', 'meal allowance', 'meal_allowance', 'tunjanganmakan', 'tunjangan makan']),
     phoneAllowance: pick(['phoneallowance', 'phone allowance', 'phone_allowance', 'tunjanganpulsa', 'tunjangan pulsa']),
     operationalCostAllowance: pick(['operationalcostallowance', 'operational cost allowance', 'operational_cost_allowance', 'tunjanganbiayaoperasional', 'tunjangan biaya operasional', 'biayaoperasionalallowance', 'biaya operasional allowance', 'biaya_operasional_allowance', 'biayaoperasional', 'biaya operasional']),
-    tlAllowance: pick(['tlallowance', 'tl allowance', 'tl_allowance', 'tunjangantl', 'tunjangan tl']),
+    ...(isExel
+      ? { jabatanAllowance: pick(['jabatanallowance', 'jabatan allowance', 'jabatan_allowance', 'tunjanganjabatan', 'tunjangan jabatan']) }
+      : { tlAllowance: pick(['tlallowance', 'tl allowance', 'tl_allowance', 'tunjangantl', 'tunjangan tl']) }),
     transportAllowanceUnit: pick(['transportallowanceunit', 'transport allowance unit', 'transport_allowance_unit', 'transportunit', 'transport unit', 'transport_unit', 'tunjangantransportunit', 'tunjangan transport unit', 'satuantunjangantransport', 'satuan tunjangan transport']),
     mealAllowanceUnit: pick(['mealallowanceunit', 'meal allowance unit', 'meal_allowance_unit', 'mealunit', 'meal unit', 'meal_unit', 'tunjanganmakanunit', 'tunjangan makan unit', 'satuantunjanganmakan', 'satuan tunjangan makan']),
     phoneAllowanceUnit: pick(['phoneallowanceunit', 'phone allowance unit', 'phone_allowance_unit', 'phoneunit', 'phone unit', 'phone_unit', 'tunjanganpulsaunit', 'tunjangan pulsa unit', 'satuantunjanganpulsa', 'satuan tunjangan pulsa']),
     operationalCostAllowanceUnit: pick(['operationalcostallowanceunit', 'operational cost allowance unit', 'operational_cost_allowance_unit', 'operationalcostunit', 'operational cost unit', 'operational_cost_unit', 'tunjanganbiayaoperasionalunit', 'tunjangan biaya operasional unit', 'satuantunjanganbiayaoperasional', 'satuan tunjangan biaya operasional']),
-    tlAllowanceUnit: pick(['tlallowanceunit', 'tl allowance unit', 'tl_allowance_unit', 'tlunit', 'tl unit', 'tl_unit', 'tunjangantlunit', 'tunjangan tl unit', 'satuantunjangantl', 'satuan tunjangan tl']),
+    ...(isExel
+      ? { jabatanAllowanceUnit: pick(['jabatanallowanceunit', 'jabatan allowance unit', 'jabatan_allowance_unit', 'jabatanunit', 'jabatan unit', 'tunjanganjabatanunit', 'tunjangan jabatan unit', 'satuantunjanganjabatan', 'satuan tunjangan jabatan']) }
+      : { tlAllowanceUnit: pick(['tlallowanceunit', 'tl allowance unit', 'tl_allowance_unit', 'tlunit', 'tl unit', 'tl_unit', 'tunjangantlunit', 'tunjangan tl unit', 'satuantunjangantl', 'satuan tunjangan tl']) }),
     partnerBankAccountNumber: pick(['partnerbankaccountnumber', 'partner bank account number', 'partner_bank_account_number', 'nomorrekeningmitra', 'nomor rekening mitra']),
     partnerBankAccountName: pick(['partnerbankaccountname', 'partner bank account name', 'partner_bank_account_name', 'namarekeningmitra', 'nama rekening mitra']),
     partnerBankName: pick(['partnerbankname', 'partner bank name', 'partner_bank_name', 'namabankmitra', 'nama bank mitra']),
@@ -1117,8 +1121,8 @@ function buildCooperationAgreementPayload(lower, opts, templateName = Cooperatio
     partnerSignatureUrl: pick(['partnersignatureurl', 'partner signature url', 'partner_signature_url', 'signaturemitraurl', 'signature mitra url', 'signature mitra', 'signaturerighturl', 'signature_right_url', 'signature right url'])
   }
 
-  payload.data = CooperationAgreementService.normalizeData(payload.data)
-  const errors = CooperationAgreementService.validateData(payload.data)
+  payload.data = CooperationAgreementService.normalizeData(payload.data, templateName)
+  const errors = CooperationAgreementService.validateData(payload.data, templateName)
   if (errors.length) {
     throw new Error(errors.join('; '))
   }

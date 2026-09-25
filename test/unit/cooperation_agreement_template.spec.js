@@ -307,6 +307,37 @@ test('mengakui template exel_cooperation_agreement sebagai alias cooperation agr
   assert.equal(normalized.logoPath, 'resources/images/logo-old.png')
 })
 
+test('tunjangan jabatan hanya muncul pada PDF dan normalisasi EXEL', async ({ assert }) => {
+  const exelData = CooperationAgreementService.normalizeData({
+    ...samplePayloadWithoutAllowances(),
+    jabatanAllowance: '150.000',
+    jabatanAllowanceUnit: ' minggu '
+  }, 'exel_cooperation_agreement')
+
+  assert.equal(exelData.jabatanAllowance, 150000)
+  assert.equal(exelData.jabatanAllowanceUnit, 'minggu')
+  assert.deepEqual(CooperationAgreementService.validateData(exelData, 'exel_cooperation_agreement'), [])
+
+  const exelItems = collectListItems(collectNodes(template({
+    ...exelData,
+    template: 'exel_cooperation_agreement'
+  }).content))
+  assert.isTrue(exelItems.some((item) => item.text.includes('Tunjangan Jabatan') && item.text.includes('per minggu')))
+  assert.isFalse(exelItems.some((item) => item.text.includes('Tunjangan TL')))
+
+  const regularItems = collectListItems(collectNodes(template({
+    ...samplePayloadWithoutAllowances(),
+    tlAllowance: 150000,
+    tlAllowanceUnit: 'minggu'
+  }).content))
+  assert.isTrue(regularItems.some((item) => item.text.includes('Tunjangan TL') && item.text.includes('per minggu')))
+  assert.isFalse(regularItems.some((item) => item.text.includes('Tunjangan Jabatan')))
+
+  const invalid = { ...samplePayloadWithoutAllowances(), jabatanAllowance: 'bukan angka' }
+  assert.isTrue(CooperationAgreementService.validateData(invalid, 'exel_cooperation_agreement').length > 0)
+  assert.deepEqual(CooperationAgreementService.validateData(invalid, 'cooperation_agreement'), [])
+})
+
 test('menghilangkan TEMA AGENCY dari pernyataan penempatan template exel', async ({ assert }) => {
   const nodes = collectNodes(template({ ...samplePayload(), template: 'exel_cooperation_agreement' }))
   const placementStatement = nodes.find((node) => plainText(node.text).includes('kebutuhan dari pihak PRINCIPAL'))

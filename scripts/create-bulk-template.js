@@ -610,7 +610,11 @@ const TEMPLATE_DEFINITIONS = {
 
 TEMPLATE_DEFINITIONS.exel_cooperation_agreement = {
   filename: 'exel_cooperation_agreement-bulk-template.xlsx',
-  headers: TEMPLATE_DEFINITIONS.cooperation_agreement.headers.slice(),
+  headers: TEMPLATE_DEFINITIONS.cooperation_agreement.headers.map((header) => {
+    if (header === 'tlAllowance') return 'jabatanAllowance'
+    if (header === 'tlAllowanceUnit') return 'jabatanAllowanceUnit'
+    return header
+  }),
   sample: [
     'PT. EXEL INTEGRASI SOLUSINDO',
     ...TEMPLATE_DEFINITIONS.cooperation_agreement.sample.slice(1)

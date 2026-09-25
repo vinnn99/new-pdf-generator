@@ -42,6 +42,10 @@ const MONEY_FIELDS = Object.freeze([
   ['operationalCostAllowance', 'tunjangan biaya operasional'],
   ['tlAllowance', 'tunjangan TL']
 ])
+const EXEL_MONEY_FIELDS = Object.freeze([
+  ...MONEY_FIELDS.slice(0, -1),
+  ['jabatanAllowance', 'tunjangan jabatan']
+])
 
 class CooperationAgreementService {
   static get TEMPLATE() {
@@ -100,12 +104,20 @@ class CooperationAgreementService {
     alias(out, 'mealAllowance', ['tunjanganMakan', 'tunjangan makan'])
     alias(out, 'phoneAllowance', ['tunjanganPulsa', 'tunjangan pulsa'])
     alias(out, 'operationalCostAllowance', ['tunjanganBiayaOperasional', 'tunjangan biaya operasional', 'biayaOperasionalAllowance', 'biaya operasional'])
-    alias(out, 'tlAllowance', ['tunjanganTl', 'tunjanganTL', 'tunjangan tl', 'tunjangan TL'])
+    if (isExel) {
+      alias(out, 'jabatanAllowance', ['tunjangan jabatan', 'Tunjangan Jabatan'])
+    } else {
+      alias(out, 'tlAllowance', ['tunjanganTl', 'tunjanganTL', 'tunjangan tl', 'tunjangan TL'])
+    }
     alias(out, 'transportAllowanceUnit', ['transportUnit', 'tunjanganTransportUnit', 'satuanTunjanganTransport', 'satuan tunjangan transport'])
     alias(out, 'mealAllowanceUnit', ['mealUnit', 'tunjanganMakanUnit', 'satuanTunjanganMakan', 'satuan tunjangan makan'])
     alias(out, 'phoneAllowanceUnit', ['phoneUnit', 'tunjanganPulsaUnit', 'satuanTunjanganPulsa', 'satuan tunjangan pulsa'])
     alias(out, 'operationalCostAllowanceUnit', ['operationalCostUnit', 'tunjanganBiayaOperasionalUnit', 'satuanTunjanganBiayaOperasional', 'satuan tunjangan biaya operasional'])
-    alias(out, 'tlAllowanceUnit', ['tlUnit', 'tunjanganTlUnit', 'tunjanganTLUnit', 'satuanTunjanganTL', 'satuan tunjangan TL'])
+    if (isExel) {
+      alias(out, 'jabatanAllowanceUnit', ['jabatanUnit', 'tunjanganJabatanUnit', 'satuanTunjanganJabatan', 'satuan tunjangan jabatan'])
+    } else {
+      alias(out, 'tlAllowanceUnit', ['tlUnit', 'tunjanganTlUnit', 'tunjanganTLUnit', 'satuanTunjanganTL', 'satuan tunjangan TL'])
+    }
     alias(out, 'partnerBankAccountNumber', ['nomorRekeningMitra', 'nomor rekening mitra'])
     alias(out, 'partnerBankAccountName', ['namaRekeningMitra', 'nama rekening mitra'])
     alias(out, 'partnerBankName', ['namaBankMitra', 'nama bank mitra'])
@@ -124,7 +136,7 @@ class CooperationAgreementService {
     if (!hasValue(out.companyName)) out.companyName = isExel ? EXEL_DEFAULT_COMPANY_NAME : DEFAULT_COMPANY_NAME
     if (isExel && !hasValue(out.logoPath) && !hasValue(out.companyLogoPath)) out.logoPath = 'resources/images/logo-old.png'
 
-    for (const [field, label] of MONEY_FIELDS) {
+    for (const [field, label] of (isExel ? EXEL_MONEY_FIELDS : MONEY_FIELDS)) {
       if (hasValue(out[field])) out[field] = NumberFormatService.parseInteger(out[field], { fieldName: label })
     }
 
@@ -133,7 +145,7 @@ class CooperationAgreementService {
       'mealAllowanceUnit',
       'phoneAllowanceUnit',
       'operationalCostAllowanceUnit',
-      'tlAllowanceUnit'
+      isExel ? 'jabatanAllowanceUnit' : 'tlAllowanceUnit'
     ]) {
       out[field] = normalizeUnit(out[field])
     }
@@ -160,15 +172,16 @@ class CooperationAgreementService {
     return out
   }
 
-  static validateData(data = {}) {
+  static validateData(data = {}, template = null) {
     const errors = []
     const normalized = data && typeof data === 'object' && !Array.isArray(data) ? data : {}
+    const isExel = this.isExelTemplate(template || normalized.template)
 
     for (const field of REQUIRED_FIELDS) {
       if (!hasValue(normalized[field])) errors.push(`Field data.${field} is required`)
     }
 
-    for (const [field, label] of MONEY_FIELDS) {
+    for (const [field, label] of (isExel ? EXEL_MONEY_FIELDS : MONEY_FIELDS)) {
       if (!hasValue(normalized[field])) continue
       try {
         NumberFormatService.parseInteger(normalized[field], { fieldName: label })

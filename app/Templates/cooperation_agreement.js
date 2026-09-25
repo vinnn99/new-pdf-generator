@@ -41,7 +41,7 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
     suffix: 'per hari',
     fieldName: 'jam kerja per hari'
   })
-  const paymentItems = requirementPaymentItems(data, companyName)
+  const paymentItems = requirementPaymentItems(data, companyName, isExelTemplate)
 
   const directorSignature = firstRenderableImage(
     data.directorSignatureImage,
@@ -316,12 +316,12 @@ function p(text) {
   return { text, style: 'paragraph' }
 }
 
-function requirementPaymentItems(data, companyName) {
+function requirementPaymentItems(data, companyName, isExelTemplate) {
   const beforeBankTable = [
     `3.1 Dalam melakukan kemitraan ini, MITRA berhak mendapat nilai upah dasar dari ${upper(companyName)} sebesar ${NumberFormatService.formatRupiahWithWords(data.salary, 'salary/gaji')}, sesuai dengan UMP 2026, tidak termasuk pajak untuk setiap bulannya.`,
     '3.2 Para Pihak sepakat tidak mengubah pasal tersebut di atas selama Masa Waktu Perjanjian ini masih berlaku.'
   ]
-  const allowanceItems = activeAllowanceItems(data)
+  const allowanceItems = activeAllowanceItems(data, isExelTemplate)
   let nextSubNumber = 3
 
   if (allowanceItems.length) {
@@ -341,13 +341,15 @@ function requirementPaymentItems(data, companyName) {
   }
 }
 
-function activeAllowanceItems(data) {
+function activeAllowanceItems(data, isExelTemplate) {
   return [
     { label: 'Tunjangan transport', amount: allowanceAmount(data.transportAllowance, 'tunjangan transport'), fieldName: 'tunjangan transport', unit: data.transportAllowanceUnit },
     { label: 'Tunjangan makan', amount: allowanceAmount(data.mealAllowance, 'tunjangan makan'), fieldName: 'tunjangan makan', unit: data.mealAllowanceUnit },
     { label: 'Tunjangan pulsa', amount: allowanceAmount(data.phoneAllowance, 'tunjangan pulsa'), fieldName: 'tunjangan pulsa', unit: data.phoneAllowanceUnit },
     { label: 'Tunjangan biaya operasional', amount: allowanceAmount(data.operationalCostAllowance, 'tunjangan biaya operasional'), fieldName: 'tunjangan biaya operasional', unit: data.operationalCostAllowanceUnit },
-    { label: 'Tunjangan TL', amount: allowanceAmount(data.tlAllowance, 'tunjangan TL'), fieldName: 'tunjangan TL', unit: data.tlAllowanceUnit }
+    isExelTemplate
+      ? { label: 'Tunjangan Jabatan', amount: allowanceAmount(data.jabatanAllowance, 'tunjangan jabatan'), fieldName: 'tunjangan jabatan', unit: data.jabatanAllowanceUnit }
+      : { label: 'Tunjangan TL', amount: allowanceAmount(data.tlAllowance, 'tunjangan TL'), fieldName: 'tunjangan TL', unit: data.tlAllowanceUnit }
   ].filter((item) => item.amount > 0)
 }
 

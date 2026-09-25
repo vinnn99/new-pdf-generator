@@ -72,7 +72,11 @@ class BaPreviewService {
       template: normalizedTemplate,
       data: payloadData
     })
-    payloadData.companyName = payloadData.companyName || company.name
+    payloadData.companyName = payloadData.companyName || (
+      CooperationAgreementService.isExelTemplate(normalizedTemplate)
+        ? CooperationAgreementService.EXEL_DEFAULT_COMPANY_NAME
+        : company.name
+    )
     if (BaTemplateService.isBaTemplate(normalizedTemplate)) {
       payloadData.letterNo = this.buildPreviewLetterNo({
         companyCode: company.code || company.name,
@@ -80,7 +84,7 @@ class BaPreviewService {
       })
     }
     if (CooperationAgreementService.isTemplate(normalizedTemplate)) {
-      payloadData = CooperationAgreementService.normalizeData(payloadData)
+      payloadData = CooperationAgreementService.normalizeData(payloadData, normalizedTemplate)
       payloadData = PayloadDateNormalizer.normalize({
         template: normalizedTemplate,
         data: payloadData
