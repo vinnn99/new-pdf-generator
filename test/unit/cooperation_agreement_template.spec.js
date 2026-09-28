@@ -350,6 +350,15 @@ test('menghilangkan TEMA AGENCY dari pernyataan penempatan template exel', async
   assert.isFalse(plainText(placementStatement.text).includes('TEMA AGENCY'))
 })
 
+test('menghilangkan pernyataan hubungan ketenagakerjaan hanya pada template exel', async ({ assert }) => {
+  const statement = 'Pelaksanaan Perjanjian ini tidak menciptakan hubungan ketenagakerjaan'
+  const exelNodes = collectNodes(template({ ...samplePayload(), template: 'exel_cooperation_agreement' }))
+  const regularNodes = collectNodes(template(samplePayload()))
+
+  assert.isFalse(exelNodes.some((node) => plainText(node.text).includes(statement)))
+  assert.isTrue(regularNodes.some((node) => plainText(node.text).includes(statement)))
+})
+
 function samplePayload() {
   return {
     companyName: 'PT. Contoh Company Indonesia',

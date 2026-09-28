@@ -156,7 +156,9 @@ module.exports = function cooperationAgreementTemplate(payloadData = {}) {
         `Bahwa ${upper(companyName)} adalah badan hukum perseroan terbatas yang bergerak dalam bidang usaha produk dan servis, antara lain di bidang informasi teknologi atau sistem informasi yang berhubungan dengan kegiatan Agency, jasa penyedia tenaga kerja seperti Sales Promotion Girl (SPG), Sales Promotion Boy (SPB), dan penyedia pekerja alih daya (Outsourcing).`,
         'Bahwa MITRA adalah perorangan yang memberikan kemampuan pengetahuan dan jasa untuk melaksanakan kerja sama kemitraan sebagaimana dimaksud dalam Perjanjian ini.',
         principalPlacementStatement,
-        `Bahwa Para Pihak telah sepakat menjalin kerja sama kemitraan yang bermanfaat. Pelaksanaan Perjanjian ini tidak menciptakan hubungan ketenagakerjaan di antara ${upper(companyName)} dengan MITRA.`
+        ...(!isExelTemplate
+          ? [`Bahwa Para Pihak telah sepakat menjalin kerja sama kemitraan yang bermanfaat. Pelaksanaan Perjanjian ini tidak menciptakan hubungan ketenagakerjaan di antara ${upper(companyName)} dengan MITRA.`]
+          : [])
       ]),
       article('Pasal 1', 'KETENTUAN UMUM', numbered([
         'Para Pihak sepakat untuk melakukan kerja sama yang bersifat kemitraan selama masa waktu yang telah ditentukan dalam Perjanjian ini.',
